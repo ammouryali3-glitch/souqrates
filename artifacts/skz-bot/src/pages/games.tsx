@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword } from "lucide-react";
+import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -144,6 +144,47 @@ export default function Games() {
 
             <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-amber-400 tracking-wide">
               <Trophy size={13} /> Grab apples for bonus time
+              <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Perfect Slice */}
+      <Link href="/games/slice">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.98 }}
+          data-testid="card-game-slice"
+          className="relative overflow-hidden rounded-3xl border border-teal-700/50 bg-gradient-to-br from-teal-900/30 via-cyan-900/10 to-background p-5 shadow-lg shadow-teal-900/30 cursor-pointer group"
+        >
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-teal-500">
+            <Scissors size={120} strokeWidth={1.2} />
+          </div>
+
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-teal-400/80">
+                Game 4
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable
+              </span>
+            </div>
+
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Perfect Slice</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Hold to cut — release before iron barriers. Watch the decoys!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-700 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,180,160,0.55)] shrink-0">
+                <Scissors size={26} className="text-white" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-teal-400 tracking-wide">
+              <Trophy size={13} /> Decoy barriers reverse to trick you
               <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>

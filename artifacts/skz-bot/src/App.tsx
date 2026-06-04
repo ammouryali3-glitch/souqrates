@@ -15,6 +15,7 @@ import Referrals from "@/pages/referrals";
 import StackGame from "@/pages/stack-game";
 import OrbitGame from "@/pages/orbit-game";
 import KnifeGame from "@/pages/knife-game";
+import SliceGame from "@/pages/slice-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ function Router() {
             <Route path="/games/stack"><StackGame /></Route>
             <Route path="/games/orbit"><OrbitGame /></Route>
             <Route path="/games/knife"><KnifeGame /></Route>
+            <Route path="/games/slice"><SliceGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
