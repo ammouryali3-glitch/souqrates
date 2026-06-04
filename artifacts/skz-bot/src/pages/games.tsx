@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Trophy, Swords, Zap, Users } from "lucide-react";
+import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
 const activeGames = [
@@ -28,6 +29,46 @@ export default function Games() {
           <span className="text-sm font-bold text-white">12.4k Online</span>
         </div>
       </div>
+
+      {/* Featured Skill Game */}
+      <Link href="/games/stack">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.98 }}
+          data-testid="card-game-stack"
+          className="relative overflow-hidden rounded-3xl border border-accent/40 bg-gradient-to-br from-accent/30 via-primary/10 to-background p-5 shadow-lg shadow-accent/20 cursor-pointer group"
+        >
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity">
+            <Layers size={120} strokeWidth={1.2} />
+          </div>
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.25),transparent_60%)]" />
+
+          <div className="relative z-10 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-display tracking-[0.3em] text-accent uppercase">New · Skill</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable
+              </span>
+            </div>
+
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Stack & Match</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Drop blocks, chain perfect combos, build the tallest tower.</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-[0_0_25px_rgba(212,175,55,0.5)] shrink-0">
+                <Play size={26} className="text-black fill-black ml-0.5" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-primary tracking-wide">
+              <Trophy size={13} /> Earn up to 5 SKZ per block
+              <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
 
       {/* Currently Playing */}
       <div className="flex flex-col gap-3">

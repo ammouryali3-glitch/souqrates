@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import Games from "@/pages/games";
 import Shop from "@/pages/shop";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
+import StackGame from "@/pages/stack-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -32,13 +33,17 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
+  const [location] = useLocation();
+  const immersive = location === "/games/stack";
+
   return (
-    <MobileContainer>
+    <MobileContainer hideHeader={immersive}>
       <div className="flex-1 relative flex flex-col h-full overflow-hidden">
         <AnimatePresence mode="wait">
           <Switch>
             <Route path="/"><PageWrapper><Home /></PageWrapper></Route>
             <Route path="/games"><PageWrapper><Games /></PageWrapper></Route>
+            <Route path="/games/stack"><StackGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
@@ -46,7 +51,7 @@ function Router() {
           </Switch>
         </AnimatePresence>
       </div>
-      <BottomNav />
+      {!immersive && <BottomNav />}
     </MobileContainer>
   );
 }

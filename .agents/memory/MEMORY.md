@@ -1,0 +1,1 @@
+- [SKZ Bot canvas games](skz-bot-games.md) — full-screen /games/<name> routes; must stop rAF on game-over and close AudioContext on unmount.
