@@ -26,6 +26,10 @@ Skill games (e.g. Stack & Match) live as full-screen pages under `/games/<name>`
 - Drive the countdown off the rAF delta (`dt`), not setInterval. Throttle HUD timer `setState` to whole-second changes via `lastSecRef`; update the timer bar imperatively via a ref (`timerBarRef.style.width`) — never setState at 60fps.
 - Persist `balance` and `best` to localStorage; credit/deduct exactly once (guarded) and write through on every change.
 
+## Dodge-game invulnerability grace (Orbit Dash and similar)
+**Why:** code review flagged a "tap = brief invulnerability" landing grace as exploitable — rapid taps kept refreshing it for near-permanent invuln, breaking the win/economy. But removing grace entirely made blindly switching lanes/rings an instant death (game felt unfair / instant-loss on first tap).
+**How to apply:** keep a short landing grace BUT pair it with a per-tap action cooldown that is strictly LONGER than the grace (e.g. grace 0.18s, cooldown 0.32s), and gate the action on the cooldown. That bounds max invulnerability well under 100% so spamming can't be exploited, while still letting a deliberate player slip through the obstacle they just moved onto. Also keep early-difficulty forgiving (few/slow obstacles) and make any mid-game obstacle spawns avoid the player's CURRENT position, not just the spawn-time start position.
+
 ## Canvas drawing gotcha
 **Why:** `roundRect`/arcTo throws `IndexSizeError: radius is negative` when a block's width shrinks below ~0. Stacking games shrink the platform, so this WILL happen at runtime even when typecheck passes.
 **How to apply:** in any rounded-rect helper, early-return on `w<=0 || h<=0` and clamp radius with `Math.max(0, Math.min(r, w/2, h/2))`.

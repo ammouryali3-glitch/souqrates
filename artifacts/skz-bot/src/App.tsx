@@ -13,6 +13,7 @@ import Shop from "@/pages/shop";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
 import StackGame from "@/pages/stack-game";
+import OrbitGame from "@/pages/orbit-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -34,7 +35,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const [location] = useLocation();
-  const immersive = location === "/games/stack";
+  const immersive = location.startsWith("/games/") && location !== "/games";
 
   return (
     <MobileContainer hideHeader={immersive}>
@@ -44,6 +45,7 @@ function Router() {
             <Route path="/"><PageWrapper><Home /></PageWrapper></Route>
             <Route path="/games"><PageWrapper><Games /></PageWrapper></Route>
             <Route path="/games/stack"><StackGame /></Route>
+            <Route path="/games/orbit"><OrbitGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
