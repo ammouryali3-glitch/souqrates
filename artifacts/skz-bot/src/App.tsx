@@ -43,6 +43,11 @@ import EchoTapGame from "@/pages/echotap-game";
 import MergeBlitzGame from "@/pages/mergeblitz-game";
 import NumBlitzGame from "@/pages/numblitz-game";
 import CardFlipGame from "@/pages/cardflip-game";
+import DetectiveGame from "@/pages/detective-game";
+import CipherRushGame from "@/pages/cipher-rush-game";
+import HiddenPathGame from "@/pages/hidden-path-game";
+import GeniusGridGame from "@/pages/genius-grid-game";
+import TruthScaleGame from "@/pages/truth-scale-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -104,6 +109,11 @@ function Router() {
             <Route path="/games/mergeblitz"><MergeBlitzGame /></Route>
             <Route path="/games/numblitz"><NumBlitzGame /></Route>
             <Route path="/games/cardflip"><CardFlipGame /></Route>
+            <Route path="/arena/detective"><DetectiveGame /></Route>
+            <Route path="/arena/cipher"><CipherRushGame /></Route>
+            <Route path="/arena/hiddenpath"><HiddenPathGame /></Route>
+            <Route path="/arena/geniusgrid"><GeniusGridGame /></Route>
+            <Route path="/arena/truthscale"><TruthScaleGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>

@@ -30,6 +30,124 @@ export default function Games() {
         </div>
       </div>
 
+      {/* ── PRIZE POOL ARENA ── */}
+      <div>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/40 to-transparent" />
+          <span className="text-[10px] tracking-[0.4em] font-display uppercase text-yellow-400/70 flex items-center gap-1.5">
+            <Trophy size={11} className="text-yellow-400" /> Prize Pool Arena
+          </span>
+          <div className="flex-1 h-px bg-gradient-to-l from-yellow-500/40 to-transparent" />
+        </div>
+        <p className="text-xs text-white/30 text-center mb-4 font-display">Pay entry · solve fastest · win the pool</p>
+
+        {/* Detective */}
+        <Link href="/arena/detective">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+            className="relative overflow-hidden rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#140a00]/90 via-orange-950/20 to-background p-5 shadow-lg shadow-orange-900/20 cursor-pointer group mb-3">
+            <div className="absolute -right-4 -top-4 opacity-15 text-orange-400"><Crosshair size={110} strokeWidth={1.2} /></div>
+            <div className="flex items-center justify-between mb-2 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-orange-400/80">Weekly · Mystery</span>
+                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+              </div>
+              <span className="font-display font-black text-orange-400 text-sm">+18K SKZ</span>
+            </div>
+            <div className="flex items-end justify-between relative z-10">
+              <div><h2 className="font-display font-black text-2xl text-white uppercase">🔍 The Detective</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Reveal clues to solve the murder. Fewest hints + fastest time takes the weekly pool.</p></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-700 to-yellow-500 flex items-center justify-center shadow-[0_0_25px_rgba(255,159,28,0.5)] shrink-0 text-2xl">🔍</div>
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-orange-400/80 relative z-10"><Trophy size={12} />Entry: 200 SKZ · Winner takes all<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
+          </motion.div>
+        </Link>
+
+        {/* Cipher Rush */}
+        <Link href="/arena/cipher">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+            className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#00080f]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group mb-3">
+            <div className="absolute -right-4 -top-4 opacity-15 text-cyan-400"><Cpu size={110} strokeWidth={1.2} /></div>
+            <div className="flex items-center justify-between mb-2 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Daily · Code</span>
+                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+              </div>
+              <span className="font-display font-black text-cyan-400 text-sm">+9.8K SKZ</span>
+            </div>
+            <div className="flex items-end justify-between relative z-10">
+              <div><h2 className="font-display font-black text-2xl text-white uppercase">🧩 Cipher Rush</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Decode 7 encrypted words using today's cipher key. Fastest solver wins the daily pool.</p></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,212,255,0.5)] shrink-0 text-2xl">🧩</div>
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-cyan-400/80 relative z-10"><Trophy size={12} />Entry: 150 SKZ · Daily reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
+          </motion.div>
+        </Link>
+
+        {/* Hidden Path */}
+        <Link href="/arena/hiddenpath">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+            className="relative overflow-hidden rounded-3xl border border-green-500/40 bg-gradient-to-br from-[#01100a]/90 via-green-950/20 to-background p-5 shadow-lg shadow-green-900/20 cursor-pointer group mb-3">
+            <div className="absolute -right-4 -top-4 opacity-15 text-green-400"><GitBranch size={110} strokeWidth={1.2} /></div>
+            <div className="flex items-center justify-between mb-2 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-green-400/80">Weekly · Maze</span>
+                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+              </div>
+              <span className="font-display font-black text-green-400 text-sm">+15K SKZ</span>
+            </div>
+            <div className="flex items-end justify-between relative z-10">
+              <div><h2 className="font-display font-black text-2xl text-white uppercase">🗺️ Hidden Path</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Find the secret route through a 7×7 grid. Wrong taps cost +5s each. Weekly winner claims all.</p></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-700 to-emerald-400 flex items-center justify-center shadow-[0_0_25px_rgba(77,255,145,0.5)] shrink-0 text-2xl">🗺️</div>
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-green-400/80 relative z-10"><Trophy size={12} />Entry: 175 SKZ · Weekly reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
+          </motion.div>
+        </Link>
+
+        {/* Genius Grid */}
+        <Link href="/arena/geniusgrid">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+            className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-[#0a0015]/90 via-purple-950/20 to-background p-5 shadow-lg shadow-purple-900/20 cursor-pointer group mb-3">
+            <div className="absolute -right-4 -top-4 opacity-15 text-purple-400"><Sparkles size={110} strokeWidth={1.2} /></div>
+            <div className="flex items-center justify-between mb-2 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-purple-400/80">Daily · Logic</span>
+                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+              </div>
+              <span className="font-display font-black text-purple-400 text-sm">+11.8K SKZ</span>
+            </div>
+            <div className="flex items-end justify-between relative z-10">
+              <div><h2 className="font-display font-black text-2xl text-white uppercase">🧠 Genius Grid</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Fill a 4×4 logic grid — each row & column must have all 4 symbols. No errors + fastest time wins.</p></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-fuchsia-400 flex items-center justify-center shadow-[0_0_25px_rgba(204,136,255,0.5)] shrink-0 text-2xl">🧠</div>
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-purple-400/80 relative z-10"><Trophy size={12} />Entry: 180 SKZ · Daily reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
+          </motion.div>
+        </Link>
+
+        {/* Truth Scale */}
+        <Link href="/arena/truthscale">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+            className="relative overflow-hidden rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#0e0900]/90 via-yellow-950/20 to-background p-5 shadow-lg shadow-yellow-900/20 cursor-pointer group mb-3">
+            <div className="absolute -right-4 -top-4 opacity-15 text-yellow-400"><Scale size={110} strokeWidth={1.2} /></div>
+            <div className="flex items-center justify-between mb-2 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-yellow-400/80">Weekly · Chain</span>
+                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+              </div>
+              <span className="font-display font-black text-yellow-400 text-sm">+14.3K SKZ</span>
+            </div>
+            <div className="flex items-end justify-between relative z-10">
+              <div><h2 className="font-display font-black text-2xl text-white uppercase">⚖️ Truth Scale</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">8 chained logic puzzles — math, deduction, patterns. Wrong = +15s penalty. Highest score wins.</p></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-yellow-700 to-amber-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,215,0,0.5)] shrink-0 text-2xl">⚖️</div>
+            </div>
+            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-yellow-400/80 relative z-10"><Trophy size={12} />Entry: 200 SKZ · Weekly reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
+          </motion.div>
+        </Link>
+
+        <div className="flex items-center gap-3 mb-5 mt-2">
+          <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
+          <span className="text-[10px] tracking-[0.4em] font-display uppercase text-white/20">Skill Games</span>
+          <div className="flex-1 h-px bg-gradient-to-l from-white/10 to-transparent" />
+        </div>
+      </div>
+
       {/* Featured Skill Game */}
       <Link href="/games/stack">
         <motion.div
