@@ -290,15 +290,12 @@ export default function ChainSumGame() {
         {phase === "playing" && (
           <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative flex-1 flex flex-col h-full">
             <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
-              <div className="flex items-center justify-between mb-2">
-                <Link href="/games"><button className="w-8 h-8 rounded-full bg-black/50 border border-emerald-500/30 flex items-center justify-center text-emerald-300"><ArrowLeft size={15} /></button></Link>
-                <span className="text-[10px] text-emerald-400/60 font-display uppercase tracking-widest">GOAL {ticket?.target}</span>
-              </div>
-              <div className="flex flex-col gap-1 pb-3">
-                <div className="flex items-center justify-between px-0.5"><span className="text-[9px] tracking-widest text-emerald-300/60 font-display uppercase">Chains</span><span className="text-[10px] font-mono font-bold text-white/70">{scoreDisp} / {ticket?.target}</span></div>
-                <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden border border-emerald-500/20"><div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400 shadow-[0_0_8px_rgba(0,200,100,0.5)] transition-[width] duration-300" style={{width:`${ticket?Math.min(100,(scoreDisp/ticket.target)*100):0}%`}}/></div>
-                <div className="flex items-center justify-between px-0.5 mt-0.5"><span className="text-[9px] tracking-widest text-white/30 font-display uppercase">Time</span><span className={`text-[10px] font-mono font-bold tabular-nums ${timeLeft<=8?"text-red-400":"text-white/50"}`}>{timeLeft}s</span></div>
-                <div className="w-full h-1.5 rounded-full bg-white/8 overflow-hidden"><div ref={timerBarRef} className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-green-400 transition-none" style={{width:"100%"}}/></div>
+              <div className="flex items-center gap-3 mb-2">
+                <Link href="/games"><button className="w-8 h-8 shrink-0 rounded-full bg-black/50 border border-emerald-500/30 flex items-center justify-center text-emerald-300"><ArrowLeft size={15} /></button></Link>
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden border border-emerald-500/20"><div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400 shadow-[0_0_8px_rgba(0,200,100,0.5)] transition-[width] duration-300" style={{width:`${ticket?Math.min(100,(scoreDisp/ticket.target)*100):0}%`}}/></div>
+                  <div className="w-full h-1.5 rounded-full bg-white/8 overflow-hidden"><div ref={timerBarRef} className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-green-400 transition-none" style={{width:"100%"}}/></div>
+                </div>
               </div>
             </div>
             <canvas ref={canvasRef} className="flex-1 w-full h-full touch-none" style={{ touchAction: "none" }} />
