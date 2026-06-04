@@ -275,10 +275,6 @@ export default function NumSmashGame() {
             <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
               <div className="flex items-center justify-between mb-2">
                 <Link href="/games"><button className="w-8 h-8 rounded-full bg-black/50 border border-orange-500/30 flex items-center justify-center text-orange-300"><ArrowLeft size={15} /></button></Link>
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="font-display font-black text-2xl text-orange-300 leading-none drop-shadow-[0_0_10px_rgba(255,140,0,0.6)]">{scoreDisp}</span>
-                  <span className="text-[9px] text-orange-400/50 font-display uppercase tracking-widest">GOAL {ticket?.target}</span>
-                </div>
                 <div className="flex gap-0.5">{Array.from({length:3}).map((_,i)=><span key={i} className={`text-sm transition-opacity ${i<hpDisp?"opacity-100":"opacity-20"}`}>❤️</span>)}</div>
               </div>
               <div className="flex flex-col gap-1 pb-3">
