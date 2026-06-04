@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors } from "lucide-react";
+import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors, Circle, GitBranch, Music2, Cpu } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -186,6 +186,102 @@ export default function Games() {
             <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-teal-400 tracking-wide">
               <Trophy size={13} /> Decoy barriers reverse to trick you
               <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Color Switch */}
+      <Link href="/games/color">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-color"
+          className="relative overflow-hidden rounded-3xl border border-violet-700/50 bg-gradient-to-br from-violet-900/30 via-fuchsia-900/10 to-background p-5 shadow-lg shadow-violet-900/30 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-violet-500"><Circle size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-violet-400/80">Game 5</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Color Switch</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Match your ball to the ring segment. Timing is everything!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-700 to-fuchsia-400 flex items-center justify-center shadow-[0_0_25px_rgba(160,80,255,0.55)] shrink-0"><Circle size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-violet-400 tracking-wide">
+              <Trophy size={13} /> Inner ring decoy appears at score 10+<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* ZigZag Driver */}
+      <Link href="/games/zigzag">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-zigzag"
+          className="relative overflow-hidden rounded-3xl border border-cyan-700/50 bg-gradient-to-br from-cyan-900/30 via-blue-900/10 to-background p-5 shadow-lg shadow-cyan-900/30 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-500"><GitBranch size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 6</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">ZigZag Driver</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap to flip direction. Grab coins at dangerous corners!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,180,240,0.55)] shrink-0"><GitBranch size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
+              <Trophy size={13} /> 3D isometric low-poly track<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Piano Tiles Rush */}
+      <Link href="/games/piano">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-piano"
+          className="relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-white/5 via-white/[0.03] to-background p-5 shadow-lg cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-15 group-hover:opacity-25 transition-opacity text-white"><Music2 size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-white/50">Game 7</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Piano Rush</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap black tiles as they fall. Hold long tiles — miss one and it's over!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-white/20 to-white/40 flex items-center justify-center shadow-[0_0_25px_rgba(255,255,255,0.25)] shrink-0"><Music2 size={26} className="text-black" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-white/60 tracking-wide">
+              <Trophy size={13} /> 4 lanes · hold tiles · speed surge<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Whack-A-Cyber */}
+      <Link href="/games/whack">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-whack"
+          className="relative overflow-hidden rounded-3xl border border-green-700/40 bg-gradient-to-br from-[#020d06]/80 via-green-900/10 to-background p-5 shadow-lg shadow-green-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-green-500"><Cpu size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-green-400/80 font-mono">Game 8</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-green-400 tracking-wide uppercase leading-none">Whack_Cyber</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Eliminate cyber creatures. Avoid bombs. Golden ones give ×2!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-900 to-green-500 flex items-center justify-center shadow-[0_0_25px_rgba(0,255,136,0.4)] shrink-0"><Cpu size={26} className="text-black" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-mono font-bold text-green-400 tracking-wide">
+              <Trophy size={13} /> Hacker terminal UI · freeze bonus<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
         </motion.div>
