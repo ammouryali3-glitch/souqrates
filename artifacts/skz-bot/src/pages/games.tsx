@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors, Circle, GitBranch, Music2, Cpu, Sparkles, Rocket, Grid2x2, ArrowUp } from "lucide-react";
+import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors, Circle, GitBranch, Music2, Cpu, Sparkles, Rocket, Grid2x2, ArrowUp, Crosshair, Hammer, Link2, Scale, BoltIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -378,6 +378,133 @@ export default function Games() {
             </div>
             <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-green-400 tracking-wide">
               <Trophy size={13} /> 5 platform types · enemies · spring boost<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Math Games Section */}
+      <div className="flex items-center gap-3 mt-4 mb-1">
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+        <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/60">Math Games</span>
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+      </div>
+
+      {/* Calc Blaster */}
+      <Link href="/games/calcblast">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-calcblast"
+          className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#001520]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-400"><Crosshair size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 13 · Math</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Calc Blaster</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Equations fall from above. Tap the right answer to blast them with a laser before they hit the ground!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,200,255,0.5)] shrink-0"><Crosshair size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
+              <Trophy size={13} /> 4 operations · 3 HP · speed ramp<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Number Smash */}
+      <Link href="/games/numsmash">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-numsmash"
+          className="relative overflow-hidden rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#1a0800]/90 via-orange-950/20 to-background p-5 shadow-lg shadow-orange-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-orange-400"><Hammer size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-orange-400/80">Game 14 · Math</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Number Smash</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Numbers pop up in a grid. Follow the challenge: Smash Primes! Evens! Squares! Tap the wrong one = −HP.</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-700 to-red-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,100,0,0.5)] shrink-0"><Hammer size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-orange-400 tracking-wide">
+              <Trophy size={13} /> 5 challenge types · rotating rules · 3 HP<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Sum Chain */}
+      <Link href="/games/chainsum">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-chainsum"
+          className="relative overflow-hidden rounded-3xl border border-emerald-500/40 bg-gradient-to-br from-[#001a08]/90 via-emerald-950/20 to-background p-5 shadow-lg shadow-emerald-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-emerald-400"><Link2 size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-emerald-400/80">Game 15 · Math</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Sum Chain</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Draw a glowing path through adjacent numbers that add up to the target sum. Race the clock!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-700 to-teal-400 flex items-center justify-center shadow-[0_0_25px_rgba(46,204,113,0.5)] shrink-0"><Link2 size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-emerald-400 tracking-wide">
+              <Trophy size={13} /> 5×5 grid · path drawing · combo clear<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Fraction Sort */}
+      <Link href="/games/fracsort">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-fracsort"
+          className="relative overflow-hidden rounded-3xl border border-violet-500/40 bg-gradient-to-br from-[#0e0020]/90 via-violet-950/20 to-background p-5 shadow-lg shadow-violet-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-violet-400"><Scale size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-violet-400/80">Game 16 · Math</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Fraction Sort</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Is the fraction less than ½ or greater than ½? Tap the correct side before you run out of HP!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-700 to-purple-400 flex items-center justify-center shadow-[0_0_25px_rgba(155,89,182,0.5)] shrink-0"><Scale size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-violet-400 tracking-wide">
+              <Trophy size={13} /> 20 unique fractions · 3 HP · visual card<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Speed Math */}
+      <Link href="/games/speedmath">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-speedmath"
+          className="relative overflow-hidden rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#100800]/90 via-yellow-950/20 to-background p-5 shadow-lg shadow-yellow-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-yellow-400"><Zap size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-yellow-400/80">Game 17 · Math</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Speed Math</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Equation flashes for 0.9s — then 4 choices appear. Answer fast for speed bonus! Build combos for ×5 multiplier!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-yellow-700 to-amber-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,200,0,0.5)] shrink-0"><Zap size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-yellow-400 tracking-wide">
+              <Trophy size={13} /> Speed bonus · ×5 combo · 4 operations<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
         </motion.div>

@@ -24,6 +24,11 @@ import BubbleGame from "@/pages/bubble-game";
 import ShooterGame from "@/pages/shooter-game";
 import BreakoutGame from "@/pages/breakout-game";
 import JumperGame from "@/pages/jumper-game";
+import CalcBlastGame from "@/pages/calc-blast-game";
+import NumSmashGame from "@/pages/num-smash-game";
+import ChainSumGame from "@/pages/chain-sum-game";
+import FracSortGame from "@/pages/frac-sort-game";
+import SpeedMathGame from "@/pages/speed-math-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -66,6 +71,11 @@ function Router() {
             <Route path="/games/striker"><ShooterGame /></Route>
             <Route path="/games/breakout"><BreakoutGame /></Route>
             <Route path="/games/hopper"><JumperGame /></Route>
+            <Route path="/games/calcblast"><CalcBlastGame /></Route>
+            <Route path="/games/numsmash"><NumSmashGame /></Route>
+            <Route path="/games/chainsum"><ChainSumGame /></Route>
+            <Route path="/games/fracsort"><FracSortGame /></Route>
+            <Route path="/games/speedmath"><SpeedMathGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
