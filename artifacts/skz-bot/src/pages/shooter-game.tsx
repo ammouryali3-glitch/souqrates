@@ -1,0 +1,631 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Link } from "wouter";
+import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins, Zap } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+type Phase = "select" | "playing" | "won" | "lost";
+interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
+
+const BEST_KEY = "skz_shooter_best";
+const BALANCE_KEY = "skz_balance";
+const START_BALANCE = 1000;
+const TWO_PI = Math.PI * 2;
+const PLAYER_SPEED = 320;
+const BULLET_SPEED = 560;
+const FIRE_RATE = 0.14; // seconds between bullets
+
+const TICKETS: Ticket[] = [
+  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 20, time: 40 },
+  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 35, time: 38 },
+  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 55, time: 36 },
+  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 80, time: 34 },
+  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 120, time: 32 },
+];
+
+interface Enemy { x: number; y: number; vx: number; vy: number; type: number; hp: number; maxHp: number; r: number; phase: number; dead?: boolean; }
+interface Bullet { x: number; y: number; vx: number; vy: number; power: number; }
+interface EnemyBullet { x: number; y: number; vx: number; vy: number; }
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; r: number; }
+interface PowerUp { x: number; y: number; vy: number; type: "triple" | "shield" | "bomb"; life: number; }
+interface Star { x: number; y: number; r: number; speed: number; alpha: number; phase: number; }
+
+interface GameState {
+  playerX: number; playerY: number; playerVX: number;
+  hp: number; maxHp: number; shieldT: number;
+  bullets: Bullet[]; enemyBullets: EnemyBullet[];
+  enemies: Enemy[]; powerUps: PowerUp[];
+  particles: Particle[]; stars: Star[];
+  kills: number; target: number; timeLeft: number; timeMax: number;
+  running: boolean; lastTime: number; flashT: number;
+  fireTimer: number; tripleT: number;
+  wave: number; waveT: number; spawnTimer: number;
+  dragX: number; dragging: boolean;
+  shakeX: number; shakeY: number; shakeT: number;
+  bossActive: boolean; bossX: number; bossY: number; bossVX: number; bossHp: number; bossMaxHp: number; bossPhase: number; bossFireT: number;
+}
+
+class AudioEngine {
+  private ctx: AudioContext | null = null; private master: GainNode | null = null; muted = false;
+  private ensure() {
+    if (!this.ctx) { const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext; this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.gain.value = 0.4; this.master.connect(this.ctx.destination); }
+    if (this.ctx.state === "suspended") void this.ctx.resume(); return this.ctx;
+  }
+  private tone(f: number, d: number, t: OscillatorType, v: number, delay = 0, fEnd?: number) {
+    if (this.muted) return; const ctx = this.ensure(); if (!ctx || !this.master) return;
+    const t0 = ctx.currentTime + delay; const osc = ctx.createOscillator(); const g = ctx.createGain();
+    osc.type = t; osc.frequency.setValueAtTime(f, t0); if (fEnd) osc.frequency.exponentialRampToValueAtTime(fEnd, t0 + d);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    osc.connect(g); g.connect(this.master); osc.start(t0); osc.stop(t0 + d + 0.02);
+  }
+  private noise(d: number, v: number, cf = 3000) {
+    if (this.muted) return; const ctx = this.ensure(); if (!ctx || !this.master) return;
+    const t0 = ctx.currentTime; const buf = ctx.createBuffer(1, ctx.sampleRate * d, ctx.sampleRate);
+    const da = buf.getChannelData(0); for (let i = 0; i < da.length; i++) da[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf; const g2 = ctx.createGain(); g2.gain.setValueAtTime(v, t0); g2.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    const flt = ctx.createBiquadFilter(); flt.type = "lowpass"; flt.frequency.value = cf;
+    src.connect(flt); flt.connect(g2); g2.connect(this.master); src.start(t0);
+  }
+  shoot() { this.tone(880, 0.06, "square", 0.18, 0, 440); }
+  explode(big: boolean) { this.noise(big ? 0.5 : 0.25, big ? 0.7 : 0.4, big ? 1500 : 3000); if (big) this.tone(80, 0.4, "sawtooth", 0.4); }
+  hit() { this.noise(0.08, 0.3, 5000); this.tone(220, 0.06, "square", 0.2); }
+  powerUp() { [523, 659, 784].forEach((f, i) => this.tone(f, 0.15, "triangle", 0.3, i * 0.05)); }
+  shield() { this.tone(440, 0.2, "sine", 0.25, 0, 660); }
+  bomb() { this.noise(0.4, 0.8, 800); this.tone(60, 0.4, "sawtooth", 0.5); }
+  start() { [330, 440, 554, 659].forEach((f, i) => this.tone(f, 0.18, "triangle", 0.3, i * 0.06)); }
+  goal() { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.24, "triangle", 0.38, i * 0.07)); }
+  gameOver() { [261, 220, 196, 165].forEach((f, i) => this.tone(f, 0.28, "sawtooth", 0.28, i * 0.11)); }
+  tick(u = false) { this.tone(u ? 900 : 650, 0.07, "square", u ? 0.22 : 0.13); }
+  dispose() { if (this.ctx) { void this.ctx.close(); this.ctx = null; this.master = null; } }
+}
+
+// Enemy types: 0=basic, 1=zigzag, 2=tank, 3=diver
+const ENEMY_COLORS = ["#e74c3c","#f39c12","#9b59b6","#1abc9c"];
+const ENEMY_GLOW = ["rgba(231,76,60,0.7)","rgba(243,156,18,0.7)","rgba(155,89,182,0.7)","rgba(26,188,156,0.7)"];
+
+function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, shield: boolean, t: number) {
+  ctx.save(); ctx.translate(x, y);
+  // Engine glow
+  const enginePulse = Math.sin(t * 15) * 0.3 + 0.7;
+  for (let e = -1; e <= 1; e += 2) {
+    const eg = ctx.createRadialGradient(e * 8, 18, 0, e * 8, 18, 14);
+    eg.addColorStop(0, `rgba(100,200,255,${enginePulse * 0.9})`);
+    eg.addColorStop(0.4, `rgba(0,100,255,${enginePulse * 0.5})`);
+    eg.addColorStop(1, "rgba(0,0,150,0)");
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(e * 8, 18, 14, 0, TWO_PI); ctx.fill();
+  }
+  // Exhaust trail
+  for (let i = 0; i < 6; i++) {
+    const ty = 14 + i * 8 + Math.sin(t * 12 + i) * 3;
+    const ta = (1 - i / 6) * 0.6;
+    const tw = (1 - i / 6) * 8;
+    ctx.fillStyle = `rgba(100,180,255,${ta})`;
+    ctx.beginPath(); ctx.ellipse(0, ty, tw, 4, 0, 0, TWO_PI); ctx.fill();
+  }
+  // Main ship body
+  ctx.shadowColor = "rgba(100,200,255,0.8)"; ctx.shadowBlur = 18;
+  // Body gradient
+  const bodyG = ctx.createLinearGradient(-18, -22, 18, 22);
+  bodyG.addColorStop(0, "#b0d4ff"); bodyG.addColorStop(0.4, "#4a9fff"); bodyG.addColorStop(1, "#1a5fa0");
+  ctx.fillStyle = bodyG;
+  ctx.beginPath();
+  ctx.moveTo(0, -24); ctx.lineTo(12, -5); ctx.lineTo(18, 8);
+  ctx.lineTo(10, 16); ctx.lineTo(-10, 16); ctx.lineTo(-18, 8);
+  ctx.lineTo(-12, -5); ctx.closePath(); ctx.fill();
+  // Cockpit
+  ctx.fillStyle = "rgba(200,240,255,0.85)";
+  ctx.beginPath(); ctx.ellipse(0, -8, 7, 10, 0, 0, TWO_PI); ctx.fill();
+  // Wings
+  const wingG = ctx.createLinearGradient(-22, 0, 22, 0);
+  wingG.addColorStop(0, "#1a5fa0"); wingG.addColorStop(0.5, "#4a9fff"); wingG.addColorStop(1, "#1a5fa0");
+  ctx.fillStyle = wingG;
+  ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(-24, 14); ctx.lineTo(-16, 14); ctx.lineTo(-10, 8); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(24, 14); ctx.lineTo(16, 14); ctx.lineTo(10, 8); ctx.closePath(); ctx.fill();
+  // Cannon tips
+  ctx.fillStyle = "#7ec8ff"; ctx.shadowBlur = 10;
+  ctx.fillRect(-14, -4, 5, 14); ctx.fillRect(9, -4, 5, 14);
+  ctx.shadowBlur = 0;
+  // Shield
+  if (shield) {
+    const sf = Math.sin(t * 6) * 0.15 + 0.85;
+    const sg = ctx.createRadialGradient(0, 0, 20, 0, 0, 38 * sf);
+    sg.addColorStop(0, "rgba(100,200,255,0)"); sg.addColorStop(0.7, "rgba(100,200,255,0.15)"); sg.addColorStop(1, "rgba(100,200,255,0.4)");
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, 38 * sf, 0, TWO_PI); ctx.fill();
+    ctx.strokeStyle = `rgba(100,220,255,${0.5 + Math.sin(t * 6) * 0.3})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 36 * sf, 0, TWO_PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, t: number) {
+  ctx.save(); ctx.translate(e.x, e.y);
+  const pulse = Math.sin(t * 5 + e.phase) * 0.1 + 0.9;
+  ctx.shadowColor = ENEMY_GLOW[e.type]; ctx.shadowBlur = 12 + Math.sin(t * 4 + e.phase) * 5;
+  ctx.rotate(Math.PI); // facing down
+  if (e.type === 0) {
+    // UFO / Saucer
+    const g = ctx.createLinearGradient(-e.r, -e.r * 0.4, e.r, e.r * 0.4);
+    g.addColorStop(0, "#cc2222"); g.addColorStop(0.5, "#ff4444"); g.addColorStop(1, "#881111");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, e.r * pulse, e.r * 0.45 * pulse, 0, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = "rgba(255,150,150,0.5)"; ctx.beginPath(); ctx.ellipse(0, -e.r * 0.15, e.r * 0.45, e.r * 0.35, 0, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = "rgba(255,220,220,0.7)"; ctx.beginPath(); ctx.ellipse(0, -e.r * 0.25, e.r * 0.2, e.r * 0.15, 0, 0, TWO_PI); ctx.fill();
+    // Lights
+    for (let l = 0; l < 5; l++) {
+      const la = (l / 5) * TWO_PI + t * 2;
+      ctx.fillStyle = l % 2 === 0 ? "#ffee00" : "#ff4400";
+      ctx.beginPath(); ctx.arc(Math.cos(la) * e.r * 0.65, Math.sin(la) * e.r * 0.2, 2.5, 0, TWO_PI); ctx.fill();
+    }
+  } else if (e.type === 1) {
+    // Zigzag dart shape
+    const g = ctx.createLinearGradient(0, -e.r, 0, e.r);
+    g.addColorStop(0, "#ff9a00"); g.addColorStop(0.5, "#ffcc44"); g.addColorStop(1, "#cc6600");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -e.r); ctx.lineTo(e.r * 0.7, e.r * 0.3); ctx.lineTo(e.r * 0.3, e.r * 0.1);
+    ctx.lineTo(e.r * 0.3, e.r); ctx.lineTo(-e.r * 0.3, e.r); ctx.lineTo(-e.r * 0.3, e.r * 0.1);
+    ctx.lineTo(-e.r * 0.7, e.r * 0.3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,240,150,0.6)"; ctx.beginPath(); ctx.ellipse(0, 0, e.r * 0.2, e.r * 0.3, 0, 0, TWO_PI); ctx.fill();
+  } else if (e.type === 2) {
+    // Tank - heavy hexagon
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, e.r);
+    g.addColorStop(0, "#bb88ee"); g.addColorStop(0.6, "#7733bb"); g.addColorStop(1, "#441188");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    for (let s = 0; s < 6; s++) { const a = (s / 6) * TWO_PI - Math.PI / 6; const pr = e.r * pulse; if (s === 0) ctx.moveTo(Math.cos(a) * pr, Math.sin(a) * pr); else ctx.lineTo(Math.cos(a) * pr, Math.sin(a) * pr); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(200,150,255,0.6)"; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let s = 0; s < 6; s++) { const a = (s / 6) * TWO_PI - Math.PI / 6; const pr = e.r * 0.7; if (s === 0) ctx.moveTo(Math.cos(a) * pr, Math.sin(a) * pr); else ctx.lineTo(Math.cos(a) * pr, Math.sin(a) * pr); }
+    ctx.closePath(); ctx.stroke();
+    // HP indicator
+    for (let h = 0; h < e.maxHp; h++) {
+      ctx.fillStyle = h < e.hp ? "#bb88ee" : "rgba(100,50,150,0.3)";
+      ctx.beginPath(); ctx.arc(-e.maxHp * 4 + h * 9 + 4, e.r + 6, 3.5, 0, TWO_PI); ctx.fill();
+    }
+  } else {
+    // Diver - sleek triangle
+    const g = ctx.createLinearGradient(0, -e.r, 0, e.r);
+    g.addColorStop(0, "#22eebb"); g.addColorStop(0.5, "#00cc99"); g.addColorStop(1, "#006655");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -e.r); ctx.lineTo(e.r * 0.55, e.r); ctx.lineTo(-e.r * 0.55, e.r); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(150,255,230,0.6)"; ctx.beginPath(); ctx.ellipse(0, e.r * 0.2, e.r * 0.25, e.r * 0.4, 0, 0, TWO_PI); ctx.fill();
+  }
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function spawnWaveEnemies(g: GameState, w: number, wave: number) {
+  const count = 3 + wave * 2;
+  const types = wave <= 1 ? [0] : wave <= 3 ? [0, 1] : wave <= 5 ? [0, 1, 3] : [0, 1, 2, 3];
+  for (let i = 0; i < count; i++) {
+    const type = types[Math.floor(Math.random() * types.length)];
+    const hp = type === 2 ? 3 : 1;
+    g.enemies.push({
+      x: 30 + Math.random() * (w - 60), y: -30 - i * 55,
+      vx: type === 1 ? (Math.random() < 0.5 ? -1 : 1) * (80 + Math.random() * 80) : 0,
+      vy: type === 3 ? 0 : 60 + wave * 10,
+      type, hp, maxHp: hp, r: type === 2 ? 22 : 16,
+      phase: Math.random() * TWO_PI
+    });
+  }
+}
+
+function spawnParticles(g: GameState, x: number, y: number, color: string, count: number, big: boolean) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * TWO_PI; const spd = (big ? 150 : 80) + Math.random() * 200;
+    g.particles.push({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: big ? 0.9 : 0.6, max: big ? 0.9 : 0.6, color, r: (big ? 4 : 2) + Math.random() * 5 });
+  }
+}
+
+export default function ShooterGame() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const gameRef = useRef<GameState | null>(null);
+  const rafRef = useRef(0);
+  const audioRef = useRef(new AudioEngine());
+  const sizeRef = useRef({ w: 0, h: 0, dpr: 1 });
+  const lastSecRef = useRef(0);
+  const timerBarRef = useRef<HTMLDivElement>(null);
+  const startingRef = useRef(false);
+  const timeElapsedRef = useRef(0);
+
+  const [phase, setPhase] = useState<Phase>("select");
+  const [score, setScore] = useState(0);
+  const [best, setBest] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [balance, setBalance] = useState(START_BALANCE);
+  const [shieldDisplay, setShieldDisplay] = useState(false);
+  const [tripleDisplay, setTripleDisplay] = useState(false);
+  const target = ticket?.target ?? 0;
+
+  useEffect(() => {
+    setBest(Number(localStorage.getItem(BEST_KEY) || "0"));
+    const b = localStorage.getItem(BALANCE_KEY); setBalance(b === null ? START_BALANCE : Number(b));
+  }, []);
+
+  const resize = useCallback(() => {
+    const canvas = canvasRef.current; const wrap = wrapRef.current; if (!canvas || !wrap) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = wrap.clientWidth * dpr; canvas.height = wrap.clientHeight * dpr;
+    canvas.style.width = `${wrap.clientWidth}px`; canvas.style.height = `${wrap.clientHeight}px`;
+    sizeRef.current = { w: wrap.clientWidth, h: wrap.clientHeight, dpr };
+  }, []);
+
+  useEffect(() => { resize(); const ro = new ResizeObserver(resize); if (wrapRef.current) ro.observe(wrapRef.current); return () => ro.disconnect(); }, [resize]);
+
+  const ticketRef = useRef<Ticket | null>(null);
+  useEffect(() => { ticketRef.current = ticket; }, [ticket]);
+
+  const finishGame = useCallback((finalScore: number, outcome: "win" | "dead" | "time") => {
+    const g = gameRef.current; if (!g || !g.running) return; g.running = false; startingRef.current = false;
+    setBest(prev => { const n = Math.max(prev, finalScore); localStorage.setItem(BEST_KEY, String(n)); return n; });
+    if (outcome === "win") { audioRef.current.goal(); const t = ticketRef.current; if (t) setBalance(prev => { const n = prev + t.prize; localStorage.setItem(BALANCE_KEY, String(n)); return n; }); setPhase("won"); }
+    else { audioRef.current.gameOver(); setPhase("lost"); }
+  }, []);
+
+  const endRef = useRef(finishGame);
+  useEffect(() => { endRef.current = finishGame; }, [finishGame]);
+
+  const loop = useCallback((time: number) => {
+    const g = gameRef.current; const canvas = canvasRef.current; if (!g || !canvas) return;
+    const ctx = canvas.getContext("2d"); if (!ctx) return;
+    const { w, h, dpr } = sizeRef.current;
+    if (!g.lastTime) g.lastTime = time;
+    const dt = Math.min((time - g.lastTime) / 1000, 0.05); g.lastTime = time;
+    timeElapsedRef.current += dt;
+    const t = timeElapsedRef.current;
+
+    if (g.running) {
+      g.timeLeft = Math.max(0, g.timeLeft - dt);
+      const sec = Math.ceil(g.timeLeft);
+      if (sec !== lastSecRef.current) { lastSecRef.current = sec; setTimeLeft(sec); if (sec <= 8 && sec > 0) audioRef.current.tick(sec <= 4); }
+      const bar = timerBarRef.current; const ratio = g.timeLeft / g.timeMax;
+      if (bar) { bar.style.width = `${ratio * 100}%`; bar.style.backgroundImage = ratio <= 0.25 ? "linear-gradient(to right,#e74c3c,#e67e22)" : "linear-gradient(to right,#3498db,#9b59b6)"; }
+      if (g.timeLeft <= 0) { endRef.current(g.kills, "time"); return; }
+    }
+
+    g.flashT = Math.max(0, g.flashT - dt);
+    if (g.shakeT > 0) { g.shakeT -= dt; g.shakeX = (Math.random() - 0.5) * 8 * (g.shakeT / 0.3); g.shakeY = (Math.random() - 0.5) * 8 * (g.shakeT / 0.3); } else { g.shakeX = 0; g.shakeY = 0; }
+    if (g.tripleT > 0) { g.tripleT -= dt; if (g.tripleT <= 0) setTripleDisplay(false); }
+    if (g.shieldT > 0) { g.shieldT -= dt; if (g.shieldT <= 0) setShieldDisplay(false); }
+
+    if (g.running) {
+      // Player movement
+      if (g.dragging) {
+        const targetX = Math.max(24, Math.min(w - 24, g.dragX));
+        g.playerX += (targetX - g.playerX) * Math.min(1, dt * 10);
+      }
+      g.playerY = h - 80;
+
+      // Auto fire
+      g.fireTimer -= dt;
+      if (g.fireTimer <= 0) {
+        g.fireTimer = FIRE_RATE;
+        const bx = g.playerX; const by = g.playerY - 20;
+        g.bullets.push({ x: bx, y: by, vx: 0, vy: -BULLET_SPEED, power: 1 });
+        if (g.tripleT > 0) {
+          g.bullets.push({ x: bx - 14, y: by + 5, vx: -60, vy: -BULLET_SPEED, power: 1 });
+          g.bullets.push({ x: bx + 14, y: by + 5, vx: 60, vy: -BULLET_SPEED, power: 1 });
+        }
+        audioRef.current.shoot();
+      }
+
+      // Move bullets
+      for (const b of g.bullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
+      g.bullets = g.bullets.filter(b => b.y > -20 && b.x > -20 && b.x < w + 20);
+
+      // Move enemy bullets
+      for (const eb of g.enemyBullets) { eb.x += eb.vx * dt; eb.y += eb.vy * dt; }
+      g.enemyBullets = g.enemyBullets.filter(eb => eb.y < h + 20 && eb.x > -20 && eb.x < w + 20);
+
+      // Enemy bullet hit player
+      for (const eb of g.enemyBullets) {
+        const dx = g.playerX - eb.x; const dy = g.playerY - eb.y;
+        if (Math.hypot(dx, dy) < 22) {
+          if (g.shieldT > 0) {
+            audioRef.current.shield();
+            // Remove bullet
+            (eb as EnemyBullet & { dead?: boolean }).dead = true;
+          } else {
+            audioRef.current.hit(); g.flashT = 0.4; g.shakeT = 0.3;
+            g.hp--; (eb as EnemyBullet & { dead?: boolean }).dead = true;
+            if (g.hp <= 0) { endRef.current(g.kills, "dead"); return; }
+          }
+        }
+      }
+      g.enemyBullets = g.enemyBullets.filter(eb => !(eb as EnemyBullet & { dead?: boolean }).dead);
+
+      // Power-up logic
+      g.waveT -= dt;
+      if (g.waveT <= 0 && g.enemies.length === 0) { g.wave++; g.waveT = 3; spawnWaveEnemies(g, w, g.wave); }
+
+      // Move enemies
+      for (const e of g.enemies) {
+        e.x += e.vx * dt; e.y += e.vy * dt; e.phase += dt;
+        if (e.type === 1) { if (e.x < 20) e.vx = Math.abs(e.vx); if (e.x > w - 20) e.vx = -Math.abs(e.vx); }
+        if (e.type === 3) {
+          // Diver: shoot toward player then fly past
+          if (e.vy === 0) { const a = Math.atan2(g.playerY - e.y, g.playerX - e.x); e.vx = Math.cos(a) * 180; e.vy = Math.sin(a) * 180 + 40; }
+        }
+        // Enemy shooting
+        if (e.type !== 3 && Math.random() < 0.008 + g.wave * 0.002) {
+          const a = Math.atan2(g.playerY - e.y, g.playerX - e.x);
+          const spd = 200 + g.wave * 20;
+          g.enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd });
+        }
+        // Player collision
+        if (Math.hypot(g.playerX - e.x, g.playerY - e.y) < 28 + e.r * 0.6) {
+          if (g.shieldT > 0) { e.dead = true; audioRef.current.shield(); }
+          else { g.hp--; e.dead = true; g.flashT = 0.5; g.shakeT = 0.4; audioRef.current.hit(); if (g.hp <= 0) { endRef.current(g.kills, "dead"); return; } }
+        }
+      }
+
+      // Bullet-enemy collision
+      for (const b of g.bullets) {
+        for (const e of g.enemies) {
+          if (e.dead) continue;
+          if (Math.hypot(b.x - e.x, b.y - e.y) < e.r + 6) {
+            e.hp -= b.power;
+            (b as Bullet & { dead?: boolean }).dead = true;
+            if (e.hp <= 0) {
+              e.dead = true; g.kills++; setScore(g.kills);
+              spawnParticles(g, e.x, e.y, ENEMY_COLORS[e.type], 15, e.type === 2);
+              audioRef.current.explode(e.type === 2);
+              g.shakeT = e.type === 2 ? 0.3 : 0.12;
+              // Chance to drop powerup
+              if (Math.random() < 0.2) {
+                const types: PowerUp["type"][] = ["triple", "shield", "bomb"];
+                g.powerUps.push({ x: e.x, y: e.y, vy: 80, type: types[Math.floor(Math.random() * types.length)], life: 6 });
+              }
+              if (g.kills >= g.target) { endRef.current(g.kills, "win"); return; }
+            }
+            break;
+          }
+        }
+      }
+      g.bullets = g.bullets.filter(b => !(b as Bullet & { dead?: boolean }).dead);
+      g.enemies = g.enemies.filter(e => !e.dead && e.y < h + 40);
+
+      // Power-ups
+      for (const pu of g.powerUps) {
+        pu.y += pu.vy * dt; pu.life -= dt;
+        if (Math.hypot(g.playerX - pu.x, g.playerY - pu.y) < 32) {
+          pu.life = -1;
+          if (pu.type === "triple") { g.tripleT = 8; audioRef.current.powerUp(); setTripleDisplay(true); }
+          else if (pu.type === "shield") { g.shieldT = 6; audioRef.current.powerUp(); setShieldDisplay(true); }
+          else if (pu.type === "bomb") {
+            audioRef.current.bomb();
+            g.enemies.forEach(e => { spawnParticles(g, e.x, e.y, ENEMY_COLORS[e.type], 10, false); e.dead = true; g.kills++; setScore(g.kills); });
+            g.enemies = []; g.shakeT = 0.5;
+            if (g.kills >= g.target) { endRef.current(g.kills, "win"); return; }
+          }
+        }
+      }
+      g.powerUps = g.powerUps.filter(pu => pu.life > 0 && pu.y < h + 30);
+    }
+
+    // Particles
+    for (const p of g.particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 100 * dt; }
+    g.particles = g.particles.filter(p => p.life > 0);
+
+    // ---- Render ----
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.save(); ctx.translate(g.shakeX, g.shakeY);
+
+    // Space background
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, "#000010"); bg.addColorStop(0.5, "#050020"); bg.addColorStop(1, "#000510");
+    ctx.fillStyle = bg; ctx.fillRect(-4, -4, w + 8, h + 8);
+
+    // Stars
+    for (const star of g.stars) {
+      star.y += star.speed * dt;
+      if (star.y > h + 2) { star.y = -2; star.x = Math.random() * w; }
+      const sa = star.alpha + Math.sin(t * 2 + star.phase * 10) * 0.2;
+      ctx.fillStyle = `rgba(255,255,255,${Math.max(0, Math.min(1, sa))})`;
+      ctx.beginPath(); ctx.arc(star.x, star.y, star.r, 0, TWO_PI); ctx.fill();
+    }
+
+    // Nebula clouds
+    for (let n = 0; n < 3; n++) {
+      const nx = ((n * 400 + t * 15) % (w + 200)) - 100;
+      const ny = n * (h / 3) + 100;
+      const ng = ctx.createRadialGradient(nx, ny, 10, nx, ny, 120);
+      ng.addColorStop(0, `rgba(${n === 0 ? "100,0,200" : n === 1 ? "0,50,150" : "0,100,100"},0.07)`);
+      ng.addColorStop(1, "rgba(0,0,50,0)");
+      ctx.fillStyle = ng; ctx.beginPath(); ctx.arc(nx, ny, 120, 0, TWO_PI); ctx.fill();
+    }
+
+    // Enemy bullets
+    for (const eb of g.enemyBullets) {
+      const eg = ctx.createRadialGradient(eb.x, eb.y, 0, eb.x, eb.y, 6);
+      eg.addColorStop(0, "#ffee00"); eg.addColorStop(0.4, "#ff8800"); eg.addColorStop(1, "rgba(255,100,0,0)");
+      ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(eb.x, eb.y, 6, 0, TWO_PI); ctx.fill();
+    }
+
+    // Enemies
+    for (const e of g.enemies) drawEnemy(ctx, e, t);
+
+    // Power-ups
+    for (const pu of g.powerUps) {
+      ctx.save(); ctx.translate(pu.x, pu.y);
+      const pulse = Math.sin(t * 4) * 0.15 + 0.85;
+      const puColor = pu.type === "triple" ? "#2ecc71" : pu.type === "shield" ? "#3498db" : "#e74c3c";
+      ctx.shadowColor = puColor; ctx.shadowBlur = 15;
+      ctx.fillStyle = `rgba(0,0,0,0.5)`; ctx.beginPath(); ctx.arc(0, 0, 14 * pulse, 0, TWO_PI); ctx.fill();
+      ctx.strokeStyle = puColor; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, 14 * pulse, 0, TWO_PI); ctx.stroke();
+      ctx.fillStyle = puColor; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(pu.type === "triple" ? "3" : pu.type === "shield" ? "🛡" : "💥", 0, 1);
+      ctx.shadowBlur = 0; ctx.restore();
+    }
+
+    // Bullets
+    for (const b of g.bullets) {
+      const bg2 = ctx.createLinearGradient(b.x, b.y, b.x, b.y - 18);
+      bg2.addColorStop(0, "rgba(100,220,255,0)"); bg2.addColorStop(0.4, "#7ec8ff"); bg2.addColorStop(1, "#ffffff");
+      ctx.fillStyle = bg2; ctx.shadowColor = "#7ec8ff"; ctx.shadowBlur = 10;
+      ctx.fillRect(b.x - 2.5, b.y - 18, 5, 18); ctx.shadowBlur = 0;
+    }
+
+    // Particles
+    for (const p of g.particles) {
+      const a = Math.max(0, p.life / p.max);
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TWO_PI); ctx.fill(); ctx.restore();
+    }
+
+    // Player
+    drawPlayer(ctx, g.playerX, g.playerY, g.shieldT > 0, t);
+
+    // HP bar
+    const hpW = 80; const hpX = 14; const hpY = h - 28;
+    ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.beginPath(); ctx.roundRect(hpX, hpY, hpW, 10, 5); ctx.fill();
+    const hpRatio = g.hp / g.maxHp;
+    const hpGrad = ctx.createLinearGradient(hpX, 0, hpX + hpW, 0);
+    hpGrad.addColorStop(0, "#e74c3c"); hpGrad.addColorStop(0.5, "#f39c12"); hpGrad.addColorStop(1, "#2ecc71");
+    ctx.fillStyle = hpGrad; ctx.beginPath(); ctx.roundRect(hpX, hpY, hpW * hpRatio, 10, 5); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(hpX, hpY, hpW, 10, 5); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 9px monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText("HP", hpX + 4, hpY + 5);
+
+    // Flash
+    if (g.flashT > 0) { ctx.fillStyle = `rgba(231,76,60,${(g.flashT / 0.5) * 0.35})`; ctx.fillRect(-4, -4, w + 8, h + 8); }
+
+    ctx.restore();
+    if (g.running || g.particles.length > 0) rafRef.current = requestAnimationFrame(loop);
+  }, []);
+
+  const startLoop = useCallback(() => { cancelAnimationFrame(rafRef.current); if (gameRef.current) gameRef.current.lastTime = 0; rafRef.current = requestAnimationFrame(loop); }, [loop]);
+
+  const playTicket = useCallback((t: Ticket) => {
+    if (startingRef.current || t.price > balance) return; startingRef.current = true;
+    setBalance(prev => { const n = prev - t.price; localStorage.setItem(BALANCE_KEY, String(n)); return n; });
+    audioRef.current.start();
+    setTicket(t);
+    const { w, h } = sizeRef.current;
+    // Build stars
+    const stars: Star[] = [];
+    for (let i = 0; i < 120; i++) stars.push({ x: Math.random() * (w || 320), y: Math.random() * (h || 600), r: 0.5 + Math.random() * 2, speed: 20 + Math.random() * 60, alpha: 0.3 + Math.random() * 0.7, phase: Math.random() });
+    gameRef.current = {
+      playerX: (w || 320) / 2, playerY: (h || 600) - 80, playerVX: 0,
+      hp: 3, maxHp: 3, shieldT: 0,
+      bullets: [], enemyBullets: [], enemies: [], powerUps: [],
+      particles: [], stars,
+      kills: 0, target: t.target, timeLeft: t.time, timeMax: t.time,
+      running: true, lastTime: 0, flashT: 0,
+      fireTimer: 0, tripleT: 0,
+      wave: 0, waveT: 0.5, spawnTimer: 0,
+      dragX: (w || 320) / 2, dragging: false,
+      shakeX: 0, shakeY: 0, shakeT: 0,
+      bossActive: false, bossX: 0, bossY: 0, bossVX: 0, bossHp: 0, bossMaxHp: 0, bossPhase: 0, bossFireT: 0,
+    };
+    timeElapsedRef.current = 0;
+    lastSecRef.current = t.time; setScore(0); setTimeLeft(t.time);
+    if (timerBarRef.current) timerBarRef.current.style.width = "100%";
+    setPhase("playing"); startLoop();
+  }, [balance, startLoop]);
+
+  useEffect(() => { const audio = audioRef.current; return () => { cancelAnimationFrame(rafRef.current); audio.dispose(); }; }, []);
+  const refillBalance = useCallback(() => { setBalance(START_BALANCE); localStorage.setItem(BALANCE_KEY, String(START_BALANCE)); }, []);
+  const toggleMute = () => { audioRef.current.muted = !muted; setMuted(!muted); };
+
+  return (
+    <div className="flex-1 relative flex flex-col h-full overflow-hidden select-none" style={{ background: "#000010" }}>
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 pt-3">
+        <Link href="/games"><button className="w-10 h-10 rounded-full bg-black/50 backdrop-blur border border-blue-500/30 flex items-center justify-center text-blue-300 hover:text-white transition-colors"><ArrowLeft size={18} /></button></Link>
+        <div className="flex flex-col items-center">
+          <span className="text-[10px] tracking-[0.3em] text-blue-300/70 font-display uppercase">{phase === "playing" ? "KILLS" : "GALAXY STRIKER"}</span>
+          <span data-testid="text-score" className="font-display font-black text-4xl text-blue-300 leading-none drop-shadow-[0_0_18px_rgba(52,152,219,0.9)]">{score}</span>
+          {phase === "playing" && <span className="text-[9px] tracking-widest text-blue-300/60 font-display uppercase mt-0.5">GOAL {target}</span>}
+        </div>
+        <button onClick={toggleMute} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur border border-blue-500/30 flex items-center justify-center text-blue-300">{muted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
+      </div>
+
+      {shieldDisplay && <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/50"><span className="text-[11px] font-mono font-bold text-blue-300 tracking-wider">🛡 SHIELD ON</span></div>}
+      {tripleDisplay && <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/20 border border-green-400/50"><Zap size={13} className="text-green-400" /><span className="text-[11px] font-mono font-bold text-green-300 tracking-wider">TRIPLE SHOT</span></div>}
+
+      {phase === "playing" && (
+        <div className={`absolute z-30 w-[72%] left-1/2 -translate-x-1/2 flex flex-col gap-2.5 ${shieldDisplay || tripleDisplay ? "top-[120px]" : "top-[84px]"}`}>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between px-0.5"><span className="text-[9px] tracking-widest text-blue-300/70 font-display uppercase">Kills</span><span data-testid="text-progress" className="text-[11px] font-mono font-bold tabular-nums text-white/90">{score} / {target}</span></div>
+            <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden border border-blue-500/20"><div data-testid="bar-progress" className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 shadow-[0_0_12px_rgba(52,152,219,0.7)] transition-[width] duration-300" style={{ width: `${target > 0 ? Math.min(100, (score / target) * 100) : 0}%` }} /></div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between px-0.5"><span className="text-[9px] tracking-widest text-white/40 font-display uppercase">Time</span><span data-testid="text-timer" className={`text-[11px] font-mono font-bold tabular-nums ${timeLeft <= 8 ? "text-red-400" : "text-white/70"}`}>{timeLeft}s</span></div>
+            <div className="w-full h-1.5 rounded-full bg-white/8 overflow-hidden"><div ref={timerBarRef} data-testid="bar-timer" className="h-full rounded-full" style={{ width: "100%" }} /></div>
+          </div>
+        </div>
+      )}
+
+      <div ref={wrapRef} className="flex-1 relative"
+        onPointerDown={(e) => { const g = gameRef.current; if (!g || !g.running) return; const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); g.dragX = e.clientX - rect.left; g.dragging = true; }}
+        onPointerMove={(e) => { const g = gameRef.current; if (!g || !g.dragging) return; const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); g.dragX = e.clientX - rect.left; }}
+        onPointerUp={() => { const g = gameRef.current; if (g) g.dragging = false; }}
+        onPointerLeave={() => { const g = gameRef.current; if (g) g.dragging = false; }}>
+        <canvas ref={canvasRef} className="absolute inset-0 touch-none" />
+        {phase === "playing" && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[11px] text-blue-300/35 font-display tracking-widest uppercase pointer-events-none">DRAG to move · auto-fires</div>}
+      </div>
+
+      <AnimatePresence>{phase === "select" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex flex-col px-6 pt-16 pb-6 overflow-y-auto" style={{ background: "rgba(0,0,16,0.97)" }}>
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col items-center text-center w-full max-w-[340px] mx-auto">
+            <div className="text-4xl mb-2">🚀</div>
+            <div className="flex items-center gap-2 mb-2"><Trophy size={14} className="text-blue-400" /><span className="text-[11px] tracking-[0.4em] text-blue-400/60 uppercase">Galaxy Striker</span></div>
+            <h1 className="font-display font-black text-2xl text-blue-300 mb-3">CHOOSE YOUR TICKET</h1>
+            <p className="text-xs text-white/50 mb-4 max-w-[260px]">Drag to pilot your ship. Auto-fire destroys enemy waves. Collect power-ups: 3× shot, shield, bomb!</p>
+            <div className="flex items-center gap-2 mb-5 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30"><Coins size={14} className="text-blue-400" /><span data-testid="text-balance" className="text-sm font-mono font-bold text-blue-400">{balance.toLocaleString()} SKZ</span></div>
+            <div className="w-full flex flex-col gap-2.5">
+              {TICKETS.map(t => { const ok = t.price <= balance; return (
+                <button key={t.id} disabled={!ok} onClick={() => ok && playTicket(t)} data-testid={`button-ticket-${t.id}`}
+                  className={`w-full flex items-center justify-between rounded-2xl border p-3.5 transition-all ${ok ? "bg-blue-500/8 border-blue-500/30 hover:border-blue-400 active:scale-[0.98]" : "bg-white/[0.02] border-white/5 opacity-40 cursor-not-allowed"}`}>
+                  <div className="flex flex-col items-start"><span className="font-mono font-bold text-base text-blue-300">{t.name}</span><span className="text-[10px] text-white/40 font-mono uppercase mt-0.5">Kill {t.target} · {t.time}s</span></div>
+                  <div className="flex flex-col items-end"><span className="flex items-center gap-1 text-blue-400 font-mono font-bold text-sm"><Coins size={12} />{t.prize.toLocaleString()}</span><span className="text-[10px] text-white/40 font-mono uppercase mt-0.5">Entry {t.price}</span></div>
+                </button>
+              ); })}
+            </div>
+            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-blue-400" /><span data-testid="text-best" className="font-mono">Best {best}</span></div>
+            {balance < 30 ? (<button onClick={refillBalance} data-testid="button-refill" className="mt-5 w-full py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-mono font-bold text-sm tracking-widest shadow-[0_0_24px_rgba(52,152,219,0.5)] active:scale-95">🎁 GET 1,000 FREE CHIPS</button>) : (<button onClick={refillBalance} data-testid="button-refill" className="mt-3 text-[10px] text-white/25 hover:text-white/50 transition-colors underline underline-offset-2 font-mono">Low on chips? Get 1,000 free</button>)}
+          </motion.div>
+        </motion.div>
+      )}</AnimatePresence>
+
+      <AnimatePresence>{phase === "won" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex items-center justify-center px-8" style={{ background: "rgba(0,0,16,0.93)" }}>
+          <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.4 }} className="w-full max-w-[300px] flex flex-col items-center text-center">
+            <div className="text-5xl mb-3">🏆</div>
+            <span data-testid="text-result" className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-blue-300">Ace Pilot!</span>
+            <div className="font-display font-black text-5xl text-blue-300 mb-1">+{ticket?.prize.toLocaleString()}</div>
+            <span className="text-sm text-white/50 mb-6 font-mono">SKZ prize claimed</span>
+            <div className="w-full grid grid-cols-2 gap-3 mb-7">
+              <div className="bg-blue-500/8 border border-blue-500/30 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Kills</div><span data-testid="text-final-score" className="font-mono font-bold text-xl text-blue-300">{score}</span></div>
+              <div className="bg-blue-500/8 border border-blue-500/30 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Balance</div><span data-testid="text-balance-final" className="font-mono font-bold text-xl text-blue-300">{balance.toLocaleString()}</span></div>
+            </div>
+            <button onClick={() => setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-mono font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95"><RotateCcw size={18} />PLAY AGAIN</button>
+            <Link href="/games"><button data-testid="button-exit" className="text-sm text-blue-300/40 hover:text-blue-300 font-mono">← Back to Arena</button></Link>
+          </motion.div>
+        </motion.div>
+      )}</AnimatePresence>
+
+      <AnimatePresence>{phase === "lost" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex items-center justify-center px-8" style={{ background: "rgba(0,0,16,0.93)" }}>
+          <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.35 }} className="w-full max-w-[300px] flex flex-col items-center text-center">
+            <div className="text-5xl mb-3">💥</div>
+            <span data-testid="text-result" className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-red-400">Ship Destroyed!</span>
+            <div data-testid="text-loss-amount" className="font-display font-black text-5xl text-red-400 mb-1">-{ticket?.price ?? 0}</div>
+            <span className="text-sm text-white/50 mb-6 font-mono">SKZ entry lost</span>
+            <div className="w-full grid grid-cols-2 gap-3 mb-7">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Kills</div><span data-testid="text-final-score" className="font-mono font-bold text-xl text-white">{score}/{target}</span></div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Balance</div><span data-testid="text-balance-final" className="font-mono font-bold text-xl text-white">{balance.toLocaleString()}</span></div>
+            </div>
+            <button onClick={() => setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-mono font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95"><RotateCcw size={18} />TRY AGAIN</button>
+            <Link href="/games"><button data-testid="button-exit" className="text-sm text-blue-300/40 hover:text-blue-300 font-mono">← Back to Arena</button></Link>
+          </motion.div>
+        </motion.div>
+      )}</AnimatePresence>
+    </div>
+  );
+}
