@@ -20,7 +20,7 @@ export default function Games() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Arena</h1>
+          <h1 className="text-2xl font-display font-bold text-white tracking-wider uppercase">Arena</h1>
           <p className="text-sm text-muted-foreground mt-1">High stakes skill matches</p>
         </div>
         <div className="bg-card/50 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
@@ -73,16 +73,16 @@ export default function Games() {
             
             <div className="relative z-10 flex justify-between items-center">
               <div className="flex flex-col gap-1">
-                <h3 className="text-xl font-bold text-white tracking-tight">{tier.name}</h3>
+                <h3 className="text-xl font-display font-black text-white tracking-wide uppercase">{tier.name}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-white/80">Entry: <span className="font-bold text-white">{tier.price} SKZ</span></span>
+                  <span className="text-sm text-white/80">Entry: <span className="font-display font-bold text-white tracking-wider">{tier.price} SKZ</span></span>
                 </div>
               </div>
               
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-lg border border-white/10">
                   <Trophy size={12} className="text-primary" />
-                  <span className="text-xs font-bold text-primary">Win {tier.win}</span>
+                  <span className="text-xs font-display font-bold text-primary tracking-wide">Win {tier.win}</span>
                 </div>
                 <Button size="sm" className="bg-white text-black hover:bg-white/90 font-semibold rounded-xl h-8 px-4">
                   Enter

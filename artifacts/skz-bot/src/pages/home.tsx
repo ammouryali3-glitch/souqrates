@@ -29,10 +29,10 @@ export default function Home() {
           <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
           <h2 className="text-muted-foreground text-sm font-medium tracking-widest uppercase mb-1 text-center">Total Balance</h2>
           <div className="flex items-center gap-2 relative">
-            <span className="text-5xl font-bold tracking-tight text-white drop-shadow-[0_0_15px_rgba(212,175,55,0.4)]">
+            <span className="text-5xl font-display font-bold tracking-tight text-white drop-shadow-[0_0_15px_rgba(212,175,55,0.6)]">
               <NumberTicker value={balance} decimals={2} />
             </span>
-            <span className="text-xl font-bold text-primary mt-3">SKZ</span>
+            <span className="text-xl font-display font-black text-primary mt-3 tracking-widest drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]">SKZ</span>
           </div>
         </motion.div>
       </div>
@@ -72,14 +72,14 @@ export default function Home() {
             <Trophy size={14} className="text-primary" />
             <span className="text-xs font-medium">Total Won</span>
           </div>
-          <span className="text-lg font-bold text-white">45,200 SKZ</span>
+          <span className="text-lg font-display font-bold text-white">45,200 SKZ</span>
         </Card>
         <Card className="bg-card/40 backdrop-blur-md border-white/5 p-4 flex flex-col gap-1">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <Users size={14} className="text-accent" />
             <span className="text-xs font-medium">Network</span>
           </div>
-          <span className="text-lg font-bold text-white">22 Refs</span>
+          <span className="text-lg font-display font-bold text-white">22 Refs</span>
         </Card>
       </div>
 
@@ -121,7 +121,7 @@ export default function Home() {
                   <span className="text-[10px] text-muted-foreground">{activity.time}</span>
                 </div>
               </div>
-              <span className={`text-sm font-bold ${activity.amount.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`text-sm font-display font-bold ${activity.amount.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
                 {activity.amount}
               </span>
             </motion.div>

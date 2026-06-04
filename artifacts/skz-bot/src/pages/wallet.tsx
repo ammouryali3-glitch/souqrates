@@ -29,7 +29,7 @@ export default function Wallet() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold text-white tracking-tight">Vault</h1>
+        <h1 className="text-2xl font-display font-bold text-white tracking-wider uppercase">Vault</h1>
       </div>
 
       {/* Hero Balance Card */}
@@ -45,7 +45,7 @@ export default function Wallet() {
         <div className="relative z-10 flex flex-col gap-1">
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Available SKZ</span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-4xl font-bold text-white tracking-tight">
+            <span className="text-4xl font-display font-bold text-white tracking-tight drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
               <NumberTicker value={balance} decimals={2} />
             </span>
           </div>
@@ -53,11 +53,11 @@ export default function Wallet() {
           <div className="flex gap-4 mt-4 pt-4 border-t border-white/10">
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground">≈ USDT</span>
-              <span className="text-sm font-medium text-white/90">${usdtValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              <span className="text-sm font-display font-medium text-white/90">${usdtValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground">≈ TON</span>
-              <span className="text-sm font-medium text-white/90">{tonValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              <span className="text-sm font-display font-medium text-white/90">{tonValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
             </div>
           </div>
         </div>
