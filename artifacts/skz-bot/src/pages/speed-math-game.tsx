@@ -312,17 +312,25 @@ export default function SpeedMathGame() {
         )}
         {phase === "playing" && (
           <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative flex-1 flex flex-col h-full">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 z-10">
-              <div ref={timerBarRef} className="h-full bg-gradient-to-r from-yellow-400 to-orange-400 transition-none" style={{ width: "100%" }} />
-            </div>
-            <div className="absolute top-3 right-3 z-10 bg-black/40 rounded-full px-3 py-1">
-              <span className="font-display text-xs text-yellow-300">{timeLeft}s</span>
-            </div>
-            {comboDisp >= 3 && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-orange-500/30 border border-orange-400/50 rounded-full px-3 py-1">
-                <span className="font-display text-xs text-orange-300">🔥 ×{comboDisp} COMBO</span>
+            <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+              <div className="flex items-center justify-between mb-2">
+                <Link href="/games"><button className="w-8 h-8 rounded-full bg-black/50 border border-yellow-500/30 flex items-center justify-center text-yellow-300"><ArrowLeft size={15} /></button></Link>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-display font-black text-2xl text-yellow-300 leading-none drop-shadow-[0_0_10px_rgba(255,200,0,0.6)]">{scoreDisp}</span>
+                  <span className="text-[9px] text-yellow-400/50 font-display uppercase tracking-widest">GOAL {ticket?.target}</span>
+                </div>
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex gap-0.5">{Array.from({length:3}).map((_,i)=><span key={i} className={`text-sm transition-opacity ${i<hpDisp?"opacity-100":"opacity-20"}`}>❤️</span>)}</div>
+                  {comboDisp >= 2 && <span className="text-[10px] font-display text-orange-300 font-bold">🔥 ×{comboDisp}</span>}
+                </div>
               </div>
-            )}
+              <div className="flex flex-col gap-1 pb-3">
+                <div className="flex items-center justify-between px-0.5"><span className="text-[9px] tracking-widest text-yellow-300/60 font-display uppercase">Score</span><span className="text-[10px] font-mono font-bold text-white/70">{scoreDisp} / {ticket?.target}</span></div>
+                <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden border border-yellow-500/20"><div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-400 shadow-[0_0_8px_rgba(255,190,0,0.5)] transition-[width] duration-300" style={{width:`${ticket?Math.min(100,(scoreDisp/ticket.target)*100):0}%`}}/></div>
+                <div className="flex items-center justify-between px-0.5 mt-0.5"><span className="text-[9px] tracking-widest text-white/30 font-display uppercase">Time</span><span className={`text-[10px] font-mono font-bold tabular-nums ${timeLeft<=8?"text-red-400":"text-white/50"}`}>{timeLeft}s</span></div>
+                <div className="w-full h-1.5 rounded-full bg-white/8 overflow-hidden"><div ref={timerBarRef} className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 transition-none" style={{width:"100%"}}/></div>
+              </div>
+            </div>
             <canvas ref={canvasRef} className="flex-1 w-full h-full touch-none" />
           </motion.div>
         )}
