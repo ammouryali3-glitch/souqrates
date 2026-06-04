@@ -17,11 +17,14 @@ Skill games (e.g. Stack & Match) live as full-screen pages under `/games/<name>`
 - stop its `requestAnimationFrame` loop once gameplay ends (keep it running only while playing OR while exit/debris animations are still settling, then let it stop), and
 - create the `AudioContext` lazily on first user gesture (autoplay policy) and `close()` it on component unmount.
 
-## Universal target-line + countdown rule (required for EVERY game)
-**Why:** user-mandated design rule for all SKZ Bot skill games — gameplay must have urgency and a clear checkpoint goal.
-**How to apply:** every game MUST have an interactive on-screen TARGET line/goal that the player must REACH before a countdown timer hits zero. Reaching it = clear the checkpoint, grant bonus time, raise the next target (level up). Running out of time = game over (distinguish "TIME UP" vs crash/"GAME OVER" in the end overlay).
-- Drive the timer off the rAF delta (`dt`), not a setInterval. Throttle HUD timer `setState` to whole-second changes via a ref (`lastSecRef`) — never setState the timer at 60fps. A separate ratio state for the depleting bar is fine.
-- Show: a countdown bar/number, current level + target, and a "TARGET CLEARED" flash on checkpoint.
+## Universal ticket-entry + progress-bar + countdown rule (required for EVERY game)
+**Why:** user-mandated design rule for all SKZ Bot skill games. REPLACED the older "in-canvas target line / endless leveling" model, which the user explicitly rejected — do NOT draw the goal as a moving line inside the canvas playfield, and do NOT do endless level-up/bonus-time loops.
+**How to apply:** every game uses a single-round bet model with 4 phases: `select | playing | won | lost`.
+- **Ticket select (entry):** show 5 priced tickets (rookie/bronze/silver/gold/diamond), each with `price`, `prize`, fixed `target` score, and `time`. Picking one deducts `price` from a localStorage SKZ balance (key like `skz_balance`, start 1000) up front. Disable tickets the player can't afford. Guard `playTicket` with a `startingRef` lock against double-tap double-deduction.
+- **Win = reach the fixed `target` score before the countdown ends** → credit `prize` to balance, phase `won`. **Lose = crash OR timer hits zero** (entry already lost) → phase `lost`, distinguish "TIME UP" vs "YOU LOST". Make `finishGame` idempotent (`if (!g||!g.running) return`) and release the start lock there.
+- **The target is a FIXED interactive PROGRESS BAR (an HTML/CSS line), NOT inside the canvas.** It fills from `score/target` and advances one step per correct hit. Drive its width from React `score` state with a CSS `transition-[width]` — NOT per-frame in rAF.
+- Drive the countdown off the rAF delta (`dt`), not setInterval. Throttle HUD timer `setState` to whole-second changes via `lastSecRef`; update the timer bar imperatively via a ref (`timerBarRef.style.width`) — never setState at 60fps.
+- Persist `balance` and `best` to localStorage; credit/deduct exactly once (guarded) and write through on every change.
 
 ## Canvas drawing gotcha
 **Why:** `roundRect`/arcTo throws `IndexSizeError: radius is negative` when a block's width shrinks below ~0. Stacking games shrink the platform, so this WILL happen at runtime even when typecheck passes.

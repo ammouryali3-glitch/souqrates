@@ -3,7 +3,16 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type Phase = "ready" | "playing" | "over";
+type Phase = "select" | "playing" | "won" | "lost";
+
+interface Ticket {
+  id: string;
+  name: string;
+  price: number; // entry cost in SKZ
+  prize: number; // payout on win
+  target: number; // correct hits required to win
+  time: number; // seconds allowed
+}
 
 interface Block {
   x: number;
@@ -41,16 +50,22 @@ interface GameState {
   timeLeft: number;
   timeMax: number;
   target: number;
-  level: number;
 }
 
 const BEST_KEY = "skz_stack_best";
+const BALANCE_KEY = "skz_balance";
+const START_BALANCE = 1000;
 
-// ---- Target line / countdown rule (applies to all SKZ Bot games) ----
-const INITIAL_TIME = 18; // seconds to reach the first target line
-const FIRST_TARGET = 8; // blocks needed to clear the first target
-const targetGap = (level: number) => 6 + level; // blocks added to reach the next target
-const timeBonus = (level: number) => Math.max(8, 15 - level); // seconds granted per target reached
+// ---- Ticket tiers: pick one to play. Reach the target score (the interactive
+// progress line) before the timer runs out to win the prize; otherwise you lose
+// the entry price. (UI-only mock economy.)
+const TICKETS: Ticket[] = [
+  { id: "rookie", name: "Rookie", price: 25, prize: 45, target: 8, time: 24 },
+  { id: "bronze", name: "Bronze", price: 50, prize: 95, target: 12, time: 26 },
+  { id: "silver", name: "Silver", price: 120, prize: 255, target: 16, time: 28 },
+  { id: "gold", name: "Gold", price: 300, prize: 680, target: 22, time: 30 },
+  { id: "diamond", name: "Diamond", price: 750, prize: 1850, target: 30, time: 32 },
+];
 
 // ---- Audio engine (Web Audio API, no asset files) ----
 class AudioEngine {
@@ -170,21 +185,24 @@ export default function StackGame() {
   const lastSecRef = useRef<number>(0);
   const timerBarRef = useRef<HTMLDivElement>(null);
 
-  const [phase, setPhase] = useState<Phase>("ready");
+  const [phase, setPhase] = useState<Phase>("select");
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [best, setBest] = useState(0);
   const [muted, setMuted] = useState(false);
   const [comboFlash, setComboFlash] = useState<{ n: number; perfect: boolean; key: number } | null>(null);
-  const [timeLeft, setTimeLeft] = useState(INITIAL_TIME);
-  const [target, setTarget] = useState(FIRST_TARGET);
-  const [level, setLevel] = useState(1);
-  const [overReason, setOverReason] = useState<"crash" | "time">("crash");
-  const [goalFlash, setGoalFlash] = useState<{ level: number; key: number } | null>(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [balance, setBalance] = useState(START_BALANCE);
+  const [lostReason, setLostReason] = useState<"crash" | "time">("crash");
+
+  const target = ticket?.target ?? 0;
 
   useEffect(() => {
     const stored = Number(localStorage.getItem(BEST_KEY) || "0");
     setBest(stored);
+    const storedBal = localStorage.getItem(BALANCE_KEY);
+    setBalance(storedBal === null ? START_BALANCE : Number(storedBal));
   }, []);
 
   // Canvas sizing with DPR
@@ -211,7 +229,7 @@ export default function StackGame() {
 
   const anchorY = useCallback(() => sizeRef.current.h * 0.34, []);
 
-  const newGameState = useCallback((): GameState => {
+  const newGameState = useCallback((t: Ticket): GameState => {
     const { w } = sizeRef.current;
     const baseWidth = Math.min(w * 0.62, 260);
     const blockH = 42;
@@ -230,10 +248,9 @@ export default function StackGame() {
       running: true,
       score: 0,
       combo: 0,
-      timeLeft: INITIAL_TIME,
-      timeMax: INITIAL_TIME,
-      target: FIRST_TARGET,
-      level: 1,
+      timeLeft: t.time,
+      timeMax: t.time,
+      target: t.target,
     };
   }, []);
 
@@ -371,43 +388,6 @@ export default function StackGame() {
       paintBlock(ctx, b.x, y, b.w, g.blockH - 4, b.index, false);
     }
 
-    // ---- Interactive TARGET LINE: must be reached before the timer hits zero ----
-    if (g.running) {
-      const targetWorldTop = g.target * g.blockH; // top edge of the target block level
-      const rawY = screenY(targetWorldTop) + (g.blockH - 4) / 2;
-      const pulse = 0.55 + 0.45 * Math.sin(time / 220);
-      const remaining = Math.max(0, g.target - g.score);
-      if (rawY > 40 && rawY < h - 6) {
-        // line is on screen
-        ctx.save();
-        ctx.strokeStyle = `rgba(212,175,55,${0.7 + 0.3 * pulse})`;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([12, 9]);
-        ctx.lineDashOffset = -(time / 28) % 21;
-        ctx.shadowColor = "rgba(212,175,55,0.85)";
-        ctx.shadowBlur = 14 * pulse + 6;
-        ctx.beginPath();
-        ctx.moveTo(0, rawY);
-        ctx.lineTo(w, rawY);
-        ctx.stroke();
-        ctx.restore();
-        ctx.save();
-        ctx.fillStyle = "rgba(212,175,55,0.95)";
-        ctx.font = "700 11px Orbitron, sans-serif";
-        ctx.textBaseline = "bottom";
-        ctx.fillText(`TARGET · ${remaining} TO GO`, 12, rawY - 6);
-        ctx.restore();
-      } else if (rawY <= 40) {
-        // target is above the viewport — pin a chevron indicator at the top
-        ctx.save();
-        ctx.fillStyle = `rgba(212,175,55,${0.6 + 0.4 * pulse})`;
-        ctx.font = "700 11px Orbitron, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(`▲ TARGET · ${remaining} TO GO`, w / 2, 92);
-        ctx.restore();
-      }
-    }
-
     // moving block
     if (g.moving && g.running) {
       const worldY = g.moving.index * g.blockH;
@@ -456,40 +436,73 @@ export default function StackGame() {
     rafRef.current = requestAnimationFrame(loop);
   }, [loop]);
 
-  const startGame = useCallback(() => {
-    audioRef.current.start();
-    gameRef.current = newGameState();
-    lastSecRef.current = INITIAL_TIME;
-    setScore(0);
-    setCombo(0);
-    setComboFlash(null);
-    setTimeLeft(INITIAL_TIME);
-    if (timerBarRef.current) timerBarRef.current.style.width = "100%";
-    setTarget(FIRST_TARGET);
-    setLevel(1);
-    setGoalFlash(null);
-    setPhase("playing");
-    startLoop();
-  }, [newGameState, startLoop]);
+  const startingRef = useRef(false);
 
-  const endGame = useCallback((finalScore: number, reason: "crash" | "time" = "crash") => {
+  const playTicket = useCallback(
+    (t: Ticket) => {
+      if (startingRef.current) return; // guard against rapid double-tap
+      if (t.price > balance) return; // can't afford
+      startingRef.current = true;
+      // Deduct the entry price up front (mock economy)
+      setBalance((prev) => {
+        const next = prev - t.price;
+        localStorage.setItem(BALANCE_KEY, String(next));
+        return next;
+      });
+      audioRef.current.start();
+      setTicket(t);
+      gameRef.current = newGameState(t);
+      lastSecRef.current = t.time;
+      setScore(0);
+      setCombo(0);
+      setComboFlash(null);
+      setTimeLeft(t.time);
+      if (timerBarRef.current) timerBarRef.current.style.width = "100%";
+      setPhase("playing");
+      startLoop();
+    },
+    [balance, newGameState, startLoop],
+  );
+
+  const finishGame = useCallback((finalScore: number, outcome: "win" | "crash" | "time") => {
     const g = gameRef.current;
-    if (g) g.running = false;
-    audioRef.current.gameOver();
-    setOverReason(reason);
-    setPhase("over");
+    if (!g || !g.running) return; // idempotent: ignore duplicate settlement
+    g.running = false;
+    startingRef.current = false; // release the start lock for the next round
     setBest((prev) => {
       const next = Math.max(prev, finalScore);
       localStorage.setItem(BEST_KEY, String(next));
       return next;
     });
+    if (outcome === "win") {
+      audioRef.current.goal();
+      const t = ticketRef.current;
+      if (t) {
+        setBalance((prev) => {
+          const next = prev + t.prize;
+          localStorage.setItem(BALANCE_KEY, String(next));
+          return next;
+        });
+      }
+      setPhase("won");
+    } else {
+      audioRef.current.gameOver();
+      setLostReason(outcome);
+      setPhase("lost");
+    }
   }, []);
 
-  // Keep a stable ref so the rAF loop can end the game without re-creating the loop.
-  const endRef = useRef(endGame);
+  // Active ticket mirrored in a ref so finishGame can read it without a dependency.
+  const ticketRef = useRef<Ticket | null>(null);
   useEffect(() => {
-    endRef.current = endGame;
-  }, [endGame]);
+    ticketRef.current = ticket;
+  }, [ticket]);
+
+  // Keep a stable ref so the rAF loop can end the game without re-creating the loop.
+  const endRef = useRef(finishGame);
+  useEffect(() => {
+    endRef.current = finishGame;
+  }, [finishGame]);
 
   const dropBlock = useCallback(() => {
     const g = gameRef.current;
@@ -517,7 +530,7 @@ export default function StackGame() {
         alpha: 1.4,
         hue: hueOf(mv.index),
       });
-      endGame(g.score);
+      finishGame(g.score, "crash");
       return;
     }
 
@@ -578,18 +591,10 @@ export default function StackGame() {
     setScore(g.score);
     setCombo(g.combo);
 
-    // TARGET LINE reached -> clear checkpoint, grant bonus time, raise the next target
+    // TARGET SCORE reached -> the interactive progress line is full: WIN.
     if (g.score >= g.target) {
-      g.level += 1;
-      g.target += targetGap(g.level);
-      g.timeLeft += timeBonus(g.level);
-      g.timeMax = g.timeLeft;
-      lastSecRef.current = Math.ceil(g.timeLeft);
-      audioRef.current.goal();
-      setLevel(g.level);
-      setTarget(g.target);
-      setTimeLeft(Math.ceil(g.timeLeft));
-      setGoalFlash({ level: g.level, key: Date.now() });
+      finishGame(g.score, "win");
+      return;
     }
 
     // spawn next moving block from alternating side
@@ -601,13 +606,12 @@ export default function StackGame() {
       index: mv.index + 1,
     };
     void h;
-  }, [anchorY, endGame]);
+  }, [anchorY, finishGame]);
 
   // Input handling
   const handleTap = useCallback(() => {
-    if (phase === "ready") startGame();
-    else if (phase === "playing") dropBlock();
-  }, [phase, startGame, dropBlock]);
+    if (phase === "playing") dropBlock();
+  }, [phase, dropBlock]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -633,8 +637,6 @@ export default function StackGame() {
     setMuted(!muted);
   };
 
-  const skzEarned = score * 5;
-
   return (
     <div className="flex-1 relative flex flex-col h-full overflow-hidden bg-[#06070d] select-none">
       {/* HUD top bar */}
@@ -649,13 +651,13 @@ export default function StackGame() {
         </Link>
 
         <div className="flex flex-col items-center -mt-1">
-          <span className="text-[10px] tracking-[0.3em] text-white/40 font-display uppercase">Height</span>
+          <span className="text-[10px] tracking-[0.3em] text-white/40 font-display uppercase">Score</span>
           <span data-testid="text-score" className="font-display font-black text-4xl text-white leading-none drop-shadow-[0_0_18px_rgba(212,175,55,0.4)]">
             {score}
           </span>
           {phase === "playing" && (
             <span className="text-[9px] tracking-[0.25em] text-primary/80 font-display uppercase mt-0.5">
-              LVL {level} · TARGET {target}
+              GOAL {target}
             </span>
           )}
         </div>
@@ -669,60 +671,49 @@ export default function StackGame() {
         </button>
       </div>
 
-      {/* Best badge */}
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/30 backdrop-blur px-3 py-1 rounded-full border border-white/10">
-        <Trophy size={11} className="text-primary" />
-        <span data-testid="text-best" className="text-[11px] font-display font-bold text-white/80 tracking-wide">BEST {best}</span>
-      </div>
-
-      {/* Countdown timer bar */}
+      {/* Interactive progress line + countdown timer */}
       {phase === "playing" && (
-        <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-30 w-[62%] flex flex-col items-center gap-1">
-          <div className="w-full flex items-center justify-between px-0.5">
-            <span className="text-[9px] tracking-[0.25em] text-white/40 font-display uppercase">Time</span>
-            <span
-              data-testid="text-timer"
-              className={`text-[11px] font-display font-bold tracking-wider tabular-nums ${
-                timeLeft <= 5 ? "text-red-400" : "text-white/80"
-              }`}
-            >
-              {timeLeft}s
-            </span>
+        <div className="absolute top-[84px] left-1/2 -translate-x-1/2 z-30 w-[68%] flex flex-col gap-2.5">
+          {/* Progress line: advances with every correct hit toward the goal */}
+          <div className="flex flex-col gap-1">
+            <div className="w-full flex items-center justify-between px-0.5">
+              <span className="text-[9px] tracking-[0.25em] text-primary/90 font-display uppercase">Progress</span>
+              <span data-testid="text-progress" className="text-[11px] font-display font-bold tracking-wider tabular-nums text-white/90">
+                {score} / {target}
+              </span>
+            </div>
+            <div className="relative w-full h-2.5 rounded-full bg-white/10 overflow-hidden border border-primary/20">
+              <div
+                data-testid="bar-progress"
+                className="h-full rounded-full bg-gradient-to-r from-primary via-yellow-300 to-accent shadow-[0_0_14px_rgba(212,175,55,0.6)] transition-[width] duration-300 ease-out"
+                style={{ width: `${target > 0 ? Math.min(100, (score / target) * 100) : 0}%` }}
+              />
+            </div>
           </div>
-          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-            <div
-              ref={timerBarRef}
-              data-testid="bar-timer"
-              className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-              style={{ width: "100%" }}
-            />
+          {/* Countdown timer (must reach the goal before it empties) */}
+          <div className="flex flex-col gap-1">
+            <div className="w-full flex items-center justify-between px-0.5">
+              <span className="text-[9px] tracking-[0.25em] text-white/40 font-display uppercase">Time</span>
+              <span
+                data-testid="text-timer"
+                className={`text-[11px] font-display font-bold tracking-wider tabular-nums ${
+                  timeLeft <= 5 ? "text-red-400" : "text-white/80"
+                }`}
+              >
+                {timeLeft}s
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                ref={timerBarRef}
+                data-testid="bar-timer"
+                className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+                style={{ width: "100%" }}
+              />
+            </div>
           </div>
         </div>
       )}
-
-      {/* Target reached flash */}
-      <AnimatePresence>
-        {goalFlash && (
-          <motion.div
-            key={goalFlash.key}
-            initial={{ opacity: 0, scale: 0.6, y: 14 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 1.25, y: -24 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            onAnimationComplete={() => setGoalFlash((g) => (g && g.key === goalFlash.key ? null : g))}
-            className="absolute top-[36%] left-1/2 -translate-x-1/2 z-30 pointer-events-none"
-          >
-            <div className="flex flex-col items-center">
-              <span className="font-display font-black text-3xl text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-accent drop-shadow-[0_0_24px_rgba(212,175,55,0.8)]">
-                TARGET CLEARED
-              </span>
-              <span className="font-display font-bold text-sm text-accent tracking-widest mt-1">
-                LEVEL {goalFlash.level} · +TIME
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Combo flash */}
       <AnimatePresence>
@@ -750,58 +741,144 @@ export default function StackGame() {
         <canvas ref={canvasRef} data-testid="canvas-stack" className="absolute inset-0 touch-none" />
       </div>
 
-      {/* Ready overlay */}
+      {/* Ticket selection overlay */}
       <AnimatePresence>
-        {phase === "ready" && (
+        {phase === "select" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/55 backdrop-blur-sm px-8"
-            onPointerDown={handleTap}
+            className="absolute inset-0 z-40 flex flex-col bg-black/70 backdrop-blur-md px-6 pt-16 pb-6 overflow-y-auto"
           >
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.05 }}
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center w-full max-w-[340px] mx-auto"
             >
-              <div className="flex items-center gap-2 mb-3">
-                <Zap size={16} className="text-accent" />
-                <span className="text-xs tracking-[0.4em] text-white/50 font-display uppercase">Skill Game</span>
+              <div className="flex items-center gap-2 mb-2">
+                <Zap size={15} className="text-accent" />
+                <span className="text-[11px] tracking-[0.4em] text-white/50 font-display uppercase">Stack & Match</span>
               </div>
-              <h1 className="font-display font-black text-4xl leading-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-primary to-accent mb-3">
-                STACK &<br />MATCH
+              <h1 className="font-display font-black text-2xl leading-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-primary to-accent mb-3">
+                CHOOSE YOUR TICKET
               </h1>
-              <p className="text-sm text-white/60 max-w-[260px] leading-relaxed mb-4">
-                Tap to drop each block. Line it up perfectly to keep your platform wide. Three perfects in a row and it grows back.
-              </p>
-              <div className="flex items-center gap-2 mb-8 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30">
-                <span className="text-[11px] text-primary font-display font-bold tracking-wide text-center leading-snug">
-                  Reach the glowing TARGET line before the timer runs out to bank time and level up.
+
+              {/* Balance */}
+              <div className="flex items-center gap-2 mb-5 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30">
+                <Coins size={14} className="text-primary" />
+                <span className="text-sm font-display font-bold text-primary tracking-wide" data-testid="text-balance">
+                  {balance.toLocaleString()} SKZ
                 </span>
               </div>
-              <motion.div
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ duration: 1.4, repeat: Infinity }}
-                className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-primary to-accent text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.45)]"
-                data-testid="button-start"
-              >
-                TAP TO START
-              </motion.div>
+
+              {/* Tickets */}
+              <div className="w-full flex flex-col gap-2.5">
+                {TICKETS.map((t) => {
+                  const affordable = t.price <= balance;
+                  return (
+                    <button
+                      key={t.id}
+                      disabled={!affordable}
+                      onClick={() => affordable && playTicket(t)}
+                      data-testid={`button-ticket-${t.id}`}
+                      className={`w-full flex items-center justify-between rounded-2xl border p-3.5 transition-all ${
+                        affordable
+                          ? "bg-white/5 border-white/10 hover:border-primary/50 active:scale-[0.98]"
+                          : "bg-white/[0.02] border-white/5 opacity-40 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex flex-col items-start">
+                        <span className="font-display font-bold text-base text-white tracking-wide">{t.name}</span>
+                        <span className="text-[10px] text-white/50 uppercase tracking-wider mt-0.5">
+                          Goal {t.target} · {t.time}s
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="flex items-center gap-1 text-primary font-display font-bold text-sm">
+                          <Coins size={12} /> {t.prize.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">
+                          Entry {t.price}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40">
+                <Trophy size={11} className="text-primary" />
+                <span data-testid="text-best">Best {best}</span>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Game over overlay */}
+      {/* Win overlay */}
       <AnimatePresence>
-        {phase === "over" && (
+        {phase === "won" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md px-8"
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md px-8"
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: "spring", bounce: 0.4 }}
+              className="w-full max-w-[300px] flex flex-col items-center text-center"
+            >
+              <span className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-primary" data-testid="text-result">
+                You Win
+              </span>
+              <div className="font-display font-black text-5xl text-transparent bg-clip-text bg-gradient-to-br from-primary via-yellow-200 to-accent mb-1 drop-shadow-[0_0_24px_rgba(212,175,55,0.6)]">
+                +{ticket?.prize.toLocaleString() ?? 0}
+              </div>
+              <span className="text-sm text-white/50 mb-6">SKZ prize claimed</span>
+
+              <div className="w-full grid grid-cols-2 gap-3 mb-7">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center">
+                  <div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1">
+                    <Zap size={11} className="text-primary" /> Score
+                  </div>
+                  <span className="font-display font-bold text-xl text-white" data-testid="text-final-score">{score}</span>
+                </div>
+                <div className="bg-primary/10 border border-primary/30 rounded-2xl p-3 flex flex-col items-center">
+                  <div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1">
+                    <Coins size={11} className="text-primary" /> Balance
+                  </div>
+                  <span className="font-display font-bold text-xl text-primary" data-testid="text-balance-final">{balance.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setPhase("select")}
+                data-testid="button-replay"
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-primary to-accent text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
+              >
+                <RotateCcw size={18} /> PLAY AGAIN
+              </button>
+              <Link href="/games">
+                <button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
+                  Back to Arena
+                </button>
+              </Link>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lose overlay */}
+      <AnimatePresence>
+        {phase === "lost" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md px-8"
           >
             <motion.div
               initial={{ scale: 0.85, opacity: 0, y: 20 }}
@@ -810,39 +887,37 @@ export default function StackGame() {
               className="w-full max-w-[300px] flex flex-col items-center text-center"
             >
               <span
-                data-testid="text-over-reason"
-                className={`text-xs tracking-[0.4em] font-display uppercase mb-2 ${
-                  overReason === "time" ? "text-red-400" : "text-white/40"
-                }`}
+                data-testid="text-result"
+                className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-red-400"
               >
-                {overReason === "time" ? "Time Up" : "Game Over"}
+                {lostReason === "time" ? "Time Up" : "You Lost"}
               </span>
-              <div className="font-display font-black text-6xl text-transparent bg-clip-text bg-gradient-to-br from-white to-primary mb-1" data-testid="text-final-score">
-                {score}
+              <div className="font-display font-black text-5xl text-transparent bg-clip-text bg-gradient-to-br from-red-400 to-white/70 mb-1" data-testid="text-loss-amount">
+                -{ticket?.price ?? 0}
               </div>
-              <span className="text-sm text-white/50 mb-6">blocks stacked</span>
+              <span className="text-sm text-white/50 mb-6">SKZ entry lost</span>
 
               <div className="w-full grid grid-cols-2 gap-3 mb-7">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center">
                   <div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1">
-                    <Trophy size={11} className="text-primary" /> Best
+                    <Zap size={11} className="text-primary" /> Reached
                   </div>
-                  <span className="font-display font-bold text-xl text-white" data-testid="text-best-final">{best}</span>
+                  <span className="font-display font-bold text-xl text-white" data-testid="text-final-score">{score} / {target}</span>
                 </div>
-                <div className="bg-primary/10 border border-primary/30 rounded-2xl p-3 flex flex-col items-center">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center">
                   <div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1">
-                    <Coins size={11} className="text-primary" /> Earned
+                    <Coins size={11} className="text-primary" /> Balance
                   </div>
-                  <span className="font-display font-bold text-xl text-primary" data-testid="text-skz-earned">+{skzEarned}</span>
+                  <span className="font-display font-bold text-xl text-white" data-testid="text-balance-final">{balance.toLocaleString()}</span>
                 </div>
               </div>
 
               <button
-                onClick={startGame}
+                onClick={() => setPhase("select")}
                 data-testid="button-replay"
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-primary to-accent text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
               >
-                <RotateCcw size={18} /> PLAY AGAIN
+                <RotateCcw size={18} /> TRY AGAIN
               </button>
               <Link href="/games">
                 <button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
