@@ -33,6 +33,16 @@ import GridPopGame from "@/pages/gridpop-game";
 import NeonLinkGame from "@/pages/neonlink-game";
 import QuickSumGame from "@/pages/quicksum-game";
 import Match3Game from "@/pages/match3-game";
+import PulseTapGame from "@/pages/pulsetap-game";
+import SwipeRushGame from "@/pages/swiperush-game";
+import BubblePopGame from "@/pages/bubblepop-game";
+import ColorRainGame from "@/pages/colorrain-game";
+import StackDropGame from "@/pages/stackdrop-game";
+import OrbitAimGame from "@/pages/orbitaim-game";
+import EchoTapGame from "@/pages/echotap-game";
+import MergeBlitzGame from "@/pages/mergeblitz-game";
+import NumBlitzGame from "@/pages/numblitz-game";
+import CardFlipGame from "@/pages/cardflip-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -84,6 +94,16 @@ function Router() {
             <Route path="/games/neonlink"><NeonLinkGame /></Route>
             <Route path="/games/quicksum"><QuickSumGame /></Route>
             <Route path="/games/match3"><Match3Game /></Route>
+            <Route path="/games/pulsetap"><PulseTapGame /></Route>
+            <Route path="/games/swiperush"><SwipeRushGame /></Route>
+            <Route path="/games/bubblepop"><BubblePopGame /></Route>
+            <Route path="/games/colorrain"><ColorRainGame /></Route>
+            <Route path="/games/stackdrop"><StackDropGame /></Route>
+            <Route path="/games/orbitaim"><OrbitAimGame /></Route>
+            <Route path="/games/echotap"><EchoTapGame /></Route>
+            <Route path="/games/mergeblitz"><MergeBlitzGame /></Route>
+            <Route path="/games/numblitz"><NumBlitzGame /></Route>
+            <Route path="/games/cardflip"><CardFlipGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
