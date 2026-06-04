@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SKZ Bot Mini App"
+version = "1.0.0"
+id = "artifacts/skz-bot"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18102
+
+[services.development]
+run = "pnpm --filter @workspace/skz-bot run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/skz-bot", "run", "build" ]
+publicDir = "artifacts/skz-bot/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18102"
+BASE_PATH = "/"

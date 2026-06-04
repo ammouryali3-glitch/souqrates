@@ -1,0 +1,67 @@
+import { Switch, Route, Router as WouterRouter } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { MobileContainer } from "@/components/layout/MobileContainer";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { AnimatePresence, motion } from "framer-motion";
+
+// Pages
+import Home from "@/pages/home";
+import Games from "@/pages/games";
+import Shop from "@/pages/shop";
+import Wallet from "@/pages/wallet";
+import Referrals from "@/pages/referrals";
+import NotFound from "@/pages/not-found";
+
+const queryClient = new QueryClient();
+
+// Page transition wrapper
+function PageWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="flex-1 overflow-y-auto pb-28 pt-6 px-4"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Router() {
+  return (
+    <MobileContainer>
+      <div className="flex-1 relative flex flex-col h-full overflow-hidden">
+        <AnimatePresence mode="wait">
+          <Switch>
+            <Route path="/"><PageWrapper><Home /></PageWrapper></Route>
+            <Route path="/games"><PageWrapper><Games /></PageWrapper></Route>
+            <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
+            <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
+            <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
+            <Route><PageWrapper><NotFound /></PageWrapper></Route>
+          </Switch>
+        </AnimatePresence>
+      </div>
+      <BottomNav />
+    </MobileContainer>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <Router />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
