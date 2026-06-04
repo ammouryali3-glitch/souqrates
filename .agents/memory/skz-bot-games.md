@@ -16,3 +16,13 @@ Skill games (e.g. Stack & Match) live as full-screen pages under `/games/<name>`
 **How to apply:** any canvas game MUST
 - stop its `requestAnimationFrame` loop once gameplay ends (keep it running only while playing OR while exit/debris animations are still settling, then let it stop), and
 - create the `AudioContext` lazily on first user gesture (autoplay policy) and `close()` it on component unmount.
+
+## Universal target-line + countdown rule (required for EVERY game)
+**Why:** user-mandated design rule for all SKZ Bot skill games — gameplay must have urgency and a clear checkpoint goal.
+**How to apply:** every game MUST have an interactive on-screen TARGET line/goal that the player must REACH before a countdown timer hits zero. Reaching it = clear the checkpoint, grant bonus time, raise the next target (level up). Running out of time = game over (distinguish "TIME UP" vs crash/"GAME OVER" in the end overlay).
+- Drive the timer off the rAF delta (`dt`), not a setInterval. Throttle HUD timer `setState` to whole-second changes via a ref (`lastSecRef`) — never setState the timer at 60fps. A separate ratio state for the depleting bar is fine.
+- Show: a countdown bar/number, current level + target, and a "TARGET CLEARED" flash on checkpoint.
+
+## Canvas drawing gotcha
+**Why:** `roundRect`/arcTo throws `IndexSizeError: radius is negative` when a block's width shrinks below ~0. Stacking games shrink the platform, so this WILL happen at runtime even when typecheck passes.
+**How to apply:** in any rounded-rect helper, early-return on `w<=0 || h<=0` and clamp radius with `Math.max(0, Math.min(r, w/2, h/2))`.

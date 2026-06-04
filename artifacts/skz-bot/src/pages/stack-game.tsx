@@ -38,9 +38,19 @@ interface GameState {
   running: boolean;
   score: number;
   combo: number;
+  timeLeft: number;
+  timeMax: number;
+  target: number;
+  level: number;
 }
 
 const BEST_KEY = "skz_stack_best";
+
+// ---- Target line / countdown rule (applies to all SKZ Bot games) ----
+const INITIAL_TIME = 18; // seconds to reach the first target line
+const FIRST_TARGET = 8; // blocks needed to clear the first target
+const targetGap = (level: number) => 6 + level; // blocks added to reach the next target
+const timeBonus = (level: number) => Math.max(8, 15 - level); // seconds granted per target reached
 
 // ---- Audio engine (Web Audio API, no asset files) ----
 class AudioEngine {
@@ -123,6 +133,17 @@ class AudioEngine {
     [392, 311, 261, 196].forEach((f, i) => this.tone(f, 0.3, "sawtooth", 0.25, i * 0.12));
   }
 
+  // countdown tick when time is running low
+  tick(urgent = false) {
+    this.tone(urgent ? 920 : 660, 0.07, "square", urgent ? 0.22 : 0.13);
+  }
+
+  // target line reached
+  goal() {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.24, "triangle", 0.34, i * 0.07));
+    this.tone(261.6, 0.5, "sine", 0.2);
+  }
+
   start() {
     [392, 523, 659].forEach((f, i) => this.tone(f, 0.18, "triangle", 0.3, i * 0.06));
   }
@@ -146,12 +167,20 @@ export default function StackGame() {
   const audioRef = useRef<AudioEngine>(new AudioEngine());
   const sizeRef = useRef<{ w: number; h: number; dpr: number }>({ w: 0, h: 0, dpr: 1 });
 
+  const lastSecRef = useRef<number>(0);
+  const timerBarRef = useRef<HTMLDivElement>(null);
+
   const [phase, setPhase] = useState<Phase>("ready");
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [best, setBest] = useState(0);
   const [muted, setMuted] = useState(false);
   const [comboFlash, setComboFlash] = useState<{ n: number; perfect: boolean; key: number } | null>(null);
+  const [timeLeft, setTimeLeft] = useState(INITIAL_TIME);
+  const [target, setTarget] = useState(FIRST_TARGET);
+  const [level, setLevel] = useState(1);
+  const [overReason, setOverReason] = useState<"crash" | "time">("crash");
+  const [goalFlash, setGoalFlash] = useState<{ level: number; key: number } | null>(null);
 
   useEffect(() => {
     const stored = Number(localStorage.getItem(BEST_KEY) || "0");
@@ -201,11 +230,16 @@ export default function StackGame() {
       running: true,
       score: 0,
       combo: 0,
+      timeLeft: INITIAL_TIME,
+      timeMax: INITIAL_TIME,
+      target: FIRST_TARGET,
+      level: 1,
     };
   }, []);
 
   const drawRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
-    const rad = Math.min(r, w / 2, h / 2);
+    if (w <= 0 || h <= 0) return;
+    const rad = Math.max(0, Math.min(r, w / 2, h / 2));
     ctx.beginPath();
     ctx.moveTo(x + rad, y);
     ctx.arcTo(x + w, y, x + w, y + h, rad);
@@ -250,6 +284,29 @@ export default function StackGame() {
     if (!g.lastTime) g.lastTime = time;
     const dt = Math.min((time - g.lastTime) / 1000, 0.05);
     g.lastTime = time;
+
+    // Countdown timer
+    if (g.running) {
+      g.timeLeft = Math.max(0, g.timeLeft - dt);
+      const sec = Math.ceil(g.timeLeft);
+      if (sec !== lastSecRef.current) {
+        lastSecRef.current = sec;
+        setTimeLeft(sec);
+        if (sec <= 5 && sec > 0) audioRef.current.tick(sec <= 3);
+      }
+      const ratio = Math.max(0, Math.min(1, g.timeLeft / g.timeMax));
+      const bar = timerBarRef.current;
+      if (bar) {
+        bar.style.width = `${ratio * 100}%`;
+        bar.style.backgroundImage =
+          ratio <= 0.28
+            ? "linear-gradient(to right, rgb(239,68,68), rgb(251,146,60))"
+            : "linear-gradient(to right, hsl(43 65% 53%), hsl(262 83% 58%))";
+      }
+      if (g.timeLeft <= 0) {
+        endRef.current(g.score, "time");
+      }
+    }
 
     // Move active block
     if (g.moving && g.running) {
@@ -314,6 +371,43 @@ export default function StackGame() {
       paintBlock(ctx, b.x, y, b.w, g.blockH - 4, b.index, false);
     }
 
+    // ---- Interactive TARGET LINE: must be reached before the timer hits zero ----
+    if (g.running) {
+      const targetWorldTop = g.target * g.blockH; // top edge of the target block level
+      const rawY = screenY(targetWorldTop) + (g.blockH - 4) / 2;
+      const pulse = 0.55 + 0.45 * Math.sin(time / 220);
+      const remaining = Math.max(0, g.target - g.score);
+      if (rawY > 40 && rawY < h - 6) {
+        // line is on screen
+        ctx.save();
+        ctx.strokeStyle = `rgba(212,175,55,${0.7 + 0.3 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([12, 9]);
+        ctx.lineDashOffset = -(time / 28) % 21;
+        ctx.shadowColor = "rgba(212,175,55,0.85)";
+        ctx.shadowBlur = 14 * pulse + 6;
+        ctx.beginPath();
+        ctx.moveTo(0, rawY);
+        ctx.lineTo(w, rawY);
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = "rgba(212,175,55,0.95)";
+        ctx.font = "700 11px Orbitron, sans-serif";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(`TARGET · ${remaining} TO GO`, 12, rawY - 6);
+        ctx.restore();
+      } else if (rawY <= 40) {
+        // target is above the viewport — pin a chevron indicator at the top
+        ctx.save();
+        ctx.fillStyle = `rgba(212,175,55,${0.6 + 0.4 * pulse})`;
+        ctx.font = "700 11px Orbitron, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`▲ TARGET · ${remaining} TO GO`, w / 2, 92);
+        ctx.restore();
+      }
+    }
+
     // moving block
     if (g.moving && g.running) {
       const worldY = g.moving.index * g.blockH;
@@ -365,17 +459,24 @@ export default function StackGame() {
   const startGame = useCallback(() => {
     audioRef.current.start();
     gameRef.current = newGameState();
+    lastSecRef.current = INITIAL_TIME;
     setScore(0);
     setCombo(0);
     setComboFlash(null);
+    setTimeLeft(INITIAL_TIME);
+    if (timerBarRef.current) timerBarRef.current.style.width = "100%";
+    setTarget(FIRST_TARGET);
+    setLevel(1);
+    setGoalFlash(null);
     setPhase("playing");
     startLoop();
   }, [newGameState, startLoop]);
 
-  const endGame = useCallback((finalScore: number) => {
+  const endGame = useCallback((finalScore: number, reason: "crash" | "time" = "crash") => {
     const g = gameRef.current;
     if (g) g.running = false;
     audioRef.current.gameOver();
+    setOverReason(reason);
     setPhase("over");
     setBest((prev) => {
       const next = Math.max(prev, finalScore);
@@ -383,6 +484,12 @@ export default function StackGame() {
       return next;
     });
   }, []);
+
+  // Keep a stable ref so the rAF loop can end the game without re-creating the loop.
+  const endRef = useRef(endGame);
+  useEffect(() => {
+    endRef.current = endGame;
+  }, [endGame]);
 
   const dropBlock = useCallback(() => {
     const g = gameRef.current;
@@ -471,6 +578,20 @@ export default function StackGame() {
     setScore(g.score);
     setCombo(g.combo);
 
+    // TARGET LINE reached -> clear checkpoint, grant bonus time, raise the next target
+    if (g.score >= g.target) {
+      g.level += 1;
+      g.target += targetGap(g.level);
+      g.timeLeft += timeBonus(g.level);
+      g.timeMax = g.timeLeft;
+      lastSecRef.current = Math.ceil(g.timeLeft);
+      audioRef.current.goal();
+      setLevel(g.level);
+      setTarget(g.target);
+      setTimeLeft(Math.ceil(g.timeLeft));
+      setGoalFlash({ level: g.level, key: Date.now() });
+    }
+
     // spawn next moving block from alternating side
     const spawnLeft = mv.index % 2 === 0;
     g.moving = {
@@ -532,6 +653,11 @@ export default function StackGame() {
           <span data-testid="text-score" className="font-display font-black text-4xl text-white leading-none drop-shadow-[0_0_18px_rgba(212,175,55,0.4)]">
             {score}
           </span>
+          {phase === "playing" && (
+            <span className="text-[9px] tracking-[0.25em] text-primary/80 font-display uppercase mt-0.5">
+              LVL {level} · TARGET {target}
+            </span>
+          )}
         </div>
 
         <button
@@ -548,6 +674,55 @@ export default function StackGame() {
         <Trophy size={11} className="text-primary" />
         <span data-testid="text-best" className="text-[11px] font-display font-bold text-white/80 tracking-wide">BEST {best}</span>
       </div>
+
+      {/* Countdown timer bar */}
+      {phase === "playing" && (
+        <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-30 w-[62%] flex flex-col items-center gap-1">
+          <div className="w-full flex items-center justify-between px-0.5">
+            <span className="text-[9px] tracking-[0.25em] text-white/40 font-display uppercase">Time</span>
+            <span
+              data-testid="text-timer"
+              className={`text-[11px] font-display font-bold tracking-wider tabular-nums ${
+                timeLeft <= 5 ? "text-red-400" : "text-white/80"
+              }`}
+            >
+              {timeLeft}s
+            </span>
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              ref={timerBarRef}
+              data-testid="bar-timer"
+              className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+              style={{ width: "100%" }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Target reached flash */}
+      <AnimatePresence>
+        {goalFlash && (
+          <motion.div
+            key={goalFlash.key}
+            initial={{ opacity: 0, scale: 0.6, y: 14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 1.25, y: -24 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            onAnimationComplete={() => setGoalFlash((g) => (g && g.key === goalFlash.key ? null : g))}
+            className="absolute top-[36%] left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+          >
+            <div className="flex flex-col items-center">
+              <span className="font-display font-black text-3xl text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-accent drop-shadow-[0_0_24px_rgba(212,175,55,0.8)]">
+                TARGET CLEARED
+              </span>
+              <span className="font-display font-bold text-sm text-accent tracking-widest mt-1">
+                LEVEL {goalFlash.level} · +TIME
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Combo flash */}
       <AnimatePresence>
@@ -598,9 +773,14 @@ export default function StackGame() {
               <h1 className="font-display font-black text-4xl leading-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-primary to-accent mb-3">
                 STACK &<br />MATCH
               </h1>
-              <p className="text-sm text-white/60 max-w-[260px] leading-relaxed mb-8">
+              <p className="text-sm text-white/60 max-w-[260px] leading-relaxed mb-4">
                 Tap to drop each block. Line it up perfectly to keep your platform wide. Three perfects in a row and it grows back.
               </p>
+              <div className="flex items-center gap-2 mb-8 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30">
+                <span className="text-[11px] text-primary font-display font-bold tracking-wide text-center leading-snug">
+                  Reach the glowing TARGET line before the timer runs out to bank time and level up.
+                </span>
+              </div>
               <motion.div
                 animate={{ scale: [1, 1.06, 1] }}
                 transition={{ duration: 1.4, repeat: Infinity }}
@@ -629,7 +809,14 @@ export default function StackGame() {
               transition={{ type: "spring", bounce: 0.35 }}
               className="w-full max-w-[300px] flex flex-col items-center text-center"
             >
-              <span className="text-xs tracking-[0.4em] text-white/40 font-display uppercase mb-2">Game Over</span>
+              <span
+                data-testid="text-over-reason"
+                className={`text-xs tracking-[0.4em] font-display uppercase mb-2 ${
+                  overReason === "time" ? "text-red-400" : "text-white/40"
+                }`}
+              >
+                {overReason === "time" ? "Time Up" : "Game Over"}
+              </span>
               <div className="font-display font-black text-6xl text-transparent bg-clip-text bg-gradient-to-br from-white to-primary mb-1" data-testid="text-final-score">
                 {score}
               </div>
