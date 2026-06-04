@@ -29,6 +29,10 @@ import NumSmashGame from "@/pages/num-smash-game";
 import ChainSumGame from "@/pages/chain-sum-game";
 import FracSortGame from "@/pages/frac-sort-game";
 import SpeedMathGame from "@/pages/speed-math-game";
+import GridPopGame from "@/pages/gridpop-game";
+import NeonLinkGame from "@/pages/neonlink-game";
+import QuickSumGame from "@/pages/quicksum-game";
+import Match3Game from "@/pages/match3-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -76,6 +80,10 @@ function Router() {
             <Route path="/games/chainsum"><ChainSumGame /></Route>
             <Route path="/games/fracsort"><FracSortGame /></Route>
             <Route path="/games/speedmath"><SpeedMathGame /></Route>
+            <Route path="/games/gridpop"><GridPopGame /></Route>
+            <Route path="/games/neonlink"><NeonLinkGame /></Route>
+            <Route path="/games/quicksum"><QuickSumGame /></Route>
+            <Route path="/games/match3"><Match3Game /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>

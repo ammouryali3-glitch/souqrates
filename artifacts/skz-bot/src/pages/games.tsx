@@ -510,6 +510,102 @@ export default function Games() {
         </motion.div>
       </Link>
 
+      {/* Grid Pop */}
+      <Link href="/games/gridpop">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-gridpop"
+          className="relative overflow-hidden rounded-3xl border border-pink-500/40 bg-gradient-to-br from-[#1a0018]/90 via-pink-950/20 to-background p-5 shadow-lg shadow-pink-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-pink-400"><Grid2x2 size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-pink-400/80">Game 18 · Puzzle</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Grid Pop</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap connected color blocks to explode them! Pop 8+ at once for bonus time, screen shake, and glass-shatter combos!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-700 to-purple-400 flex items-center justify-center shadow-[0_0_25px_rgba(236,72,153,0.5)] shrink-0"><Grid2x2 size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-pink-400 tracking-wide">
+              <Trophy size={13} /> Flood-fill · 6 colors · screen shake<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Neon Link */}
+      <Link href="/games/neonlink">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-neonlink"
+          className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#000a18]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-400"><GitBranch size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 19 · Puzzle</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Neon Link</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Drag fluid neon lines to connect matching symbols. But beware the ⚡ blocker — cross it and your connection snaps!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-indigo-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.5)] shrink-0"><GitBranch size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
+              <Trophy size={13} /> Drag lines · moving blocker · escalating pairs<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Quick Sum */}
+      <Link href="/games/quicksum">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-quicksum"
+          className="relative overflow-hidden rounded-3xl border border-blue-500/40 bg-gradient-to-br from-[#000514]/90 via-blue-950/20 to-background p-5 shadow-lg shadow-blue-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-blue-400"><Cpu size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-blue-400/80">Game 20 · Math</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Quick Sum</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap numbers that add up to the target. Suddenly, × mode kicks in — find two numbers whose product matches instead!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-700 to-violet-400 flex items-center justify-center shadow-[0_0_25px_rgba(59,130,246,0.5)] shrink-0"><Cpu size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-blue-400 tracking-wide">
+              <Trophy size={13} /> + and × modes · Apple-style UI · speed solving<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Match 3 Blitz */}
+      <Link href="/games/match3">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-match3"
+          className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-[#0c0018]/90 via-purple-950/20 to-background p-5 shadow-lg shadow-purple-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-purple-400"><Sparkles size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-purple-400/80">Game 21 · Puzzle</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Match 3 Blitz</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Swap glowing gems to match 3 or more in a row. Match 5+ for cascade combos, bonus time, and screen-shaking explosions!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-pink-400 flex items-center justify-center shadow-[0_0_25px_rgba(168,85,247,0.5)] shrink-0"><Sparkles size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-purple-400 tracking-wide">
+              <Trophy size={13} /> 7×7 grid · cascades · 5-match bonus time<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
       {/* Currently Playing */}
       <div className="flex flex-col gap-3">
         <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Live Matches</h3>
