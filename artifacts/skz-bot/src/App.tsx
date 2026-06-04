@@ -69,7 +69,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const [location] = useLocation();
-  const immersive = location.startsWith("/games/") && location !== "/games";
+  const immersive = (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
 
   return (
     <MobileContainer hideHeader={immersive}>
