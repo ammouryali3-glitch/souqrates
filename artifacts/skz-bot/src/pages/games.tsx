@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors, Circle, GitBranch, Music2, Cpu } from "lucide-react";
+import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors, Circle, GitBranch, Music2, Cpu, Mountain, Fish, Dribbble, Milestone } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -282,6 +282,102 @@ export default function Games() {
             </div>
             <div className="flex items-center gap-2 mt-1 text-xs font-mono font-bold text-green-400 tracking-wide">
               <Trophy size={13} /> Hacker terminal UI · freeze bonus<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Bouncy Dune */}
+      <Link href="/games/dune">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-dune"
+          className="relative overflow-hidden rounded-3xl border border-amber-600/50 bg-gradient-to-br from-amber-900/30 via-orange-900/10 to-background p-5 shadow-lg shadow-amber-900/30 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-amber-500"><Mountain size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-amber-400/80">Game 9</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Bouncy Dune</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Hold to dive, release to soar! Smooth landings gain speed. High air time = bonus.</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-700 to-orange-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,160,0,0.5)] shrink-0"><Mountain size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-amber-400 tracking-wide">
+              <Trophy size={13} /> Desert sunset parallax · air time bonus<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Flappy Submarine */}
+      <Link href="/games/submarine">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-submarine"
+          className="relative overflow-hidden rounded-3xl border border-cyan-700/40 bg-gradient-to-br from-[#001a2e]/80 via-blue-900/10 to-background p-5 shadow-lg shadow-blue-900/30 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-500"><Fish size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 10</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Flappy Sub</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Navigate coral reefs underwater. Dodge moving mines & sudden currents!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-800 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,200,255,0.45)] shrink-0"><Fish size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
+              <Trophy size={13} /> Ocean currents · mines · bubbles<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Dunk Shot */}
+      <Link href="/games/dunk">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-dunk"
+          className="relative overflow-hidden rounded-3xl border border-orange-600/40 bg-gradient-to-br from-[#0d0d1a]/80 via-orange-900/10 to-background p-5 shadow-lg shadow-orange-900/20 cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-orange-500"><Dribbble size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-orange-400/80">Game 11</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Dunk Shot</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Slingshot the ball into moving hoops. Swish = ×2. 3 swishes = ON FIRE 🔥</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-800 to-yellow-500 flex items-center justify-center shadow-[0_0_25px_rgba(255,120,0,0.5)] shrink-0"><Dribbble size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-orange-400 tracking-wide">
+              <Trophy size={13} /> Moving hoops · fire mode · bounce physics<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+
+      {/* Bridge Builder */}
+      <Link href="/games/bridge">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-bridge"
+          className="relative overflow-hidden rounded-3xl border border-yellow-700/40 bg-gradient-to-br from-[#e8e0d5]/10 via-amber-900/10 to-background p-5 shadow-lg cursor-pointer group">
+          <div className="absolute -right-6 -top-6 opacity-15 group-hover:opacity-25 transition-opacity text-amber-600"><Milestone size={120} strokeWidth={1.2} /></div>
+          <div className="flex flex-col gap-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-amber-400/80">Game 12</span>
+              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Bridge Builder</h2>
+                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Hold to extend, release to drop. Hit the red dot perfectly for ×2 score!</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-800 to-yellow-600 flex items-center justify-center shadow-[0_0_25px_rgba(212,175,55,0.45)] shrink-0"><Milestone size={26} className="text-white" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-amber-400 tracking-wide">
+              <Trophy size={13} /> Zen Japanese aesthetic · perfect center bonus<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
         </motion.div>

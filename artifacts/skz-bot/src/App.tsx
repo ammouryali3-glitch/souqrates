@@ -20,6 +20,10 @@ import ColorSwitchGame from "@/pages/color-switch-game";
 import ZigZagGame from "@/pages/zigzag-game";
 import PianoGame from "@/pages/piano-game";
 import WhackGame from "@/pages/whack-game";
+import DuneGame from "@/pages/dune-game";
+import SubmarineGame from "@/pages/submarine-game";
+import DunkGame from "@/pages/dunk-game";
+import BridgeGame from "@/pages/bridge-game";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -58,6 +62,10 @@ function Router() {
             <Route path="/games/zigzag"><ZigZagGame /></Route>
             <Route path="/games/piano"><PianoGame /></Route>
             <Route path="/games/whack"><WhackGame /></Route>
+            <Route path="/games/dune"><DuneGame /></Route>
+            <Route path="/games/submarine"><SubmarineGame /></Route>
+            <Route path="/games/dunk"><DunkGame /></Route>
+            <Route path="/games/bridge"><BridgeGame /></Route>
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
