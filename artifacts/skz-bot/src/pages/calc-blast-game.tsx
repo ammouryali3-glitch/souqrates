@@ -54,6 +54,7 @@ export default function CalcBlastGame() {
   const timerBarRef = useRef<HTMLDivElement>(null);
   const lastSecRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const pendingTicketRef = useRef<Ticket | null>(null);
 
   const gsRef = useRef({ eq: null as Eq | null, score: 0, hp: 3, level: 1, nextId: 0, time: 60, maxTime: 60, target: 12, particles: [] as Particle[], stars: [] as Star[], wrongFlash: 0, correctFlash: 0 });
 
@@ -92,7 +93,6 @@ export default function CalcBlastGame() {
     g.stars = Array.from({ length: 80 }, () => ({ x: Math.random() * w, y: Math.random() * h, r: 0.5 + Math.random() * 2, a: 0.3 + Math.random() * 0.7 }));
     lastSecRef.current = Date.now();
     setHpDisp(3); setScoreDisp(0); setTimeLeft(t.time);
-    setPhase("playing");
     startingRef.current = false;
     let last = performance.now();
     const TWO_PI = Math.PI * 2;
@@ -194,6 +194,12 @@ export default function CalcBlastGame() {
   }, [finishGame]);
 
   useEffect(() => { return () => { cancelAnimationFrame(rafRef.current); abortRef.current?.abort(); }; }, []);
+  useEffect(() => {
+    if (phase !== "playing" || !pendingTicketRef.current) return;
+    const t = pendingTicketRef.current;
+    pendingTicketRef.current = null;
+    startGame(t);
+  }, [phase, startGame]);
 
   const refillBalance = () => { setBalance(1000); localStorage.setItem(BALANCE_KEY, "1000"); };
 
@@ -221,7 +227,7 @@ export default function CalcBlastGame() {
                 const canAfford = balance >= t.price;
                 return (
                   <motion.button key={t.id} whileTap={{ scale: 0.97 }} disabled={!canAfford}
-                    onClick={() => { if (!canAfford) return; setTicket(t); startGame(t); }}
+                    onClick={() => { if (!canAfford) return; pendingTicketRef.current = t; setTicket(t); setPhase("playing"); }}
                     className={`flex items-center justify-between px-5 py-4 rounded-2xl border transition-all ${canAfford ? "bg-white/5 border-cyan-500/30 hover:border-cyan-400/60 cursor-pointer" : "opacity-40 border-white/10 cursor-not-allowed"}`}>
                     <div className="text-left">
                       <div className="font-display font-bold text-white text-base">{t.name}</div>

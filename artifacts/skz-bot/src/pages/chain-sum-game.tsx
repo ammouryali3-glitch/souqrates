@@ -39,6 +39,7 @@ export default function ChainSumGame() {
   const timerBarRef = useRef<HTMLDivElement>(null);
   const lastSecRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const pendingTicketRef = useRef<Ticket | null>(null);
 
   const gsRef = useRef({
     cells: [] as Cell[], chain: [] as number[], score: 0,
@@ -94,7 +95,6 @@ export default function ChainSumGame() {
 
     lastSecRef.current = Date.now();
     setScoreDisp(0); setTimeLeft(t.time);
-    setPhase("playing");
     startingRef.current = false;
     let last = performance.now();
     const TWO_PI = Math.PI * 2;
@@ -237,6 +237,12 @@ export default function ChainSumGame() {
   }, [finishGame]);
 
   useEffect(() => { return () => { cancelAnimationFrame(rafRef.current); abortRef.current?.abort(); }; }, []);
+  useEffect(() => {
+    if (phase !== "playing" || !pendingTicketRef.current) return;
+    const t = pendingTicketRef.current;
+    pendingTicketRef.current = null;
+    startGame(t);
+  }, [phase, startGame]);
   const refillBalance = () => { setBalance(1000); localStorage.setItem(BALANCE_KEY, "1000"); };
 
   return (
@@ -263,7 +269,7 @@ export default function ChainSumGame() {
                 const canAfford = balance >= t.price;
                 return (
                   <motion.button key={t.id} whileTap={{ scale: 0.97 }} disabled={!canAfford}
-                    onClick={() => { if (!canAfford) return; setTicket(t); startGame(t); }}
+                    onClick={() => { if (!canAfford) return; pendingTicketRef.current = t; setTicket(t); setPhase("playing"); }}
                     className={`flex items-center justify-between px-5 py-4 rounded-2xl border transition-all ${canAfford ? "bg-white/5 border-emerald-500/30 hover:border-emerald-400/60 cursor-pointer" : "opacity-40 border-white/10 cursor-not-allowed"}`}>
                     <div className="text-left">
                       <div className="font-display font-bold text-white text-base">{t.name}</div>
