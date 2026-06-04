@@ -78,6 +78,7 @@ export default function CalcBlastGame() {
 
   const startGame = useCallback((t: Ticket) => {
     if (startingRef.current) return;
+    if (!canvasRef.current) { rafRef.current = requestAnimationFrame(() => startGame(t)); return; }
     startingRef.current = true;
     finishedRef.current = false;
     abortRef.current?.abort();
@@ -87,7 +88,7 @@ export default function CalcBlastGame() {
     g.time = t.time; g.maxTime = t.time; g.target = t.target;
     g.particles = []; g.wrongFlash = 0; g.correctFlash = 0;
     g.eq = genEq(1, g.nextId++);
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
     canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
     const w = canvas.width, h = canvas.height;
     g.stars = Array.from({ length: 80 }, () => ({ x: Math.random() * w, y: Math.random() * h, r: 0.5 + Math.random() * 2, a: 0.3 + Math.random() * 0.7 }));

@@ -72,6 +72,7 @@ export default function FracSortGame() {
 
   const startGame = useCallback((t: Ticket) => {
     if (startingRef.current) return;
+    if (!canvasRef.current) { rafRef.current = requestAnimationFrame(() => startGame(t)); return; }
     startingRef.current = true;
     finishedRef.current = false;
     abortRef.current?.abort();
@@ -82,7 +83,7 @@ export default function FracSortGame() {
     g.frac = FRAC_POOL[Math.floor(Math.random() * FRAC_POOL.length)];
     g.fracY = 0; g.fracT = 0;
 
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
     canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
     lastSecRef.current = Date.now();
     setHpDisp(3); setScoreDisp(0); setTimeLeft(t.time);

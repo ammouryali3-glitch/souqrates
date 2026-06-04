@@ -72,6 +72,7 @@ export default function NumSmashGame() {
 
   const startGame = useCallback((t: Ticket) => {
     if (startingRef.current) return;
+    if (!canvasRef.current) { rafRef.current = requestAnimationFrame(() => startGame(t)); return; }
     startingRef.current = true;
     finishedRef.current = false;
     abortRef.current?.abort();
@@ -80,7 +81,7 @@ export default function NumSmashGame() {
     g.score = 0; g.hp = 3; g.time = t.time; g.maxTime = t.time; g.target = t.target;
     g.cells = []; g.particles = []; g.challengeIdx = 0; g.challengeT = 0;
     g.nextCellId = 0; g.spawnT = 0; g.spawnInterval = 1.8;
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
     canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
     lastSecRef.current = Date.now();
     setHpDisp(3); setScoreDisp(0); setTimeLeft(t.time);

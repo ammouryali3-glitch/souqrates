@@ -87,6 +87,7 @@ export default function SpeedMathGame() {
 
   const startGame = useCallback((t: Ticket) => {
     if (startingRef.current) return;
+    if (!canvasRef.current) { rafRef.current = requestAnimationFrame(() => startGame(t)); return; }
     startingRef.current = true;
     finishedRef.current = false;
     abortRef.current?.abort();
@@ -96,7 +97,7 @@ export default function SpeedMathGame() {
     g.time = t.time; g.maxTime = t.time; g.target = t.target;
     g.particles = []; g.resultFlash = null;
     g.q = genQuestion(1); g.qPhase = "show"; g.showT = 0.9; g.answerT = 0;
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
     canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
     lastSecRef.current = Date.now();
     setHpDisp(3); setScoreDisp(0); setComboDisp(0); setTimeLeft(t.time);

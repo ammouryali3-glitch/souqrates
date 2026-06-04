@@ -1,1 +1,2 @@
 - [SKZ Bot canvas games](skz-bot-games.md) — full-screen /games/<name> routes; must stop rAF on game-over and close AudioContext on unmount.
+- [Canvas ref null with AnimatePresence](canvas-animatepresence-null.md) — canvasRef.current is null when startGame fires if canvas is inside AnimatePresence mode="wait". Fix: RAF retry guard at top of startGame.

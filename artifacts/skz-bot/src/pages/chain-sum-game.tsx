@@ -68,6 +68,7 @@ export default function ChainSumGame() {
 
   const startGame = useCallback((t: Ticket) => {
     if (startingRef.current) return;
+    if (!canvasRef.current) { rafRef.current = requestAnimationFrame(() => startGame(t)); return; }
     startingRef.current = true;
     finishedRef.current = false;
     abortRef.current?.abort();
@@ -75,7 +76,7 @@ export default function ChainSumGame() {
     const g = gsRef.current;
     g.score = 0; g.time = t.time; g.maxTime = t.time; g.target = t.target; g.targetSum = t.targetSum;
     g.chain = []; g.dragging = false; g.particles = []; g.wrongFlash = 0; g.correctFlash = 0;
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
     canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
     const cw = canvas.width, ch = canvas.height;
     const PAD = 16, HEADER = 110;
