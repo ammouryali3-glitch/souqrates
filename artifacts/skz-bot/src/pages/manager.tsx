@@ -210,7 +210,7 @@ function Dashboard({
           <button onClick={() => setOpen(true)} className="lg:hidden w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center">
             <Menu size={18} className="text-white/70" />
           </button>
-          <div className="flex items-center gap-2 min-w-0 shrink-0">
+          <div className="hidden sm:flex items-center gap-2 min-w-0 shrink-0">
             <active.icon size={18} className="text-primary shrink-0" />
             <span className="font-display font-bold text-white truncate hidden md:block">{active.label}</span>
           </div>

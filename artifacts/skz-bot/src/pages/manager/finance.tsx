@@ -289,7 +289,7 @@ export default function FinanceSection() {
                     type="number"
                     value={finance.withdrawMin[c]}
                     onChange={setPerCur("withdrawMin", c)}
-                    className="w-28"
+                    className="w-20 sm:w-28"
                     data-testid={`input-withdraw-min-${c}`}
                   />
                 </Td>
@@ -298,7 +298,7 @@ export default function FinanceSection() {
                     type="number"
                     value={finance.withdrawMax[c]}
                     onChange={setPerCur("withdrawMax", c)}
-                    className="w-28"
+                    className="w-20 sm:w-28"
                     data-testid={`input-withdraw-max-${c}`}
                   />
                 </Td>
@@ -307,7 +307,7 @@ export default function FinanceSection() {
                     type="number"
                     value={finance.dailyMax[c]}
                     onChange={setPerCur("dailyMax", c)}
-                    className="w-28"
+                    className="w-20 sm:w-28"
                     data-testid={`input-daily-max-${c}`}
                   />
                 </Td>
@@ -316,7 +316,7 @@ export default function FinanceSection() {
                     type="number"
                     value={finance.gasFee[c]}
                     onChange={setPerCur("gasFee", c)}
-                    className="w-28"
+                    className="w-20 sm:w-28"
                     data-testid={`input-gas-fee-${c}`}
                   />
                 </Td>

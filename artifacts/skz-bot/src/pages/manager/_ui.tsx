@@ -183,13 +183,15 @@ export function Pill({ tone = "gray", children }: { tone?: keyof typeof PILL; ch
 // ── Table ─────────────────────────────────────────────────────────────────────
 export function Table({ head, children }: { head: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto -mx-1">
-      <table className="w-full text-right border-collapse">
-        <thead>
-          <tr className="text-[11px] font-display text-white/40 border-b border-white/10">{head}</tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">{children}</tbody>
-      </table>
+    <div className="overflow-x-auto -mx-4 sm:-mx-5">
+      <div className="px-4 sm:px-5 min-w-max w-full">
+        <table className="w-full text-right border-collapse">
+          <thead>
+            <tr className="text-[11px] font-display text-white/40 border-b border-white/10">{head}</tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">{children}</tbody>
+        </table>
+      </div>
     </div>
   );
 }
