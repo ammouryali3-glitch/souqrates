@@ -7,10 +7,9 @@ import type {
   TicketMsg, TokenPackage, Withdrawal,
 } from "./admin-types";
 import {
-  seedApiKeys, seedBackupSettings, seedBroadcasts, seedCmsTexts, seedDeposits,
-  seedFinanceSettings, seedInventory, seedPromoCodes, seedReferralLevels,
-  seedReferrers, seedRoles, seedSecuritySettings, seedSocialTasks, seedTickets,
-  seedTokenPackages, seedUsers, seedWithdrawals,
+  seedApiKeys, seedBackupSettings, seedCmsTexts,
+  seedFinanceSettings, seedReferralLevels,
+  seedRoles, seedSecuritySettings,
 } from "./admin-seed";
 import {
   fetchRuntimeConfig,
