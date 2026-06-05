@@ -11,6 +11,7 @@ import {
   seedFinanceSettings, seedReferralLevels,
   seedRoles, seedSecuritySettings,
 } from "./admin-seed";
+import { initTelegramUser, syncBalanceToServer } from "./telegram-user";
 import {
   fetchRuntimeConfig,
   fetchAdminState,
@@ -347,6 +348,7 @@ function applyFullAdminState(
 /**
  * On startup: fetch runtime config (public) for all users,
  * plus optionally the full admin state (auth-required) if an admin session is active.
+ * Also initialises Telegram WebApp identity and syncs balance from DB.
  * Fire-and-forget; the UI shows optimistic (localStorage) state immediately.
  */
 async function initFromApi(): Promise<void> {
@@ -358,14 +360,54 @@ async function initFromApi(): Promise<void> {
     emit();
   }
 
-  // Attempt to fetch full admin state (auth-required — succeeds only if admin is logged in)
-  const fullState = await fetchAdminState();
-  if (fullState) {
-    applyRuntimeConfig(fullState.config, fullState.notifications as AppNotification[]);
-    applyFullAdminState(fullState, fullState.config);
-    persist();
-    emit();
+  // Identify the Telegram user and get their server-side balance.
+  // Run in parallel with the admin state fetch to save time.
+  const [telegramSkz] = await Promise.all([
+    initTelegramUser(),
+    // Attempt to fetch full admin state (auth-required — succeeds only if admin is logged in)
+    fetchAdminState().then((fullState) => {
+      if (fullState) {
+        applyRuntimeConfig(fullState.config, fullState.notifications as AppNotification[]);
+        applyFullAdminState(fullState, fullState.config);
+        persist();
+        emit();
+      }
+    }),
+  ]);
+
+  // If the server returned a confirmed balance for this Telegram user, apply it.
+  // This overrides whatever was in localStorage so the balance is always authoritative.
+  if (telegramSkz !== null) {
+    balance = Math.max(0, Math.floor(telegramSkz));
+    try {
+      localStorage.setItem(BALANCE_KEY, String(balance));
+    } catch {
+      /* ignore */
+    }
+    balListeners.forEach((l) => l());
   }
+}
+
+// ── localStorage interceptor ──────────────────────────────────────────────────
+// Games and other components write directly to localStorage[BALANCE_KEY].
+// We intercept every setItem call so those writes are caught here and synced
+// to the server — without requiring changes in each individual game file.
+if (typeof window !== "undefined") {
+  const _origSetItem = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function (key: string, value: string) {
+    _origSetItem(key, value);
+    if (key === BALANCE_KEY) {
+      const n = parseInt(value, 10);
+      if (Number.isFinite(n)) {
+        const clamped = Math.max(0, n);
+        if (clamped !== balance) {
+          balance = clamped;
+          balListeners.forEach((l) => l());
+          syncBalanceToServer(balance);
+        }
+      }
+    }
+  };
 }
 
 // Fire and forget — initialize from API after module loads
@@ -429,6 +471,8 @@ function writeBalance(n: number) {
     /* ignore */
   }
   balListeners.forEach((l) => l());
+  // Sync to DB whenever a Telegram user is identified.
+  syncBalanceToServer(balance);
 }
 /** Re-read from storage in case a game mutated it directly. */
 export function syncBalance() {
@@ -436,8 +480,15 @@ export function syncBalance() {
   if (v !== balance) {
     balance = v;
     balListeners.forEach((l) => l());
+    syncBalanceToServer(balance);
   }
 }
+
+/**
+ * Public version of writeBalance — exported so new code can call it directly
+ * instead of mutating localStorage. Triggers both UI notification and DB sync.
+ */
+export { writeBalance };
 
 // ── Library helpers ───────────────────────────────────────────────────────────
 export function getLibraryIds(): number[] {

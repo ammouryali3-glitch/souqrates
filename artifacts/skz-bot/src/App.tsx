@@ -9,6 +9,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Ban, Wrench } from "lucide-react";
 import { useAdmin } from "@/lib/admin-store";
 import { ALL_GAMES, getGameById } from "@/lib/games-data";
+import { setCurrentGameContext } from "@/lib/telegram-user";
+import { useEffect, useRef } from "react";
 
 // Pages
 import Home from "@/pages/home";
@@ -131,6 +133,23 @@ function Router() {
   const [location] = useLocation();
   const { banned, settings } = useAdmin();
   const isManager = location === "/manager";
+
+  // Pre-fetch a game-session nonce on every game or arena route entry.
+  // This is an optimization — reduces latency for the first credit after
+  // entering a play context.  For repeated plays or arena credits, the sync
+  // layer automatically requests fresh nonces inline (see telegram-user.ts).
+  const lastContextRoute = useRef<string | null>(null);
+  useEffect(() => {
+    const gameMatch = location.match(/^\/games\/(\w+)/);
+    const arenaMatch = location.match(/^\/arena\/(\w+)/);
+    const contextId = gameMatch?.[1] ?? arenaMatch?.[1] ?? null;
+    if (contextId && location !== lastContextRoute.current) {
+      lastContextRoute.current = location;
+      setCurrentGameContext(contextId).catch(() => {/* ignore */});
+    } else if (!gameMatch && !arenaMatch) {
+      lastContextRoute.current = null;
+    }
+  }, [location]);
   const immersive = isManager || (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
 
   if (banned && !isManager) {
