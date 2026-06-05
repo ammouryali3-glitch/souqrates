@@ -19,7 +19,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 export interface DepositRecord {
   id: string;
   userId: string;
-  currency: "TON" | "USDT";
+  currency: "TON";
   amount: number;
   skzCredited?: number;
   status: "pending" | "confirmed";
@@ -30,7 +30,7 @@ export interface DepositRecord {
 export interface WithdrawalRecord {
   id: string;
   userId: string;
-  currency: "TON" | "USDT";
+  currency: "TON";
   amount: number;
   status: "pending" | "approved" | "rejected" | "completed";
   wallet: string;
@@ -39,7 +39,6 @@ export interface WithdrawalRecord {
 
 export interface WalletData {
   tonDepositWallet: string;
-  tronDepositWallet: string;
   depositMemo: string;
   deposits: DepositRecord[];
   withdrawals: WithdrawalRecord[];
@@ -67,12 +66,12 @@ export interface WithdrawResult {
 export async function submitWithdrawal(
   skzAmount: number,
   destWallet: string,
-  currency: "USDT" | "TON",
+  _currency?: string,
 ): Promise<WithdrawResult> {
   try {
     const res = await apiFetch("/api/user/withdraw", {
       method: "POST",
-      body: JSON.stringify({ skzAmount, destWallet, currency }),
+      body: JSON.stringify({ skzAmount, destWallet }),
     });
     const json = await res.json();
     if (!res.ok) {

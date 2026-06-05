@@ -34,6 +34,7 @@ externalPort = 80
 [userenv]
 
 [userenv.shared]
+TON_DEPOSIT_WALLET = "UQA6ob_h_pLqtbdEMY2nmCuKemoHl2c4zuA9bo3oUu_9g8e1"
 
 [nix]
 channel = "stable-25_05"

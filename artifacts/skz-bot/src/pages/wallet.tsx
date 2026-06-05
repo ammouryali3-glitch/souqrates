@@ -17,7 +17,7 @@ import { fetchUserWallet, submitWithdrawal, type WalletData } from "@/lib/user-a
 
 interface DepositRecord {
   id: string;
-  currency: "TON" | "USDT";
+  currency: "TON";
   amount: number;
   skzCredited?: number;
   status: "pending" | "confirmed";
@@ -27,7 +27,7 @@ interface DepositRecord {
 
 interface WithdrawalRecord {
   id: string;
-  currency: "TON" | "USDT";
+  currency: "TON";
   amount: number;
   status: "pending" | "approved" | "rejected" | "completed";
   wallet: string;
@@ -65,8 +65,6 @@ function statusColor(status: string): string {
   }
 }
 
-type DepNetwork = "USDT" | "TON";
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Wallet() {
@@ -75,7 +73,6 @@ export default function Wallet() {
   const s = t[lang];
 
   const [copied, setCopied] = useState<"address" | "memo" | null>(null);
-  const [network, setNetwork] = useState<DepNetwork>("USDT");
 
   // Wallet data from server
   const [walletData, setWalletData] = useState<WalletData | null>(null);
@@ -84,7 +81,6 @@ export default function Wallet() {
   // Withdrawal form
   const [wdAmount, setWdAmount] = useState("");
   const [wdAddress, setWdAddress] = useState("");
-  const [wdCurrency, setWdCurrency] = useState<"USDT" | "TON">("USDT");
   const [wdLoading, setWdLoading] = useState(false);
   const [wdError, setWdError] = useState("");
   const [wdSuccess, setWdSuccess] = useState(false);
@@ -110,14 +106,8 @@ export default function Wallet() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const depositAddress = network === "TON"
-    ? (walletData?.tonDepositWallet ?? "")
-    : (walletData?.tronDepositWallet ?? "");
-
-  const depositNote = network === "TON"
-    ? "أرسل TON إلى هذا العنوان مع ذكر معرّفك كـ تعليق على العملية. الحد الأدنى: 0.5 TON."
-    : "أرسل USDT عبر شبكة TRON (TRC20) فقط إلى هذا العنوان مع ذكر معرّفك كتعليق. الحد الأدنى: 5 USDT.";
-
+  const depositAddress = walletData?.tonDepositWallet ?? "";
+  const depositNote = "أرسل TON إلى هذا العنوان مع ذكر معرّفك كـ تعليق على العملية. الحد الأدنى: 0.5 TON.";
   const hasDepositWallet = !!depositAddress;
 
   async function handleWithdraw() {
@@ -138,7 +128,7 @@ export default function Wallet() {
     setWdLoading(true);
     setWdError("");
     try {
-      const result = await submitWithdrawal(amount, wdAddress.trim(), wdCurrency);
+      const result = await submitWithdrawal(amount, wdAddress.trim(), "TON");
       if (result.ok) {
         setWdSuccess(true);
         setWdAmount("");
@@ -211,28 +201,11 @@ export default function Wallet() {
         {/* ── Deposit Tab ── */}
         <TabsContent value="deposit" className="mt-4 flex flex-col gap-4">
           <div className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-4">
-            {/* Network selector */}
+            {/* Network badge */}
             <div className="flex gap-2">
-              <button
-                onClick={() => setNetwork("USDT")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  network === "USDT"
-                    ? "bg-primary/20 text-primary border border-primary/30"
-                    : "bg-card border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
-                USDT (TRC20)
-              </button>
-              <button
-                onClick={() => setNetwork("TON")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  network === "TON"
-                    ? "bg-primary/20 text-primary border border-primary/30"
-                    : "bg-card border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary/20 text-primary border border-primary/30">
                 TON
-              </button>
+              </span>
             </div>
 
             {/* Deposit address */}
@@ -300,28 +273,11 @@ export default function Wallet() {
         <TabsContent value="withdraw" className="mt-4 flex flex-col gap-4">
           <div className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-4">
 
-            {/* Currency selector */}
+            {/* Network badge */}
             <div className="flex gap-2">
-              <button
-                onClick={() => setWdCurrency("USDT")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  wdCurrency === "USDT"
-                    ? "bg-primary/20 text-primary border border-primary/30"
-                    : "bg-card border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
-                USDT (TRC20)
-              </button>
-              <button
-                onClick={() => setWdCurrency("TON")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  wdCurrency === "TON"
-                    ? "bg-primary/20 text-primary border border-primary/30"
-                    : "bg-card border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary/20 text-primary border border-primary/30">
                 TON
-              </button>
+              </span>
             </div>
 
             {/* SKZ Amount */}
@@ -348,7 +304,7 @@ export default function Wallet() {
             <div className="flex flex-col gap-2">
               <Label className="text-xs text-muted-foreground">{s.destWallet}</Label>
               <Input
-                placeholder={wdCurrency === "TON" ? "EQ..." : "T..."}
+                placeholder="EQ..."
                 value={wdAddress}
                 onChange={(e) => setWdAddress(e.target.value)}
                 className="bg-black/40 border-white/10 rounded-xl h-12 font-mono text-sm"

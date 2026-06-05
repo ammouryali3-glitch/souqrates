@@ -722,7 +722,6 @@ router.get("/wallet", async (req: Request, res: Response) => {
 
     res.json({
       tonDepositWallet: process.env.TON_DEPOSIT_WALLET ?? "",
-      tronDepositWallet: process.env.TRON_DEPOSIT_WALLET ?? "",
       depositMemo: payload.tgId,
       deposits: (depositRows.rows as Array<{ data: unknown }>).map((r) => r.data),
       withdrawals: (withdrawalRows.rows as Array<{ data: unknown }>).map((r) => r.data),
@@ -740,7 +739,7 @@ router.get("/wallet", async (req: Request, res: Response) => {
  * Immediately debits the user's SKZ balance.
  * Creates a pending withdrawal record for admin approval.
  *
- * Body: { skzAmount: number, destWallet: string, currency: "USDT" | "TON" }
+ * Body: { skzAmount: number, destWallet: string }
  * Returns: { ok: true, withdrawalId: string, newSkz: number }
  */
 router.post("/withdraw", async (req: Request, res: Response) => {
@@ -749,7 +748,7 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   const payload = verifyUserToken(token);
   if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
 
-  const { skzAmount, destWallet, currency } = req.body ?? {};
+  const { skzAmount, destWallet } = req.body ?? {};
 
   if (typeof skzAmount !== "number" || !Number.isFinite(skzAmount) || skzAmount <= 0) {
     res.status(400).json({ error: "skzAmount must be a positive number" }); return;
@@ -757,7 +756,7 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   if (typeof destWallet !== "string" || !destWallet.trim()) {
     res.status(400).json({ error: "destWallet required" }); return;
   }
-  const safeCurrency: "USDT" | "TON" = (currency === "TON" ? "TON" : "USDT");
+  const safeCurrency = "TON" as const;
   const safeAmount = Math.floor(skzAmount);
 
   try {

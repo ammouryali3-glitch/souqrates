@@ -1,20 +1,19 @@
 /**
  * Blockchain deposit poller.
  *
- * Polls TON Center API (TON) and TronGrid API (USDT TRC20) every 60 seconds
- * for new incoming transactions to the platform deposit wallets.
+ * Polls TON Center API every 60 seconds for new incoming TON transactions
+ * to the platform deposit wallet.
  *
  * User identification: sender includes their Telegram user ID as the
  * transaction comment/memo. The server parses it, looks up the user, and
  * credits their balance.
  *
  * Env vars:
- *   TON_DEPOSIT_WALLET    — TON/USDt-on-TON deposit address (optional)
- *   TRON_DEPOSIT_WALLET   — USDT TRC20 deposit address (optional)
+ *   TON_DEPOSIT_WALLET    — TON deposit address (required to enable polling)
  *   TONCENTER_API_KEY     — TON Center API key (optional, raises rate limit)
  *
  * Admin config key "deposit_config":
- *   { skzPerUsdt: number, skzPerTon: number }
+ *   { skzPerTon: number }
  *
  * Deposit records use the blockchain tx hash as their DB ID to prevent
  * double-crediting. If a deposit row with that ID already exists, it is
@@ -29,21 +28,15 @@ import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 60_000;
 
-/** USDT TRC20 contract on TRON mainnet */
-const USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
-
 const TON_WALLET = process.env.TON_DEPOSIT_WALLET ?? "";
-const TRON_WALLET = process.env.TRON_DEPOSIT_WALLET ?? "";
 const TON_API_KEY = process.env.TONCENTER_API_KEY ?? "";
 
-/** Default exchange rates (admin config "deposit_config" can override). */
-const DEFAULT_SKZ_PER_USDT = 100;
+/** Default exchange rate (admin config "deposit_config" can override). */
 const DEFAULT_SKZ_PER_TON = 500;
 
 // ── Rate config ───────────────────────────────────────────────────────────────
 
 interface DepositConfig {
-  skzPerUsdt: number;
   skzPerTon: number;
 }
 
@@ -57,19 +50,17 @@ async function getDepositConfig(): Promise<DepositConfig> {
     if (row?.value) {
       const c = row.value as Partial<DepositConfig>;
       return {
-        skzPerUsdt: typeof c.skzPerUsdt === "number" && c.skzPerUsdt > 0 ? c.skzPerUsdt : DEFAULT_SKZ_PER_USDT,
         skzPerTon: typeof c.skzPerTon === "number" && c.skzPerTon > 0 ? c.skzPerTon : DEFAULT_SKZ_PER_TON,
       };
     }
   } catch { /* use defaults */ }
-  return { skzPerUsdt: DEFAULT_SKZ_PER_USDT, skzPerTon: DEFAULT_SKZ_PER_TON };
+  return { skzPerTon: DEFAULT_SKZ_PER_TON };
 }
 
 // ── Poller state ──────────────────────────────────────────────────────────────
 
 interface PollerState {
   tonLastLt: string;    // TON: last processed logical time (lt), skip older TXs
-  tronMinBlock: number; // TRON: minimum block timestamp (ms) to process
 }
 
 async function loadPollerState(): Promise<PollerState> {
@@ -83,11 +74,10 @@ async function loadPollerState(): Promise<PollerState> {
       const s = row.value as Partial<PollerState>;
       return {
         tonLastLt: typeof s.tonLastLt === "string" ? s.tonLastLt : "0",
-        tronMinBlock: typeof s.tronMinBlock === "number" ? s.tronMinBlock : Date.now() - 60_000,
       };
     }
   } catch { /* use defaults */ }
-  return { tonLastLt: "0", tronMinBlock: Date.now() - 60_000 };
+  return { tonLastLt: "0" };
 }
 
 async function savePollerState(state: PollerState): Promise<void> {
@@ -107,18 +97,17 @@ async function savePollerState(state: PollerState): Promise<void> {
 // ── Credit helper ─────────────────────────────────────────────────────────────
 
 /**
- * Credit a confirmed deposit to a user.
+ * Credit a confirmed TON deposit to a user.
  * Returns false if the deposit was already processed (txHash exists as a deposit ID).
  */
 async function creditDeposit(
   txHash: string,
   tgId: string,
-  currency: "TON" | "USDT",
-  rawAmount: number,  // native units: nanotons (TON) or micro-USDT (USDT TRC20)
-  skzRate: number,    // SKZ per 1 currency unit
+  rawAmount: number,  // native units: nanotons
+  skzRate: number,    // SKZ per 1 TON
 ): Promise<boolean> {
-  // Convert from raw units to display units.
-  const amount = currency === "TON" ? rawAmount / 1e9 : rawAmount / 1e6;
+  // Convert nanotons to TON.
+  const amount = rawAmount / 1e9;
   const skzCredit = Math.floor(amount * skzRate);
 
   if (skzCredit <= 0) return false;
@@ -134,7 +123,7 @@ async function creditDeposit(
     .where(eq(platformUsersTable.id, tgId))
     .limit(1);
   if (!userRow) {
-    logger.warn({ tgId, txHash, currency }, "ton-poller: deposit memo tgId not found in DB");
+    logger.warn({ tgId, txHash }, "ton-poller: deposit memo tgId not found in DB");
     return false;
   }
 
@@ -143,10 +132,9 @@ async function creditDeposit(
 
   // Credit SKZ and update totalDeposit atomically
   const nowMs = Date.now();
-  const usdtEquivalent = currency === "USDT" ? amount : amount * (DEFAULT_SKZ_PER_TON / DEFAULT_SKZ_PER_USDT);
 
   await db.transaction(async (tx) => {
-    // Credit SKZ balance and update totalDeposit
+    // Credit SKZ balance and update totalDeposit (totalDeposit tracked in TON)
     await tx.execute(sql`
       UPDATE platform_users
       SET
@@ -157,7 +145,7 @@ async function creditDeposit(
               to_jsonb(COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${skzCredit}::numeric)
             ),
             '{totalDeposit}',
-            to_jsonb(COALESCE((data #>> '{totalDeposit}')::numeric, 0) + ${usdtEquivalent}::numeric)
+            to_jsonb(COALESCE((data #>> '{totalDeposit}')::numeric, 0) + ${amount}::numeric)
           ),
           '{lastSeen}',
           to_jsonb(${nowMs}::bigint)
@@ -171,7 +159,7 @@ async function creditDeposit(
       id: txHash,
       userId: tgId,
       userName,
-      currency,
+      currency: "TON",
       amount,
       skzCredited: skzCredit,
       txHash,
@@ -186,8 +174,8 @@ async function creditDeposit(
   });
 
   logger.info(
-    { tgId, txHash, currency, amount, skzCredit },
-    "ton-poller: deposit confirmed and credited",
+    { tgId, txHash, amount, skzCredit },
+    "ton-poller: TON deposit confirmed and credited",
   );
   return true;
 }
@@ -257,108 +245,13 @@ async function pollTon(state: PollerState): Promise<string> {
       const tgId = parseTgIdFromComment(comment);
       if (!tgId) continue;
 
-      await creditDeposit(hash, tgId, "TON", rawValue, config.skzPerTon);
+      await creditDeposit(hash, tgId, rawValue, config.skzPerTon);
     }
 
     return latestLt;
   } catch (err) {
     logger.warn({ err }, "ton-poller: TON poll error");
     return state.tonLastLt;
-  }
-}
-
-// ── TRON USDT TRC20 poller ────────────────────────────────────────────────────
-
-/**
- * Fetch the raw memo/data field from a TRON transaction.
- * TronGrid returns the memo as a hex-encoded UTF-8 string in
- * `raw_data.data`. Returns null if absent or the fetch fails.
- */
-async function fetchTronTxMemo(txId: string): Promise<string | null> {
-  try {
-    const url = `https://api.trongrid.io/v1/transactions/${txId}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) return null;
-    const json = await res.json() as {
-      data?: Array<{ raw_data?: { data?: string } }>;
-    };
-    const hexData = json.data?.[0]?.raw_data?.data;
-    if (!hexData) return null;
-    // Hex-encoded UTF-8 memo
-    return Buffer.from(hexData, "hex").toString("utf8").trim();
-  } catch {
-    return null;
-  }
-}
-
-async function pollTron(state: PollerState): Promise<number> {
-  if (!TRON_WALLET) return state.tronMinBlock;
-
-  try {
-    const params = new URLSearchParams({
-      contract_address: USDT_TRC20_CONTRACT,
-      limit: "50",
-      order_by: "block_timestamp,desc",
-      min_timestamp: String(state.tronMinBlock),
-    });
-
-    const url = `https://api.trongrid.io/v1/accounts/${TRON_WALLET}/transactions/trc20?${params}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    if (!res.ok) {
-      logger.warn({ status: res.status }, "ton-poller: TRON API returned non-OK status");
-      return state.tronMinBlock;
-    }
-
-    const json = await res.json() as { data?: Array<{
-      transaction_id: string;
-      block_timestamp: number;
-      from: string;
-      to: string;
-      value: string;
-      token_info: { decimals: number; symbol: string };
-    }> };
-
-    if (!Array.isArray(json.data)) return state.tronMinBlock;
-
-    const config = await getDepositConfig();
-    let maxTs = state.tronMinBlock;
-
-    for (const tx of json.data) {
-      if (tx.to.toLowerCase() !== TRON_WALLET.toLowerCase()) continue;
-      if (tx.token_info.symbol !== "USDT") continue;
-
-      if (tx.block_timestamp > maxTs) maxTs = tx.block_timestamp;
-      if (tx.block_timestamp <= state.tronMinBlock) continue;
-
-      const rawValue = parseInt(tx.value, 10);
-      if (!Number.isFinite(rawValue) || rawValue <= 0) continue;
-
-      // Fetch the full transaction to extract the memo from raw_data.data
-      // (hex-encoded UTF-8 string the sender includes as a note/memo).
-      const memo = await fetchTronTxMemo(tx.transaction_id);
-      const tgId = parseTgIdFromComment(memo);
-      if (!tgId) {
-        logger.debug(
-          { txId: tx.transaction_id, memo },
-          "ton-poller: TRON USDT tx has no parseable tgId memo — skipping",
-        );
-        continue;
-      }
-
-      await creditDeposit(tx.transaction_id, tgId, "USDT", rawValue, config.skzPerUsdt);
-    }
-
-    return maxTs;
-  } catch (err) {
-    logger.warn({ err }, "ton-poller: TRON poll error");
-    return state.tronMinBlock;
   }
 }
 
@@ -372,16 +265,8 @@ async function runPoll(): Promise<void> {
 
   try {
     const state = await loadPollerState();
-    const [newTonLt, newTronTs] = await Promise.all([
-      pollTon(state),
-      pollTron(state),
-    ]);
-
-    const updatedState: PollerState = {
-      tonLastLt: newTonLt,
-      tronMinBlock: newTronTs,
-    };
-    await savePollerState(updatedState);
+    const newTonLt = await pollTon(state);
+    await savePollerState({ tonLastLt: newTonLt });
   } catch (err) {
     logger.error({ err }, "ton-poller: unexpected error in poll cycle");
   } finally {
@@ -390,18 +275,14 @@ async function runPoll(): Promise<void> {
 }
 
 export function startDepositPoller(): void {
-  if (!TON_WALLET && !TRON_WALLET) {
+  if (!TON_WALLET) {
     logger.warn(
-      "ton-poller: neither TON_DEPOSIT_WALLET nor TRON_DEPOSIT_WALLET is set — " +
-      "deposit auto-detection is disabled. Set these env vars to enable.",
+      "ton-poller: TON_DEPOSIT_WALLET is not set — deposit auto-detection is disabled.",
     );
     return;
   }
 
-  logger.info(
-    { tonWallet: TON_WALLET || "(not set)", tronWallet: TRON_WALLET || "(not set)" },
-    "ton-poller: deposit poller starting",
-  );
+  logger.info({ tonWallet: TON_WALLET }, "ton-poller: deposit poller starting");
 
   // Run once immediately, then every POLL_INTERVAL_MS
   runPoll().catch(() => {});
