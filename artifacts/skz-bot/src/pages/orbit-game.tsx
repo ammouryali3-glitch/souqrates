@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -78,7 +79,7 @@ const GEM_HUES = [280, 320, 48];
 // ---- Ticket tiers: pick one to play. Collect the target number of gems (the
 // interactive progress line) before the timer runs out to win the prize; crash
 // into an obstacle or run out of time and you lose the entry. (UI-only mock economy.)
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie", name: "Rookie", price: 25, prize: 45, target: 6, time: 30 },
   { id: "bronze", name: "Bronze", price: 50, prize: 95, target: 9, time: 32 },
   { id: "silver", name: "Silver", price: 120, prize: 255, target: 12, time: 34 },
@@ -229,6 +230,7 @@ const makeObstacle = (avoidRing: number, avoidAngle: number): Obstacle => {
 };
 
 export default function OrbitGame() {
+  const TICKETS = useGameTickets("orbit", RAW_TICKETS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameState | null>(null);

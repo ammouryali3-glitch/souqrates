@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_swiperush_best", BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 150,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 300,  time: 55 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 500,  time: 50 },
@@ -19,6 +20,7 @@ const DIR_COLOR:Record<Dir,string> = {up:"#4dff91",down:"#ff4da6",left:"#ffdd00"
 const DIR_ARROW:Record<Dir,string> = {up:"↑",down:"↓",left:"←",right:"→"};
 
 export default function SwipeRushGame() {
+  const TICKETS = useGameTickets("swiperush", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);

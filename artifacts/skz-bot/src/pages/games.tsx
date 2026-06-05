@@ -92,13 +92,18 @@ export default function Games() {
       ...g,
       title: o.title ?? g.title,
       tagline: o.tagline ?? g.tagline,
+      desc: o.desc ?? g.desc,
       prize: o.prize ?? g.prize,
       entry: o.entry ?? g.entry,
     };
   };
 
-  const arena = settings.arenaEnabled ? ARENA_GAMES.map(applyOverride).filter(Boolean) as GameDef[] : [];
-  const skill = settings.skillEnabled ? SKILL_GAMES.map(applyOverride).filter(Boolean) as GameDef[] : [];
+  // Featured (pinned) games float to the top of their section.
+  const byFeatured = (a: GameDef, b: GameDef) =>
+    (gameOverrides[b.id]?.featured ? 1 : 0) - (gameOverrides[a.id]?.featured ? 1 : 0);
+
+  const arena = settings.arenaEnabled ? [...ARENA_GAMES].sort(byFeatured).map(applyOverride).filter(Boolean) as GameDef[] : [];
+  const skill = settings.skillEnabled ? [...SKILL_GAMES].sort(byFeatured).map(applyOverride).filter(Boolean) as GameDef[] : [];
 
   return (
     <div className="flex flex-col gap-6">

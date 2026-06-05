@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins } from "lucide-react";
+import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins, Gift } from "lucide-react";
 import { Link } from "wouter";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useAdmin, useBalance, admin } from "@/lib/admin-store";
 
 const recentActivity = [
   { id: 1, type: "win", title: "Won Diamond Match", amount: "+10,000", time: "2m ago" },
@@ -15,11 +16,53 @@ const recentActivity = [
 
 export default function Home() {
   const [balance] = useState(12450.75);
+  const { settings } = useAdmin();
+  const skzBalance = useBalance();
+  // canClaimDailyBonus() is date-based; useBalance re-renders after a claim, so
+  // this re-evaluates correctly (incl. day rollover) without a sticky flag.
+  const canClaim = settings.dailyBonus > 0 && admin.canClaimDailyBonus();
+
+  function claim() {
+    admin.claimDailyBonus();
+  }
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Brand header */}
+      <div className="flex flex-col items-center text-center mt-4 -mb-2">
+        <h1
+          className="text-xl font-display font-black tracking-wide"
+          style={{ color: settings.accent, textShadow: `0 0 16px ${settings.accent}66` }}
+        >
+          {settings.appName}
+        </h1>
+        {settings.welcomeMessage && (
+          <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">{settings.welcomeMessage}</p>
+        )}
+      </div>
+
+      {/* Daily bonus */}
+      {canClaim && (
+        <motion.button
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={claim}
+          className="flex items-center gap-3 p-3 rounded-2xl border text-right"
+          style={{ borderColor: `${settings.accent}55`, background: `linear-gradient(135deg, ${settings.accent}22, transparent)` }}
+        >
+          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${settings.accent}30`, color: settings.accent }}>
+            <Gift size={20} />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-display font-bold text-white">مكافأة يومية متاحة</div>
+            <div className="text-[11px] text-muted-foreground">اضغط للحصول على {settings.dailyBonus} SKZ · رصيدك {skzBalance}</div>
+          </div>
+          <ArrowRight size={16} style={{ color: settings.accent }} />
+        </motion.button>
+      )}
+
       {/* Header / Balance */}
-      <div className="flex flex-col items-center justify-center mt-6 mb-2">
+      <div className="flex flex-col items-center justify-center mt-2 mb-2">
         <motion.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -18,7 +19,7 @@ const PLATFORM_SPEED_X = 90;
 const PLAYER_R = 14;
 const MOVE_SPEED = 240;
 
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 20, time: 50 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 35, time: 48 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 55, time: 45 },
@@ -242,6 +243,7 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, screenY: number, t: 
 }
 
 export default function JumperGame() {
+  const TICKETS = useGameTickets("hopper", RAW_TICKETS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameState | null>(null);

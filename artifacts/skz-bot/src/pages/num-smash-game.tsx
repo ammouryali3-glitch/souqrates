@@ -2,12 +2,13 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_numsmash_best";
 const BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 15, time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 25, time: 55 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 38, time: 50 },
@@ -29,6 +30,7 @@ interface Cell { id: number; num: number; x: number; y: number; w: number; visib
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; r: number; }
 
 export default function NumSmashGame() {
+  const TICKETS = useGameTickets("numsmash", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [hpDisp, setHpDisp] = useState(3);

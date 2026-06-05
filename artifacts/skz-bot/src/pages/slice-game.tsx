@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -80,7 +81,7 @@ const BALANCE_KEY = "skz_balance";
 const START_BALANCE = 1000;
 const TWO_PI = Math.PI * 2;
 
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie", name: "Rookie", price: 30, prize: 55, target: 8, time: 35 },
   { id: "bronze", name: "Bronze", price: 75, prize: 140, target: 12, time: 33 },
   { id: "silver", name: "Silver", price: 150, prize: 320, target: 16, time: 31 },
@@ -370,6 +371,7 @@ class AudioEngine {
 }
 
 export default function SliceGame() {
+  const TICKETS = useGameTickets("slice", RAW_TICKETS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameState | null>(null);

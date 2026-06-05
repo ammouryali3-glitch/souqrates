@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, LayoutDashboard, Gamepad2, Store, Bell, UserCog, Settings2,
   Coins, Plus, Minus, Trash2, Pencil, Check, X, Power, Ban, ShieldCheck,
-  AlertTriangle, Package, Trophy, Save, RotateCcw,
+  AlertTriangle, Package, Trophy, Save, RotateCcw, TrendingUp, Star,
+  Target, Gift, Zap, Sparkles,
 } from "lucide-react";
 import {
   useAdmin, useBalance, syncBalance, admin, getLibraryIds,
@@ -13,11 +14,12 @@ import {
 import { ARENA_GAMES, SKILL_GAMES, ACCENTS, type GameDef } from "@/lib/games-data";
 import { CATEGORIES, type Category } from "@/lib/shop-products";
 
-type Tab = "overview" | "games" | "shop" | "notify" | "user" | "settings";
+type Tab = "overview" | "games" | "economy" | "shop" | "notify" | "user" | "settings";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "نظرة عامة", icon: LayoutDashboard },
   { id: "games", label: "الألعاب", icon: Gamepad2 },
+  { id: "economy", label: "الاقتصاد", icon: TrendingUp },
   { id: "shop", label: "المتجر", icon: Store },
   { id: "notify", label: "الإشعارات", icon: Bell },
   { id: "user", label: "المستخدم", icon: UserCog },
@@ -107,6 +109,23 @@ function Overview({ go }: { go: (t: Tab) => void }) {
 }
 
 // ── Games ─────────────────────────────────────────────────────────────────────
+function posNum(v: string, fallback = 1) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function FactorInput({ label, icon: Icon, value, onChange, testId }: {
+  label: string; icon: typeof Target; value: string; onChange: (v: string) => void; testId: string;
+}) {
+  return (
+    <div>
+      <Label><span className="inline-flex items-center gap-1"><Icon size={11} /> {label}</span></Label>
+      <Field type="number" step="0.1" min="0" value={value} data-testid={testId}
+        onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
 function GameRow({ game }: { game: GameDef }) {
   const { gameOverrides } = useAdmin();
   const o = gameOverrides[game.id];
@@ -114,19 +133,39 @@ function GameRow({ game }: { game: GameDef }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(o?.title ?? game.title);
   const [tagline, setTagline] = useState(o?.tagline ?? game.tagline);
+  const [desc, setDesc] = useState(o?.desc ?? game.desc);
   const [prize, setPrize] = useState(o?.prize ?? game.prize ?? "");
   const [entry, setEntry] = useState(String(o?.entry ?? game.entry ?? ""));
+  const [feat, setFeat] = useState(!!o?.featured);
+  const [priceF, setPriceF] = useState(String(o?.priceFactor ?? 1));
+  const [prizeF, setPrizeF] = useState(String(o?.prizeFactor ?? 1));
+  const [targetF, setTargetF] = useState(String(o?.targetFactor ?? 1));
+  const [timeF, setTimeF] = useState(String(o?.timeFactor ?? 1));
   const a = ACCENTS[game.accent];
 
   function save() {
     admin.setGameOverride(game.id, {
       enabled,
+      featured: feat,
       title: title.trim() || game.title,
       tagline: tagline.trim() || game.tagline,
+      desc: desc.trim() || game.desc,
+      priceFactor: posNum(priceF),
+      prizeFactor: posNum(prizeF),
+      targetFactor: posNum(targetF, 1) || 1,
+      timeFactor: posNum(timeF, 1) || 1,
       ...(game.type === "arena"
-        ? { prize: prize.trim() || game.prize, entry: parseInt(entry) || game.entry }
+        ? { prize: prize.trim() || game.prize, entry: entry.trim() === "" ? game.entry : Math.max(0, parseInt(entry) || 0) }
         : {}),
     });
+    setOpen(false);
+  }
+
+  function resetLocal() {
+    admin.resetGame(game.id);
+    setTitle(game.title); setTagline(game.tagline); setDesc(game.desc);
+    setPrize(game.prize ?? ""); setEntry(String(game.entry ?? ""));
+    setFeat(false); setPriceF("1"); setPrizeF("1"); setTargetF("1"); setTimeF("1");
     setOpen(false);
   }
 
@@ -135,7 +174,10 @@ function GameRow({ game }: { game: GameDef }) {
       <div className="flex items-center gap-3">
         <div className="w-2 h-2 rounded-full shrink-0" style={{ background: a.dot }} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-display font-bold text-white truncate">{o?.title ?? game.title}</div>
+          <div className="text-sm font-display font-bold text-white truncate flex items-center gap-1.5">
+            {o?.featured && <Star size={11} className="text-yellow-400 fill-yellow-400 shrink-0" />}
+            {o?.title ?? game.title}
+          </div>
           <div className="text-[10px] text-white/35 font-display">
             {game.type === "arena" ? `ساحة · ${o?.prize ?? game.prize} SKZ` : `مهارة · ${game.category}`}
           </div>
@@ -152,20 +194,48 @@ function GameRow({ game }: { game: GameDef }) {
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden">
             <div className="flex flex-col gap-2 pt-3 mt-3 border-t border-white/8">
-              <div><Label>العنوان</Label><Field value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+              <div><Label>العنوان</Label><Field value={title} data-testid={`input-title-${game.id}`} onChange={(e) => setTitle(e.target.value)} /></div>
               <div><Label>السطر الوصفي</Label><Field value={tagline} onChange={(e) => setTagline(e.target.value)} /></div>
+              <div><Label>الوصف</Label><Area rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+
               {game.type === "arena" && (
                 <div className="grid grid-cols-2 gap-2">
                   <div><Label>الجائزة</Label><Field value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="+18K" /></div>
-                  <div><Label>رسوم الدخول</Label><Field type="number" value={entry} onChange={(e) => setEntry(e.target.value)} /></div>
+                  <div><Label>رسوم الدخول</Label><Field type="number" value={entry} data-testid={`input-entry-${game.id}`} onChange={(e) => setEntry(e.target.value)} /></div>
                 </div>
               )}
+
+              {/* Economy controls */}
+              <div className="rounded-xl bg-black/20 border border-white/8 p-2.5 mt-1">
+                <div className="text-[11px] font-display font-bold text-yellow-300/80 mb-2 flex items-center gap-1.5">
+                  <TrendingUp size={12} /> {game.type === "arena" ? "مضاعفات الاقتصاد" : "التحكم بالاقتصاد (لكل المستويات)"}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <FactorInput label="سعر الدخول ×" icon={Coins} value={priceF} onChange={setPriceF} testId={`input-pricef-${game.id}`} />
+                  <FactorInput label="الجائزة ×" icon={Trophy} value={prizeF} onChange={setPrizeF} testId={`input-prizef-${game.id}`} />
+                  {game.type === "skill" && (
+                    <>
+                      <FactorInput label="سكور الفوز ×" icon={Target} value={targetF} onChange={setTargetF} testId={`input-targetf-${game.id}`} />
+                      <FactorInput label="الوقت ×" icon={Zap} value={timeF} onChange={setTimeF} testId={`input-timef-${game.id}`} />
+                    </>
+                  )}
+                </div>
+                <div className="text-[10px] text-white/30 font-display mt-1.5">1 = الافتراضي · أقل من 1 = أرخص/أسهل · أكبر = أصعب/أغلى</div>
+              </div>
+
+              {/* Featured */}
+              <div className="flex items-center gap-2 px-1 mt-1">
+                <Star size={14} className="text-yellow-400/70" />
+                <span className="flex-1 text-xs font-display text-white/70">تمييز اللعبة (تثبيت بأعلى القائمة)</span>
+                <Toggle on={feat} onClick={() => setFeat((v) => !v)} />
+              </div>
+
               <div className="flex gap-2 mt-1">
                 <button onClick={save} data-testid={`button-save-game-${game.id}`}
                   className="flex-1 py-2 rounded-xl bg-green-500/20 border border-green-400/40 text-green-300 text-xs font-display font-bold flex items-center justify-center gap-1.5">
                   <Save size={13} /> حفظ
                 </button>
-                <button onClick={() => { admin.resetGame(game.id); setTitle(game.title); setTagline(game.tagline); setPrize(game.prize ?? ""); setEntry(String(game.entry ?? "")); setOpen(false); }}
+                <button onClick={resetLocal} data-testid={`button-reset-game-${game.id}`}
                   className="px-4 py-2 rounded-xl bg-white/8 text-white/60 text-xs font-display font-bold flex items-center justify-center gap-1.5">
                   <RotateCcw size={13} /> افتراضي
                 </button>
@@ -189,6 +259,115 @@ function GamesTab() {
         <div className="text-xs font-display font-bold text-cyan-400/80 mb-2 flex items-center gap-1.5"><Gamepad2 size={12} /> ألعاب المهارة ({SKILL_GAMES.length})</div>
         <div className="flex flex-col gap-2">{SKILL_GAMES.map((g) => <GameRow key={g.id} game={g} />)}</div>
       </div>
+    </div>
+  );
+}
+
+// ── Economy ───────────────────────────────────────────────────────────────────
+function FactorSetting({ label, desc, icon: Icon, value, onChange, presets, suffix = "×" }: {
+  label: string; desc: string; icon: typeof Coins; value: number;
+  onChange: (v: number) => void; presets: number[]; suffix?: string;
+}) {
+  const [txt, setTxt] = useState(String(value));
+  useEffect(() => { setTxt(String(value)); }, [value]);
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={15} className="text-yellow-300/80" />
+        <div className="flex-1">
+          <div className="text-sm font-display font-bold text-white">{label}</div>
+          <div className="text-[10px] text-white/40 font-display">{desc}</div>
+        </div>
+        <div className="text-base font-display font-black text-yellow-300">{value}{suffix}</div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Field type="number" step="0.1" min="0" value={txt}
+          onChange={(e) => { setTxt(e.target.value); const n = parseFloat(e.target.value); if (Number.isFinite(n) && n >= 0) onChange(n); }} />
+      </div>
+      <div className="flex gap-1.5 mt-2">
+        {presets.map((p) => (
+          <button key={p} onClick={() => onChange(p)}
+            className={`flex-1 py-1.5 rounded-lg text-[11px] font-display font-bold border transition-colors ${value === p ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-300" : "bg-white/5 border-white/10 text-white/45"}`}>
+            {p}{suffix}
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function EconomyTab() {
+  const { settings } = useAdmin();
+  const set = (patch: Parameters<typeof admin.setSettings>[0]) => admin.setSettings(patch);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Card className="border-yellow-400/25 bg-yellow-400/5">
+        <div className="text-xs text-white/60 font-display leading-relaxed">
+          هذه الإعدادات تتحكم بكل الألعاب فوراً — أسعار الدخول، الجوائز، والسكور المطلوب للفوز. المضاعف <b className="text-yellow-300">1</b> يعني القيم الأصلية.
+        </div>
+      </Card>
+
+      {/* Free play */}
+      <Card className={settings.freePlay ? "border-green-400/40 bg-green-500/8" : ""}>
+        <div className="flex items-center gap-3">
+          <Gift size={17} className={settings.freePlay ? "text-green-300" : "text-white/40"} />
+          <div className="flex-1">
+            <div className="text-sm font-display font-bold text-white">اللعب المجاني</div>
+            <div className="text-[11px] text-white/40 font-display">كل الألعاب بدون رسوم دخول</div>
+          </div>
+          <Toggle on={settings.freePlay} onClick={() => set({ freePlay: !settings.freePlay })} />
+        </div>
+      </Card>
+
+      <FactorSetting label="مضاعف الأسعار" desc="يضرب رسوم الدخول لكل الألعاب" icon={Coins}
+        value={settings.globalPriceFactor} onChange={(v) => set({ globalPriceFactor: v })} presets={[0.5, 1, 1.5, 2]} />
+      <FactorSetting label="مضاعف الجوائز" desc="يضرب كل الجوائز المدفوعة للفائزين" icon={Trophy}
+        value={settings.globalPrizeFactor} onChange={(v) => set({ globalPrizeFactor: v })} presets={[1, 1.5, 2, 3]} />
+      <FactorSetting label="مضاعف الصعوبة" desc="يضرب السكور المطلوب للفوز (أقل = أسهل)" icon={Target}
+        value={settings.globalDifficulty} onChange={(v) => set({ globalDifficulty: v })} presets={[0.5, 0.75, 1, 1.5]} />
+
+      {/* Winner cut */}
+      <Card>
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles size={15} className="text-yellow-300/80" />
+          <div className="flex-1">
+            <div className="text-sm font-display font-bold text-white">حصة الفائز (الساحة)</div>
+            <div className="text-[10px] text-white/40 font-display">نسبة الفائز من تجمّع الجوائز</div>
+          </div>
+          <div className="text-base font-display font-black text-yellow-300">{Math.round(settings.winnerCut * 100)}%</div>
+        </div>
+        <div className="flex gap-1.5">
+          {[0.5, 0.75, 0.9, 0.95, 1].map((p) => (
+            <button key={p} onClick={() => set({ winnerCut: p })}
+              className={`flex-1 py-1.5 rounded-lg text-[11px] font-display font-bold border transition-colors ${settings.winnerCut === p ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-300" : "bg-white/5 border-white/10 text-white/45"}`}>
+              {Math.round(p * 100)}%
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {/* Starting balance + daily bonus */}
+      <Card>
+        <Label>الرصيد الابتدائي (للاعب الجديد / بعد إعادة الضبط)</Label>
+        <Field type="number" min="0" value={settings.startingBalance}
+          data-testid="input-starting-balance"
+          onChange={(e) => set({ startingBalance: Math.max(0, parseInt(e.target.value) || 0) })} />
+        <button onClick={() => admin.applyStartingBalance()} data-testid="button-apply-balance"
+          className="w-full mt-2 py-2 rounded-xl bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 text-xs font-display font-bold flex items-center justify-center gap-1.5">
+          <Coins size={13} /> تطبيق على الرصيد الحالي
+        </button>
+      </Card>
+      <Card>
+        <div className="flex items-center gap-2 mb-1">
+          <Gift size={14} className="text-fuchsia-300/80" />
+          <Label>المكافأة اليومية (تُطالب من الرئيسية)</Label>
+        </div>
+        <Field type="number" min="0" value={settings.dailyBonus}
+          data-testid="input-daily-bonus"
+          onChange={(e) => set({ dailyBonus: Math.max(0, parseInt(e.target.value) || 0) })} />
+        <div className="text-[10px] text-white/30 font-display mt-1">0 = إيقاف المكافأة اليومية</div>
+      </Card>
     </div>
   );
 }
@@ -471,8 +650,41 @@ function SettingsTab() {
     { key: "maintenance", label: "وضع الصيانة", desc: "شارة تنبيه في اللوحة" },
   ];
 
+  const accentKeys = Object.keys(ACCENTS) as (keyof typeof ACCENTS)[];
+
   return (
     <div className="flex flex-col gap-3">
+      {/* Identity */}
+      <Card>
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles size={15} className="text-yellow-300/80" />
+          <div className="text-sm font-display font-bold text-white">هوية التطبيق</div>
+        </div>
+        <Label>اسم التطبيق</Label>
+        <Field value={settings.appName} data-testid="input-app-name"
+          onChange={(e) => admin.setSettings({ appName: e.target.value })} placeholder="SKZ" />
+        <div className="mt-2">
+          <Label>رسالة الترحيب</Label>
+          <Area rows={2} value={settings.welcomeMessage} data-testid="input-welcome"
+            onChange={(e) => admin.setSettings({ welcomeMessage: e.target.value })} placeholder="أهلاً بك في..." />
+        </div>
+        <div className="mt-2">
+          <Label>اللون المميّز</Label>
+          <div className="flex gap-2 flex-wrap mt-1">
+            {accentKeys.map((k) => {
+              const c = ACCENTS[k].dot;
+              const active = settings.accent === c;
+              return (
+                <button key={k} onClick={() => admin.setSettings({ accent: c })}
+                  data-testid={`accent-${k}`}
+                  className={`w-8 h-8 rounded-full border-2 transition-transform ${active ? "scale-110 border-white" : "border-white/20"}`}
+                  style={{ background: c }} />
+              );
+            })}
+          </div>
+        </div>
+      </Card>
+
       {rows.map((r) => (
         <Card key={r.key}>
           <div className="flex items-center gap-3">
@@ -553,6 +765,7 @@ export default function Manager() {
           <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
             {tab === "overview" && <Overview go={setTab} />}
             {tab === "games" && <GamesTab />}
+            {tab === "economy" && <EconomyTab />}
             {tab === "shop" && <ShopTab />}
             {tab === "notify" && <NotifyTab />}
             {tab === "user" && <UserTab />}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -69,7 +70,7 @@ const APPLE_THRESH = 0.30; // radians — apple collection radius
 const APPLE_COUNT = 2;
 const APPLE_BONUS = 5; // bonus seconds on apple hit
 
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie", name: "Rookie", price: 30, prize: 55, target: 8, time: 35, preKnives: 2 },
   { id: "bronze", name: "Bronze", price: 75, prize: 140, target: 11, time: 33, preKnives: 2 },
   { id: "silver", name: "Silver", price: 150, prize: 320, target: 14, time: 31, preKnives: 3 },
@@ -334,6 +335,7 @@ function spawnApples(count: number, knives: PlantedKnife[]): Apple[] {
 }
 
 export default function KnifeGame() {
+  const TICKETS = useGameTickets("knife", RAW_TICKETS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameState | null>(null);

@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_pulsetap_best", BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 400,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 800,  time: 55 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 1400, time: 50 },
@@ -18,6 +19,7 @@ const TARGET_R = 55, MAX_R = 85;
 interface Ring { id:number; x:number; y:number; r:number; color:string; hit:boolean; hitT:number; hitScore:number; }
 
 export default function PulseTapGame() {
+  const TICKETS = useGameTickets("pulsetap", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);

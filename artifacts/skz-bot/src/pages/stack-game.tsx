@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -59,7 +60,7 @@ const START_BALANCE = 1000;
 // ---- Ticket tiers: pick one to play. Reach the target score (the interactive
 // progress line) before the timer runs out to win the prize; otherwise you lose
 // the entry price. (UI-only mock economy.)
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie", name: "Rookie", price: 25, prize: 45, target: 8, time: 24 },
   { id: "bronze", name: "Bronze", price: 50, prize: 95, target: 12, time: 26 },
   { id: "silver", name: "Silver", price: 120, prize: 255, target: 16, time: 28 },
@@ -175,6 +176,7 @@ class AudioEngine {
 const hueOf = (i: number) => (205 + i * 7 + Math.floor(i / 10) * 38) % 360;
 
 export default function StackGame() {
+  const TICKETS = useGameTickets("stack", RAW_TICKETS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameState | null>(null);

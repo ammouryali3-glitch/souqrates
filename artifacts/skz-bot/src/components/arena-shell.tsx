@@ -7,6 +7,7 @@ import {
   getLeaderboard, submitScore, getCountdown, formatTime,
   getDefaultLeaders, ArenaPeriod, LeaderEntry,
 } from "@/lib/arena";
+import { useArenaEconomy } from "@/lib/game-economy";
 
 const BALANCE_KEY = "skz_balance";
 
@@ -58,6 +59,8 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
   const [countdown, setCountdown] = useState(() => getCountdown(period));
   const [alreadyPlayed] = useState(() => hasPlayed(gameId, period));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { fee: effEntry, prizeFactor, winnerCut } = useArenaEconomy(gameId, entryFee);
+  const winnerTake = Math.floor(pool * winnerCut * prizeFactor);
 
   // Live prize pool simulation
   useEffect(() => {
@@ -77,16 +80,16 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
   }, [shell, period]);
 
   const handlePay = useCallback(() => {
-    if (balance < entryFee) return;
-    const nb = balance - entryFee;
+    if (balance < effEntry) return;
+    const nb = balance - effEntry;
     setBalance(nb);
     localStorage.setItem(BALANCE_KEY, String(nb));
-    addEntry(gameId, entryFee);
+    addEntry(gameId, effEntry);
     setPool(getPool(gameId));
     setEntries(getEntries(gameId));
     markPlayed(gameId);
     setShell("playing");
-  }, [balance, entryFee, gameId]);
+  }, [balance, effEntry, gameId]);
 
   const handleComplete = useCallback((score: number, timeSec: number) => {
     setMyScore(score);
@@ -182,18 +185,18 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                   <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white/5 border border-white/10 mb-3">
                     <span className="text-sm text-white/50 font-display">Entry Fee</span>
                     <span className="font-display font-bold flex items-center gap-1" style={{ color }}>
-                      <Coins size={14} />{entryFee} SKZ
+                      <Coins size={14} />{effEntry === 0 ? "FREE" : `${effEntry} SKZ`}
                     </span>
                   </div>
                   <motion.button
                     whileTap={{ scale: 0.97 }}
-                    disabled={balance < entryFee}
+                    disabled={balance < effEntry}
                     onClick={handlePay}
                     className="w-full py-4 rounded-2xl font-display font-black text-base tracking-widest uppercase flex items-center justify-center gap-2 disabled:opacity-30"
                     style={{ background: `linear-gradient(135deg, ${color}, ${color}99)`, color: "#000", boxShadow: `0 0 30px ${color}55` }}>
-                    <Flame size={18} /> Pay {entryFee} SKZ &amp; Play
+                    <Flame size={18} /> {effEntry === 0 ? "Play Free" : `Pay ${effEntry} SKZ & Play`}
                   </motion.button>
-                  {balance < entryFee && (
+                  {balance < effEntry && (
                     <button onClick={() => { setBalance(2000); localStorage.setItem(BALANCE_KEY, "2000"); }} className="mt-2 w-full text-xs text-white/30 underline text-center">Refill balance (demo)</button>
                   )}
                   <div className="text-center text-xs text-white/25 mt-2 font-display">Your entry adds to the prize pool</div>
@@ -289,7 +292,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               <div className="text-right">
                 <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">Winner Takes</div>
                 <div className="font-display font-black text-xl text-yellow-400">
-                  <AnimatedNumber value={Math.floor(pool * 0.95)} suffix=" SKZ" />
+                  <AnimatedNumber value={winnerTake} suffix=" SKZ" />
                 </div>
               </div>
             </div>

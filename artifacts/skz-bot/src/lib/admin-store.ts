@@ -5,14 +5,22 @@ import type { Product, Category } from "./shop-products";
 const ADMIN_KEY = "skz_admin";
 const BALANCE_KEY = "skz_balance";
 const LIBRARY_KEY = "skz_library";
+const DAILY_KEY = "skz_daily_bonus";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface GameOverride {
   enabled: boolean;
   title?: string;
   tagline?: string;
-  prize?: string;
-  entry?: number;
+  desc?: string;
+  prize?: string; // arena display label
+  entry?: number; // arena absolute entry fee
+  featured?: boolean; // pin to top of its section
+  /** Economy multipliers applied to a game's ticket tiers (and arena fee). */
+  priceFactor?: number; // default 1 — scales ticket prices / entry
+  prizeFactor?: number; // default 1 — scales ticket prizes
+  targetFactor?: number; // default 1 — scales score-to-win (lower = easier)
+  timeFactor?: number; // default 1 — scales time limit (higher = more time)
 }
 
 export type NotifType = "info" | "success" | "warning" | "promo";
@@ -27,11 +35,24 @@ export interface AppNotification {
 }
 
 export interface AdminSettings {
+  // sections
   shopEnabled: boolean;
   arenaEnabled: boolean;
   skillEnabled: boolean;
   maintenance: boolean;
   onlineCount: string;
+  // identity / branding
+  appName: string;
+  welcomeMessage: string;
+  accent: string; // hex accent used on the home hero
+  // economy (global)
+  freePlay: boolean; // all entries cost 0
+  globalPriceFactor: number; // default 1 — multiplies every entry/price
+  globalPrizeFactor: number; // default 1 — multiplies every prize
+  globalDifficulty: number; // default 1 — multiplies every score-to-win
+  startingBalance: number; // default 1000 — balance after reset
+  winnerCut: number; // default 0.95 — arena winner share of pool
+  dailyBonus: number; // default 0 — claimable once per day on home
 }
 
 export interface AdminState {
@@ -48,6 +69,16 @@ const DEFAULT_SETTINGS: AdminSettings = {
   skillEnabled: true,
   maintenance: false,
   onlineCount: "12.4k",
+  appName: "SKZ Arcade",
+  welcomeMessage: "العب، تنافس، واربح جوائز SKZ",
+  accent: "#f5b301",
+  freePlay: false,
+  globalPriceFactor: 1,
+  globalPrizeFactor: 1,
+  globalDifficulty: 1,
+  startingBalance: 1000,
+  winnerCut: 0.95,
+  dailyBonus: 0,
 };
 
 const DEFAULT_STATE: AdminState = {
@@ -113,8 +144,13 @@ const balListeners = new Set<() => void>();
 let balance = readBalanceRaw();
 
 function readBalanceRaw(): number {
-  const v = parseInt(localStorage.getItem(BALANCE_KEY) || "1000", 10);
-  return Number.isFinite(v) ? v : 1000;
+  const stored = localStorage.getItem(BALANCE_KEY);
+  if (stored === null) {
+    // First-ever load: seed from the admin-configured starting balance.
+    return DEFAULT_SETTINGS.startingBalance;
+  }
+  const v = parseInt(stored, 10);
+  return Number.isFinite(v) ? v : DEFAULT_SETTINGS.startingBalance;
 }
 function subscribeBalance(l: () => void) {
   balListeners.add(l);
@@ -237,12 +273,50 @@ export const admin = {
     writeBalance(balance - n);
   },
 
+  // Daily bonus — claimable once per calendar day. Returns granted amount (0 if none).
+  claimDailyBonus(): number {
+    const amount = state.settings.dailyBonus;
+    if (amount <= 0) return 0;
+    const today = new Date().toDateString();
+    try {
+      if (localStorage.getItem(DAILY_KEY) === today) return 0;
+      localStorage.setItem(DAILY_KEY, today);
+    } catch {
+      /* ignore */
+    }
+    // Re-read first: a game may have mutated the balance directly since last sync.
+    writeBalance(readBalanceRaw() + amount);
+    return amount;
+  },
+  canClaimDailyBonus(): boolean {
+    if (state.settings.dailyBonus <= 0) return false;
+    try {
+      return localStorage.getItem(DAILY_KEY) !== new Date().toDateString();
+    } catch {
+      return false;
+    }
+  },
+
+  // Set the live balance to the configured starting balance (no full wipe).
+  applyStartingBalance(): number {
+    const sb = state.settings.startingBalance;
+    writeBalance(sb);
+    return sb;
+  },
+
   // Danger
   resetAll() {
-    state = { ...DEFAULT_STATE, settings: { ...DEFAULT_SETTINGS } };
+    // Keep the admin-configured starting balance; reset everything else to defaults.
+    const startingBalance = state.settings.startingBalance;
+    state = { ...DEFAULT_STATE, settings: { ...DEFAULT_SETTINGS, startingBalance } };
     persist();
-    writeBalance(1000);
+    writeBalance(startingBalance);
     clearLibrary();
+    try {
+      localStorage.removeItem(DAILY_KEY);
+    } catch {
+      /* ignore */
+    }
     emit();
   },
 };

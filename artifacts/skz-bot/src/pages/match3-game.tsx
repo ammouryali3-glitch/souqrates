@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_match3_best";
 const BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 150,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 300,  time: 60 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 550,  time: 60 },
@@ -51,6 +52,7 @@ function dropAndFill(grid: number[]): void {
 }
 
 export default function Match3Game() {
+  const TICKETS = useGameTickets("match3", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);

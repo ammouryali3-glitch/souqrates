@@ -2,13 +2,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 type Op = "+" | "×";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_quicksum_best";
 const BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 8,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 15, time: 55 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 25, time: 50 },
@@ -35,6 +36,7 @@ function genRound(roundNum: number): { nums: number[]; target: number; op: Op } 
 }
 
 export default function QuickSumGame() {
+  const TICKETS = useGameTickets("quicksum", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);

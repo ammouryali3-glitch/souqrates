@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_cardflip_best", BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 8,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 16, time: 60 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 28, time: 60 },
@@ -29,6 +30,7 @@ function makeBoard(): Card[] {
 }
 
 export default function CardFlipGame() {
+  const TICKETS = useGameTickets("cardflip", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);

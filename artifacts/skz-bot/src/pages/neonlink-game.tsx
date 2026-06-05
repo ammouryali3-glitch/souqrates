@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_neonlink_best";
 const BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 6,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 12, time: 55 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 20, time: 50 },
@@ -23,6 +24,7 @@ interface Conn { x1: number; y1: number; x2: number; y2: number; color: string; 
 interface Obstacle { x: number; y: number; vx: number; vy: number; r: number; }
 
 export default function NeonLinkGame() {
+  const TICKETS = useGameTickets("neonlink", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);

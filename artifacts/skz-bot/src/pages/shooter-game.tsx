@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -14,7 +15,7 @@ const PLAYER_SPEED = 320;
 const BULLET_SPEED = 560;
 const FIRE_RATE = 0.14; // seconds between bullets
 
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 20, time: 40 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 35, time: 38 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 55, time: 36 },
@@ -218,6 +219,7 @@ function spawnParticles(g: GameState, x: number, y: number, color: string, count
 }
 
 export default function ShooterGame() {
+  const TICKETS = useGameTickets("striker", RAW_TICKETS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameState | null>(null);

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins, Grid2x2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGameTickets } from "@/lib/game-economy";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_gridpop_best";
 const BALANCE_KEY = "skz_balance";
-const TICKETS: Ticket[] = [
+const RAW_TICKETS: Ticket[] = [
   { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 200,  time: 60 },
   { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 450,  time: 55 },
   { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 850,  time: 50 },
@@ -19,6 +20,7 @@ const COLORS = ["#ff4da6", "#00d4ff", "#ffdd00", "#4dff91", "#ff7a00", "#cc88ff"
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; color: string; r: number; }
 
 export default function GridPopGame() {
+  const TICKETS = useGameTickets("gridpop", RAW_TICKETS);
   const [phase, setPhase] = useState<Phase>("select");
   const [scoreDisp, setScoreDisp] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);
