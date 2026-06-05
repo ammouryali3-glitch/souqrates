@@ -96,6 +96,27 @@ async function requireOwner(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+/**
+ * Permission check middleware. Owners always pass.
+ * Other accounts must have the section name in their permissions[] array.
+ *
+ * Usage: router.patch("/deposits/:id", requireAdminSession, requirePermission("finance"), handler)
+ */
+export function requirePermission(section: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const account = (req as any).adminAccount as typeof adminAccountsTable.$inferSelect;
+    if (account?.role === "owner") {
+      next();
+      return;
+    }
+    if (Array.isArray(account?.permissions) && account.permissions.includes(section)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: `Permission denied: requires '${section}'` });
+  };
+}
+
 // Helper: serialize account for client (never expose passwordHash)
 function serializeAccount(acct: typeof adminAccountsTable.$inferSelect) {
   return {

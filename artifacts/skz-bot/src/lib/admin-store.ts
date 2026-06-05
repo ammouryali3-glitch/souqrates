@@ -12,6 +12,40 @@ import {
   seedReferrers, seedRoles, seedSecuritySettings, seedSocialTasks, seedTickets,
   seedTokenPackages, seedUsers, seedWithdrawals,
 } from "./admin-seed";
+import {
+  fetchRuntimeConfig,
+  fetchAdminState,
+  putAdminConfig,
+  apiCreateNotification,
+  apiDeleteNotification,
+  apiUpsertUser,
+  apiPatchUser,
+  apiPatchDeposit,
+  apiUpsertDeposit,
+  apiPatchWithdrawal,
+  apiUpsertWithdrawal,
+  apiUpsertTokenPackage,
+  apiPatchTokenPackage,
+  apiDeleteTokenPackage,
+  apiUpsertInventory,
+  apiPatchInventory,
+  apiDeleteInventory,
+  apiUpsertSocialTask,
+  apiPatchSocialTask,
+  apiDeleteSocialTask,
+  apiUpsertPromoCode,
+  apiPatchPromoCode,
+  apiDeletePromoCode,
+  apiUpsertBroadcast,
+  apiPatchBroadcast,
+  apiDeleteBroadcast,
+  apiUpsertTicket,
+  apiPatchTicket,
+  apiUpsertProduct,
+  apiPatchProduct,
+  apiDeleteProduct,
+  apiUpsertReferrer,
+} from "./admin-api";
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
 const ADMIN_KEY = "skz_admin";
@@ -92,7 +126,7 @@ export interface AdminState {
   notifications: AppNotification[];
   banned: boolean;
   settings: AdminSettings;
-  // ── Web dashboard slices (mock data) ──
+  // ── Web dashboard slices ──
   users: ManagedUser[];
   deposits: Deposit[];
   withdrawals: Withdrawal[];
@@ -246,6 +280,141 @@ function getSnapshot() {
   return state;
 }
 
+// ── API bootstrap ─────────────────────────────────────────────────────────────
+/**
+ * Push the current seed/localStorage state to the backend on first use.
+ * Called when the API returns empty data for a resource type.
+ */
+async function seedApi(s: AdminState): Promise<void> {
+  // Config blobs
+  await Promise.allSettled([
+    putAdminConfig("settings", s.settings),
+    putAdminConfig("game_overrides", s.gameOverrides),
+    putAdminConfig("ticket_overrides", s.ticketOverrides),
+    putAdminConfig("cms", s.cms),
+    putAdminConfig("finance", s.finance),
+    putAdminConfig("security", s.security),
+    putAdminConfig("backup", s.backup),
+    putAdminConfig("referral_config", { levels: s.referralLevels, triggers: s.referralTriggers }),
+    putAdminConfig("daily_checkin", s.dailyCheckin),
+    putAdminConfig("api_keys", s.apiKeys),
+  ]);
+
+  // Entity lists (seed one at a time to avoid overwhelming the server)
+  for (const u of s.users) await apiUpsertUser(u);
+  for (const d of s.deposits) await apiUpsertDeposit(d);
+  for (const w of s.withdrawals) await apiUpsertWithdrawal(w);
+  for (const p of s.tokenPackages) await apiUpsertTokenPackage(p);
+  for (const i of s.inventory) await apiUpsertInventory(i);
+  for (const t of s.socialTasks) await apiUpsertSocialTask(t);
+  for (const p of s.promoCodes) await apiUpsertPromoCode(p);
+  for (const b of s.broadcasts) await apiUpsertBroadcast(b);
+  for (const t of s.tickets) await apiUpsertTicket(t);
+  for (const r of s.referrers) await apiUpsertReferrer(r);
+  for (const p of s.products) await apiUpsertProduct(p);
+}
+
+/**
+ * Merge mini-app safe runtime config (public) into local state.
+ * Only touches: settings, game_overrides, ticket_overrides, referral_config, daily_checkin, notifications.
+ */
+function applyRuntimeConfig(cfg: Record<string, unknown>, notifications: AppNotification[]) {
+  state = {
+    ...state,
+    notifications,
+    settings: cfg.settings
+      ? { ...DEFAULT_SETTINGS, ...(cfg.settings as Partial<AdminSettings>) }
+      : state.settings,
+    gameOverrides: cfg.game_overrides
+      ? (cfg.game_overrides as Record<string, GameOverride>)
+      : state.gameOverrides,
+    ticketOverrides: cfg.ticket_overrides
+      ? (cfg.ticket_overrides as Record<string, Record<string, TicketPatch>>)
+      : state.ticketOverrides,
+    referralLevels: cfg.referral_config
+      ? ((cfg.referral_config as { levels: ReferralLevel[] }).levels ?? state.referralLevels)
+      : state.referralLevels,
+    referralTriggers: cfg.referral_config
+      ? ((cfg.referral_config as { triggers: ReferralTrigger[] }).triggers ?? state.referralTriggers)
+      : state.referralTriggers,
+    dailyCheckin: Array.isArray(cfg.daily_checkin)
+      ? (cfg.daily_checkin as number[])
+      : state.dailyCheckin,
+  };
+}
+
+/**
+ * Merge full admin state (auth-required) into local state.
+ * The server is the authoritative source of truth — always use its values.
+ * Only called when the admin dashboard is open with an active session.
+ */
+function applyFullAdminState(
+  apiState: import("./admin-api").ApiAdminState,
+  cfg: Record<string, unknown>,
+) {
+  const seeded = freshSlices();
+  state = {
+    ...state,
+    // Entity lists: always use server payload (even empty means server says "empty")
+    products: apiState.products as Product[],
+    users: apiState.users as ManagedUser[],
+    deposits: apiState.deposits as Deposit[],
+    withdrawals: apiState.withdrawals as Withdrawal[],
+    referrers: apiState.referrers as Referrer[],
+    tokenPackages: apiState.tokenPackages as TokenPackage[],
+    inventory: apiState.inventory as InventoryItem[],
+    socialTasks: apiState.socialTasks as SocialTask[],
+    promoCodes: apiState.promoCodes as PromoCode[],
+    broadcasts: apiState.broadcasts as Broadcast[],
+    tickets: apiState.tickets as SupportTicket[],
+    // Config: always prefer server values (null/undefined means server has no entry yet)
+    apiKeys: Array.isArray(cfg.api_keys) ? (cfg.api_keys as ApiKey[]) : seeded.apiKeys,
+    roles: Array.isArray(cfg.roles) ? (cfg.roles as AdminRole[]) : state.roles,
+    cms: cfg.cms ? { ...seeded.cms, ...(cfg.cms as Partial<CmsTexts>) } : seeded.cms,
+    finance: cfg.finance ? { ...seeded.finance, ...(cfg.finance as Partial<FinanceSettings>) } : seeded.finance,
+    security: cfg.security ? { ...seeded.security, ...(cfg.security as Partial<SecuritySettings>) } : seeded.security,
+    backup: cfg.backup ? { ...seeded.backup, ...(cfg.backup as Partial<BackupSettings>) } : seeded.backup,
+  };
+}
+
+/**
+ * On startup: fetch runtime config (public) for all users,
+ * plus optionally the full admin state (auth-required) if an admin session is active.
+ * Fire-and-forget; the UI shows optimistic (localStorage) state immediately.
+ */
+async function initFromApi(): Promise<void> {
+  // Always fetch mini-app safe config (public, no auth required)
+  const runtime = await fetchRuntimeConfig();
+  if (runtime) {
+    applyRuntimeConfig(runtime.config, runtime.notifications as AppNotification[]);
+    persist();
+    emit();
+  }
+
+  // Attempt to fetch full admin state (auth-required — succeeds only if admin is logged in)
+  const fullState = await fetchAdminState();
+  if (fullState) {
+    applyRuntimeConfig(fullState.config, fullState.notifications as AppNotification[]);
+    applyFullAdminState(fullState, fullState.config);
+    persist();
+    emit();
+  }
+}
+
+// Fire and forget — initialize from API after module loads
+// Use a small delay so the UI renders first from localStorage
+if (typeof window !== "undefined") {
+  setTimeout(() => { initFromApi().catch(() => {}); }, 50);
+}
+
+/**
+ * Re-sync state from the API. Call after admin login to hydrate
+ * the full authenticated dataset without requiring a page refresh.
+ */
+export async function refreshFromApi(): Promise<void> {
+  await initFromApi();
+}
+
 /**
  * Non-reactive: fraction of an arena entry fee that flows into the prize pool
  * after the house cut (rake). Per-game `rake` overrides the global
@@ -338,6 +507,7 @@ export const admin = {
     const id = state.products.reduce((m, x) => Math.max(m, x.id), 0) + 1;
     const created: Product = { ...p, id };
     update((s) => ({ ...s, products: [...s.products, created] }));
+    apiUpsertProduct(created);
     return created;
   },
   updateProduct(id: number, patch: Partial<Product>) {
@@ -345,9 +515,12 @@ export const admin = {
       ...s,
       products: s.products.map((p) => (p.id === id ? { ...p, ...patch, id } : p)),
     }));
+    const updated = state.products.find((p) => p.id === id);
+    if (updated) apiPatchProduct(id, patch);
   },
   deleteProduct(id: number) {
     update((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
+    apiDeleteProduct(id);
   },
 
   // Games
@@ -356,6 +529,7 @@ export const admin = {
       const prev = s.gameOverrides[id] ?? { enabled: true };
       return { ...s, gameOverrides: { ...s.gameOverrides, [id]: { ...prev, ...patch } } };
     });
+    putAdminConfig("game_overrides", state.gameOverrides);
   },
   resetGame(id: string) {
     update((s) => {
@@ -365,6 +539,8 @@ export const admin = {
       delete nextTickets[id];
       return { ...s, gameOverrides: next, ticketOverrides: nextTickets };
     });
+    putAdminConfig("game_overrides", state.gameOverrides);
+    putAdminConfig("ticket_overrides", state.ticketOverrides);
   },
 
   // Per-ticket economy — set one absolute field for one tier of one game.
@@ -380,6 +556,7 @@ export const admin = {
         },
       };
     });
+    putAdminConfig("ticket_overrides", state.ticketOverrides);
   },
   // Clear a single overridden field (revert that field to the game default).
   clearTicketField(gameId: string, ticketId: string, field: keyof TicketPatch) {
@@ -394,6 +571,7 @@ export const admin = {
       if (Object.keys(nextGame).length === 0) delete nextTickets[gameId];
       return { ...s, ticketOverrides: nextTickets };
     });
+    putAdminConfig("ticket_overrides", state.ticketOverrides);
   },
   // Revert all tiers of a game to their defaults.
   resetGameTickets(gameId: string) {
@@ -402,16 +580,19 @@ export const admin = {
       delete next[gameId];
       return { ...s, ticketOverrides: next };
     });
+    putAdminConfig("ticket_overrides", state.ticketOverrides);
   },
 
   // Notifications
   addNotification(n: Omit<AppNotification, "id">): AppNotification {
     const created: AppNotification = { ...n, id: genId() };
     update((s) => ({ ...s, notifications: [created, ...s.notifications] }));
+    apiCreateNotification(created);
     return created;
   },
   deleteNotification(id: string) {
     update((s) => ({ ...s, notifications: s.notifications.filter((n) => n.id !== id) }));
+    apiDeleteNotification(id);
   },
 
   // User control (mini-app player ban — kept for backwards compat)
@@ -422,6 +603,7 @@ export const admin = {
   // Settings
   setSettings(patch: Partial<AdminSettings>) {
     update((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+    putAdminConfig("settings", state.settings);
   },
 
   // Balance
@@ -469,18 +651,23 @@ export const admin = {
   // ── Users ──────────────────────────────────────────────────────────────────
   updateUser(id: string, patch: Partial<ManagedUser>) {
     update((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, ...patch, id } : u)) }));
+    apiPatchUser(id, patch);
   },
   setUserStatus(id: string, status: ManagedUser["status"]) {
     update((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, status } : u)) }));
+    apiPatchUser(id, { status });
   },
   setUserRestriction(id: string, key: keyof ManagedUser["restrictions"], value: boolean) {
     update((s) => ({
       ...s,
       users: s.users.map((u) => (u.id === id ? { ...u, restrictions: { ...u.restrictions, [key]: value } } : u)),
     }));
+    const user = state.users.find((u) => u.id === id);
+    if (user) apiPatchUser(id, { restrictions: user.restrictions });
   },
   setUserFlag(id: string, flagged: boolean) {
     update((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, flagged } : u)) }));
+    apiPatchUser(id, { flagged });
   },
   adjustUserBalance(id: string, currency: Currency, delta: number) {
     update((s) => ({
@@ -489,34 +676,45 @@ export const admin = {
         u.id === id ? { ...u, balances: { ...u.balances, [currency]: Math.max(0, (u.balances[currency] ?? 0) + delta) } } : u,
       ),
     }));
+    const user = state.users.find((u) => u.id === id);
+    if (user) apiPatchUser(id, { balances: user.balances });
   },
   setUserTier(id: string, tier: ManagedUser["tier"]) {
     update((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, tier } : u)) }));
+    apiPatchUser(id, { tier });
   },
 
   // ── Finance: deposits & withdrawals ─────────────────────────────────────────
   setDepositStatus(id: string, status: Deposit["status"]) {
     update((s) => ({ ...s, deposits: s.deposits.map((d) => (d.id === id ? { ...d, status } : d)) }));
+    apiPatchDeposit(id, { status });
   },
   setWithdrawalStatus(id: string, status: Withdrawal["status"]) {
     update((s) => ({ ...s, withdrawals: s.withdrawals.map((w) => (w.id === id ? { ...w, status } : w)) }));
+    apiPatchWithdrawal(id, { status });
   },
   approveAllAutoWithdrawals() {
     update((s) => ({
       ...s,
       withdrawals: s.withdrawals.map((w) => (w.status === "pending" && w.auto ? { ...w, status: "approved" } : w)),
     }));
+    state.withdrawals
+      .filter((w) => w.status === "approved" && w.auto)
+      .forEach((w) => apiPatchWithdrawal(w.id, { status: "approved" }));
   },
   setFinance(patch: Partial<FinanceSettings>) {
     update((s) => ({ ...s, finance: { ...s.finance, ...patch } }));
+    putAdminConfig("finance", state.finance);
   },
   sweepHotWallet() {
     update((s) => ({ ...s, finance: { ...s.finance, hotWalletBalance: Math.min(s.finance.hotWalletBalance, s.finance.hotWalletCap) } }));
+    putAdminConfig("finance", state.finance);
   },
 
   // ── Security ─────────────────────────────────────────────────────────────────
   setSecurity(patch: Partial<SecuritySettings>) {
     update((s) => ({ ...s, security: { ...s.security, ...patch } }));
+    putAdminConfig("security", state.security);
   },
 
   // ── Affiliate ────────────────────────────────────────────────────────────────
@@ -525,6 +723,7 @@ export const admin = {
       ...s,
       referralLevels: s.referralLevels.map((l) => (l.level === level ? { ...l, ...patch } : l)),
     }));
+    putAdminConfig("referral_config", { levels: state.referralLevels, triggers: state.referralTriggers });
   },
   toggleReferralTrigger(t: ReferralTrigger) {
     update((s) => ({
@@ -533,25 +732,30 @@ export const admin = {
         ? s.referralTriggers.filter((x) => x !== t)
         : [...s.referralTriggers, t],
     }));
+    putAdminConfig("referral_config", { levels: state.referralLevels, triggers: state.referralTriggers });
   },
 
   // ── Token packages ───────────────────────────────────────────────────────────
   addTokenPackage(p: Omit<TokenPackage, "id">): TokenPackage {
     const created: TokenPackage = { ...p, id: genId() };
     update((s) => ({ ...s, tokenPackages: [...s.tokenPackages, created] }));
+    apiUpsertTokenPackage(created);
     return created;
   },
   updateTokenPackage(id: string, patch: Partial<TokenPackage>) {
     update((s) => ({ ...s, tokenPackages: s.tokenPackages.map((p) => (p.id === id ? { ...p, ...patch, id } : p)) }));
+    apiPatchTokenPackage(id, patch);
   },
   deleteTokenPackage(id: string) {
     update((s) => ({ ...s, tokenPackages: s.tokenPackages.filter((p) => p.id !== id) }));
+    apiDeleteTokenPackage(id);
   },
 
   // ── Inventory ────────────────────────────────────────────────────────────────
   addInventory(i: Omit<InventoryItem, "id">): InventoryItem {
     const created: InventoryItem = { ...i, id: genId() };
     update((s) => ({ ...s, inventory: [...s.inventory, created] }));
+    apiUpsertInventory(created);
     return created;
   },
   updateInventory(id: string, patch: Partial<InventoryItem>) {
@@ -564,53 +768,66 @@ export const admin = {
         return merged;
       }),
     }));
+    const updated = state.inventory.find((i) => i.id === id);
+    if (updated) apiPatchInventory(id, updated);
   },
   deleteInventory(id: string) {
     update((s) => ({ ...s, inventory: s.inventory.filter((i) => i.id !== id) }));
+    apiDeleteInventory(id);
   },
 
   // ── Social tasks ─────────────────────────────────────────────────────────────
   addSocialTask(t: Omit<SocialTask, "id">): SocialTask {
     const created: SocialTask = { ...t, id: genId() };
     update((s) => ({ ...s, socialTasks: [...s.socialTasks, created] }));
+    apiUpsertSocialTask(created);
     return created;
   },
   updateSocialTask(id: string, patch: Partial<SocialTask>) {
     update((s) => ({ ...s, socialTasks: s.socialTasks.map((t) => (t.id === id ? { ...t, ...patch, id } : t)) }));
+    apiPatchSocialTask(id, patch);
   },
   deleteSocialTask(id: string) {
     update((s) => ({ ...s, socialTasks: s.socialTasks.filter((t) => t.id !== id) }));
+    apiDeleteSocialTask(id);
   },
 
   // ── Daily check-in ───────────────────────────────────────────────────────────
   setCheckinDay(index: number, value: number) {
     update((s) => ({ ...s, dailyCheckin: s.dailyCheckin.map((v, i) => (i === index ? Math.max(0, value) : v)) }));
+    putAdminConfig("daily_checkin", state.dailyCheckin);
   },
 
   // ── Promo codes ──────────────────────────────────────────────────────────────
   addPromoCode(p: Omit<PromoCode, "id" | "usedCount">): PromoCode {
     const created: PromoCode = { ...p, id: genId(), usedCount: 0 };
     update((s) => ({ ...s, promoCodes: [created, ...s.promoCodes] }));
+    apiUpsertPromoCode(created);
     return created;
   },
   updatePromoCode(id: string, patch: Partial<PromoCode>) {
     update((s) => ({ ...s, promoCodes: s.promoCodes.map((p) => (p.id === id ? { ...p, ...patch, id } : p)) }));
+    apiPatchPromoCode(id, patch);
   },
   deletePromoCode(id: string) {
     update((s) => ({ ...s, promoCodes: s.promoCodes.filter((p) => p.id !== id) }));
+    apiDeletePromoCode(id);
   },
 
   // ── Broadcasts ───────────────────────────────────────────────────────────────
   addBroadcast(b: Omit<Broadcast, "id">): Broadcast {
     const created: Broadcast = { ...b, id: genId() };
     update((s) => ({ ...s, broadcasts: [created, ...s.broadcasts] }));
+    apiUpsertBroadcast(created);
     return created;
   },
   updateBroadcast(id: string, patch: Partial<Broadcast>) {
     update((s) => ({ ...s, broadcasts: s.broadcasts.map((b) => (b.id === id ? { ...b, ...patch, id } : b)) }));
+    apiPatchBroadcast(id, patch);
   },
   deleteBroadcast(id: string) {
     update((s) => ({ ...s, broadcasts: s.broadcasts.filter((b) => b.id !== id) }));
+    apiDeleteBroadcast(id);
   },
 
   // ── Support tickets ──────────────────────────────────────────────────────────
@@ -622,38 +839,48 @@ export const admin = {
         t.id === id ? { ...t, messages: [...t.messages, msg], status: "answered", updatedAt: Date.now() } : t,
       ),
     }));
+    const ticket = state.tickets.find((t) => t.id === id);
+    if (ticket) apiPatchTicket(id, { messages: ticket.messages, status: "answered", updatedAt: ticket.updatedAt });
   },
   setTicketStatus(id: string, status: SupportTicket["status"]) {
     update((s) => ({ ...s, tickets: s.tickets.map((t) => (t.id === id ? { ...t, status, updatedAt: Date.now() } : t)) }));
+    apiPatchTicket(id, { status });
   },
 
   // ── CMS texts ────────────────────────────────────────────────────────────────
   setCms(patch: Partial<CmsTexts>) {
     update((s) => ({ ...s, cms: { ...s.cms, ...patch } }));
+    putAdminConfig("cms", state.cms);
   },
 
   // ── Roles ────────────────────────────────────────────────────────────────────
   addRole(r: Omit<AdminRole, "id">): AdminRole {
     const created: AdminRole = { ...r, id: genId() };
     update((s) => ({ ...s, roles: [...s.roles, created] }));
+    putAdminConfig("roles", state.roles);
     return created;
   },
   updateRole(id: string, patch: Partial<AdminRole>) {
     update((s) => ({ ...s, roles: s.roles.map((r) => (r.id === id ? { ...r, ...patch, id } : r)) }));
+    putAdminConfig("roles", state.roles);
   },
   deleteRole(id: string) {
     update((s) => ({ ...s, roles: s.roles.filter((r) => r.id !== id) }));
+    putAdminConfig("roles", state.roles);
   },
 
   // ── API keys / backup ────────────────────────────────────────────────────────
   updateApiKey(id: string, value: string) {
     update((s) => ({ ...s, apiKeys: s.apiKeys.map((k) => (k.id === id ? { ...k, value, updatedAt: Date.now() } : k)) }));
+    putAdminConfig("api_keys", state.apiKeys);
   },
   setBackup(patch: Partial<BackupSettings>) {
     update((s) => ({ ...s, backup: { ...s.backup, ...patch } }));
+    putAdminConfig("backup", state.backup);
   },
   runBackupNow() {
     update((s) => ({ ...s, backup: { ...s.backup, lastBackupAt: Date.now() } }));
+    putAdminConfig("backup", state.backup);
   },
 
   // Danger
@@ -670,6 +897,8 @@ export const admin = {
       /* ignore */
     }
     emit();
+    // Re-seed the backend with fresh defaults
+    seedApi(state).catch(() => {});
   },
 };
 

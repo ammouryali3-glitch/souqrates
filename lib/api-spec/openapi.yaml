@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: admin
+    description: Admin dashboard operations
 paths:
   /healthz:
     get:
@@ -24,7 +26,856 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /admin/runtime-config:
+    get:
+      operationId: getRuntimeConfig
+      tags: [admin]
+      summary: Get mini-app safe runtime config
+      description: >
+        Public endpoint. Returns only non-sensitive fields required by the mini-app at runtime:
+        settings, game_overrides, ticket_overrides, referral_config, daily_checkin, and active notifications.
+        Never returns PII, api_keys, finance, security, or backup data.
+      responses:
+        "200":
+          description: Mini-app safe runtime config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeConfig"
+
+  /admin/state:
+    get:
+      operationId: getAdminState
+      tags: [admin]
+      summary: Get full admin state (auth required)
+      description: Returns all configuration and entity lists. Requires an active admin session (JWT cookie). Use /admin/runtime-config for unauthenticated mini-app access.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Full admin state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminState"
+        "401":
+          description: Unauthorized
+
+  /admin/config/{key}:
+    put:
+      operationId: putAdminConfig
+      tags: [admin]
+      summary: Update a config section
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - settings
+              - game_overrides
+              - ticket_overrides
+              - cms
+              - finance
+              - security
+              - backup
+              - referral_config
+              - daily_checkin
+              - api_keys
+              - roles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Config updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/notifications:
+    get:
+      operationId: listNotifications
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: List app notifications
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppNotification"
+    post:
+      operationId: createNotification
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Create a notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppNotification"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppNotification"
+
+  /admin/notifications/{id}:
+    delete:
+      operationId: deleteNotification
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Delete a notification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/users:
+    get:
+      operationId: listPlatformUsers
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: List platform users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: upsertPlatformUser
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Upsert a platform user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created or updated
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Forbidden
+
+  /admin/users/{id}:
+    patch:
+      operationId: patchPlatformUser
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Patch a platform user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: {}
+
+  /admin/deposits:
+    get:
+      operationId: listDeposits
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: List deposits
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: upsertDeposit
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Upsert a deposit record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created or updated
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Forbidden
+
+  /admin/deposits/{id}:
+    patch:
+      operationId: patchDeposit
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Patch deposit status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+
+  /admin/withdrawals:
+    get:
+      operationId: listWithdrawals
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: List withdrawals
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: upsertWithdrawal
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Upsert a withdrawal record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created or updated
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Forbidden
+
+  /admin/withdrawals/{id}:
+    patch:
+      operationId: patchWithdrawal
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Patch withdrawal status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+
+  /admin/token-packages:
+    get:
+      operationId: listTokenPackages
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: List token packages
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: createTokenPackage
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Create or replace a token package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {}
+
+  /admin/token-packages/{id}:
+    patch:
+      operationId: patchTokenPackage
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+    delete:
+      operationId: deleteTokenPackage
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/inventory:
+    get:
+      operationId: listInventory
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: List inventory items
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: createInventoryItem
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {}
+
+  /admin/inventory/{id}:
+    patch:
+      operationId: patchInventoryItem
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+    delete:
+      operationId: deleteInventoryItem
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/social-tasks:
+    get:
+      operationId: listSocialTasks
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: createSocialTask
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {}
+
+  /admin/social-tasks/{id}:
+    patch:
+      operationId: patchSocialTask
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+    delete:
+      operationId: deleteSocialTask
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/promo-codes:
+    get:
+      operationId: listPromoCodes
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: createPromoCode
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {}
+
+  /admin/promo-codes/{id}:
+    patch:
+      operationId: patchPromoCode
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+    delete:
+      operationId: deletePromoCode
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/broadcasts:
+    get:
+      operationId: listBroadcasts
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: createBroadcast
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {}
+
+  /admin/broadcasts/{id}:
+    patch:
+      operationId: patchBroadcast
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+    delete:
+      operationId: deleteBroadcast
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/support-tickets:
+    get:
+      operationId: listSupportTickets
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: upsertSupportTicket
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Upsert a support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created or updated
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Forbidden
+
+  /admin/support-tickets/{id}:
+    patch:
+      operationId: patchSupportTicket
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+
+  /admin/products:
+    get:
+      operationId: listShopProducts
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: createShopProduct
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {}
+
+  /admin/products/{id}:
+    patch:
+      operationId: patchShopProduct
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {}
+    delete:
+      operationId: deleteShopProduct
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /admin/referrers:
+    get:
+      operationId: listReferrers
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+    post:
+      operationId: upsertReferrer
+      tags: [admin]
+      security:
+        - cookieAuth: []
+      summary: Upsert a referrer record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "201":
+          description: Created or updated
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Forbidden
+
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: skz_admin_token
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +885,108 @@ components:
       required:
         - status
 
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+
+    AppNotification:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [info, success, warning, promo]
+        startAt:
+          type: number
+        endAt:
+          type: number
+      required:
+        - id
+        - title
+        - message
+        - type
+        - startAt
+        - endAt
+
+    AdminState:
+      type: object
+      properties:
+        config:
+          type: object
+          additionalProperties: {}
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppNotification"
+        users:
+          type: array
+          items: {}
+        deposits:
+          type: array
+          items: {}
+        withdrawals:
+          type: array
+          items: {}
+        tokenPackages:
+          type: array
+          items: {}
+        inventory:
+          type: array
+          items: {}
+        socialTasks:
+          type: array
+          items: {}
+        promoCodes:
+          type: array
+          items: {}
+        broadcasts:
+          type: array
+          items: {}
+        tickets:
+          type: array
+          items: {}
+        products:
+          type: array
+          items: {}
+        referrers:
+          type: array
+          items: {}
+      required:
+        - config
+        - notifications
+        - users
+        - deposits
+        - withdrawals
+        - tokenPackages
+        - inventory
+        - socialTasks
+        - promoCodes
+        - broadcasts
+        - tickets
+        - products
+        - referrers
+
+    RuntimeConfig:
+      type: object
+      description: Mini-app safe public runtime config. Never contains PII or sensitive admin data.
+      properties:
+        config:
+          type: object
+          description: Allowlisted config keys (settings, game_overrides, ticket_overrides, referral_config, daily_checkin)
+          additionalProperties: {}
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppNotification"
+      required:
+        - config
+        - notifications

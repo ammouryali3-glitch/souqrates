@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded } from "./lib/seed";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,14 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Seed database with demo data if empty (non-blocking)
+  seedDatabaseIfEmpty().catch((err) => {
+    logger.error({ err }, "Failed to seed database");
+  });
+
+  // Fix roles config shape from old object-permissions format to AdminRole[]
+  migrateRolesConfigIfNeeded().catch((err) => {
+    logger.error({ err }, "Failed to migrate roles config");
+  });
 });

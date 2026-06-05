@@ -6,7 +6,7 @@ import {
   Trophy, Megaphone, Settings2, Menu, X, ArrowRight, UserCog, AlertTriangle,
   Search, CornerDownLeft, LogOut, ShieldOff, type LucideIcon,
 } from "lucide-react";
-import { useAdmin, admin, syncBalance } from "../lib/admin-store";
+import { useAdmin, admin, syncBalance, refreshFromApi } from "../lib/admin-store";
 import { ARENA_GAMES, SKILL_GAMES } from "../lib/games-data";
 import {
   fetchAdminSession, logoutAdmin, hasPermission,
@@ -275,6 +275,14 @@ export default function Manager() {
   useEffect(() => {
     fetchAdminSession().then(setSession);
   }, []);
+
+  // When session transitions to authenticated, pull the full admin state from
+  // the server so the dashboard sees live data without a page refresh.
+  useEffect(() => {
+    if (session && session !== "loading") {
+      refreshFromApi().catch(() => {});
+    }
+  }, [session]);
 
   if (session === "loading") {
     return (
