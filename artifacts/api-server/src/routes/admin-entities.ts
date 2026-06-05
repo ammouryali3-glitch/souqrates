@@ -235,10 +235,40 @@ router.patch("/withdrawals/:id", requirePermission("finance"), async (req: Reque
     }
     const merged = { ...(existing.data as object), ...req.body, id };
     const newStatus: "pending" | "approved" | "rejected" | "completed" = status ?? existing.status;
-    await db
-      .update(withdrawalsTable)
-      .set({ status: newStatus, data: merged })
-      .where(eq(withdrawalsTable.id, id));
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(withdrawalsTable)
+        .set({ status: newStatus, data: merged })
+        .where(eq(withdrawalsTable.id, id));
+
+      // If admin rejects a pending withdrawal, credit the SKZ back to the user.
+      if (newStatus === "rejected" && existing.status === "pending") {
+        const wdData = existing.data as Record<string, unknown>;
+        const userId = String(wdData.userId ?? "");
+        const skzAmount = Number(wdData.amount ?? 0);
+
+        if (userId && skzAmount > 0) {
+          const nowMs = Date.now();
+          await tx.execute(sql`
+            UPDATE platform_users
+            SET
+              data = jsonb_set(
+                jsonb_set(data,
+                  '{balances,SKZ}',
+                  to_jsonb(COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${skzAmount}::numeric)
+                ),
+                '{lastSeen}',
+                to_jsonb(${nowMs}::bigint)
+              ),
+              updated_at = NOW()
+            WHERE id = ${userId}
+          `);
+          req.log.info({ id, userId, skzAmount }, "withdrawal rejected — SKZ refunded to user");
+        }
+      }
+    });
+
     res.json(merged);
   } catch (err) {
     req.log.error({ err }, "patch withdrawal error");

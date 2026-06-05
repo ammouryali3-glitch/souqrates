@@ -80,6 +80,9 @@ export const t = {
     play: "العب",
     vaultTitle: "الخزنة",
     refs: "إحالات",
+    depositMemoLabel: "معرّفك (أضفه كتعليق على التحويل)",
+    depositMemoNote: "يجب إدراج هذا الرقم كـ تعليق/مذكرة في عملية التحويل لتحديد هويتك وإضافة الرصيد تلقائياً.",
+    withdrawSuccess: "تم إرسال طلب السحب بنجاح — سيراجعه الفريق قريباً.",
   },
   en: {
     home: "Home",
@@ -129,6 +132,9 @@ export const t = {
     play: "Play",
     vaultTitle: "Vault",
     refs: "Refs",
+    depositMemoLabel: "Your ID (add as transaction comment/memo)",
+    depositMemoNote: "Include this number as the comment/memo in your transfer so the system can identify you and credit your balance automatically.",
+    withdrawSuccess: "Withdrawal submitted — the team will process it shortly.",
   },
 } as const;
 

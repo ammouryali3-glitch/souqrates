@@ -8,7 +8,7 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { platformUsersTable, adminConfigTable, gameResultsTable } from "@workspace/db";
+import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 const router = Router();
@@ -679,6 +679,162 @@ router.post("/submit-score", async (req: Request, res: Response) => {
     res.json({ ok: true, rank });
   } catch (err) {
     req.log.error({ err }, "submit-score error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/wallet ───────────────────────────────────────────────────────
+
+/**
+ * Returns the authenticated user's deposit addresses, their deposit memo
+ * (tgId used as the transaction comment), and their recent transaction history.
+ *
+ * Returns: {
+ *   tonDepositWallet: string,
+ *   tronDepositWallet: string,
+ *   depositMemo: string,          // the value to put as transaction comment/memo
+ *   deposits: DepositRecord[],    // most-recent 50 confirmed deposits
+ *   withdrawals: WithdrawalRecord[], // most-recent 50 withdrawals
+ * }
+ */
+router.get("/wallet", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [userRow, depositRows, withdrawalRows] = await Promise.all([
+      db.select().from(platformUsersTable).where(eq(platformUsersTable.id, payload.tgId)).limit(1),
+      db.execute(sql`
+        SELECT data FROM deposits
+        WHERE data->>'userId' = ${payload.tgId}
+        ORDER BY created_at DESC LIMIT 50
+      `),
+      db.execute(sql`
+        SELECT data FROM withdrawals
+        WHERE data->>'userId' = ${payload.tgId}
+        ORDER BY created_at DESC LIMIT 50
+      `),
+    ]);
+
+    if (!userRow[0]) { res.status(404).json({ error: "User not found" }); return; }
+
+    res.json({
+      tonDepositWallet: process.env.TON_DEPOSIT_WALLET ?? "",
+      tronDepositWallet: process.env.TRON_DEPOSIT_WALLET ?? "",
+      depositMemo: payload.tgId,
+      deposits: (depositRows.rows as Array<{ data: unknown }>).map((r) => r.data),
+      withdrawals: (withdrawalRows.rows as Array<{ data: unknown }>).map((r) => r.data),
+    });
+  } catch (err) {
+    req.log.error({ err }, "user wallet error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/withdraw ────────────────────────────────────────────────────
+
+/**
+ * Submit a withdrawal request.
+ * Immediately debits the user's SKZ balance.
+ * Creates a pending withdrawal record for admin approval.
+ *
+ * Body: { skzAmount: number, destWallet: string, currency: "USDT" | "TON" }
+ * Returns: { ok: true, withdrawalId: string, newSkz: number }
+ */
+router.post("/withdraw", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const { skzAmount, destWallet, currency } = req.body ?? {};
+
+  if (typeof skzAmount !== "number" || !Number.isFinite(skzAmount) || skzAmount <= 0) {
+    res.status(400).json({ error: "skzAmount must be a positive number" }); return;
+  }
+  if (typeof destWallet !== "string" || !destWallet.trim()) {
+    res.status(400).json({ error: "destWallet required" }); return;
+  }
+  const safeCurrency: "USDT" | "TON" = (currency === "TON" ? "TON" : "USDT");
+  const safeAmount = Math.floor(skzAmount);
+
+  try {
+    let newSkz = 0;
+    let withdrawalId = "";
+
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+
+      if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
+
+      const data = row.data as Record<string, unknown>;
+      const balances = (data.balances ?? {}) as Record<string, number>;
+      const currentSkz = Math.floor(Number(balances.SKZ ?? 0));
+
+      if (currentSkz < safeAmount) {
+        throw Object.assign(new Error("Insufficient SKZ balance"), { status: 400 });
+      }
+
+      // Check withdrawal restrictions
+      const restrictions = (data.restrictions ?? {}) as Record<string, boolean>;
+      if (restrictions.withdraw) {
+        throw Object.assign(new Error("Withdrawals are restricted on this account"), { status: 403 });
+      }
+
+      const newSkzValue = currentSkz - safeAmount;
+      const nowMs = Date.now();
+
+      // Debit SKZ
+      const updatedData: Record<string, unknown> = {
+        ...data,
+        balances: { ...balances, SKZ: newSkzValue },
+        lastSeen: nowMs,
+      };
+      await tx
+        .update(platformUsersTable)
+        .set({ data: updatedData, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      // Create withdrawal record
+      withdrawalId = randomBytes(12).toString("hex");
+      const withdrawalData = {
+        id: withdrawalId,
+        userId: payload.tgId,
+        userName: String(data.name ?? ""),
+        currency: safeCurrency,
+        amount: safeAmount,
+        fee: 0,
+        at: nowMs,
+        status: "pending",
+        wallet: destWallet.trim(),
+        auto: safeAmount <= 1000, // auto-approve small amounts
+      };
+
+      await tx
+        .insert(withdrawalsTable)
+        .values({ id: withdrawalId, status: "pending", data: withdrawalData });
+
+      newSkz = newSkzValue;
+    });
+
+    req.log.info(
+      { tgId: payload.tgId, withdrawalId, skzAmount: safeAmount, currency: safeCurrency },
+      "withdrawal submitted",
+    );
+    res.json({ ok: true, withdrawalId, newSkz });
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 400) { res.status(400).json({ error: e.message ?? "Invalid request" }); return; }
+    if (e.status === 403) { res.status(403).json({ error: e.message ?? "Forbidden" }); return; }
+    req.log.error({ err }, "withdraw error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

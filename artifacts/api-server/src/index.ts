@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded } from "./lib/seed";
+import { startDepositPoller } from "./lib/ton-poller";
 
 const rawPort = process.env["PORT"];
 
@@ -33,4 +34,7 @@ app.listen(port, (err) => {
   migrateRolesConfigIfNeeded().catch((err) => {
     logger.error({ err }, "Failed to migrate roles config");
   });
+
+  // Start the blockchain deposit poller (TON + USDT TRC20)
+  startDepositPoller();
 });

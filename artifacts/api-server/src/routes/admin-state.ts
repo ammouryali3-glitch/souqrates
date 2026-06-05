@@ -41,6 +41,7 @@ const VALID_CONFIG_KEYS = new Set([
   "daily_checkin",
   "api_keys",
   "roles",
+  "deposit_config",
 ]);
 
 /**
@@ -56,6 +57,7 @@ const KEY_PERMISSION: Record<string, string> = {
   ticket_overrides: "content",
   cms: "content",
   finance: "finance",
+  deposit_config: "finance",
   referral_config: "affiliate",
   daily_checkin: "content",
 };

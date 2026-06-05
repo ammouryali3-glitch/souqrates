@@ -62,6 +62,10 @@ const DEFAULT_CONFIG = {
     { id: "k2", label: "TON API Key", value: "", updatedAt: NOW - 15 * D },
     { id: "k3", label: "TON Center Endpoint", value: "https://toncenter.com/api/v2", updatedAt: NOW - 15 * D },
   ],
+  deposit_config: {
+    skzPerUsdt: 100,
+    skzPerTon: 500,
+  },
   roles: [
     {
       id: "role_super", name: "Super Admin", handle: "@super_admin",
