@@ -1,12 +1,161 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ShoppingCart, Star, Download, FileText, X,
-  Coins, TrendingUp, Zap, ChevronDown, BookOpen,
-  CheckCircle, Package, ArrowLeft, ExternalLink,
+  Coins, ChevronDown, BookOpen,
+  CheckCircle, Package,
 } from "lucide-react";
 import { products, CATEGORIES, type Category, type Product } from "@/lib/shop-products";
+
+// ── Download helper ──────────────────────────────────────────────────────────
+
+function buildFileContent(p: Product): string {
+  const sep = "═".repeat(60);
+  const thin = "─".repeat(60);
+  return [
+    sep,
+    `  SKZ MARKETPLACE — ملف رقمي`,
+    sep,
+    ``,
+    `  الاسم:     ${p.titleAr}`,
+    `  العنوان:   ${p.title}`,
+    `  الفئة:     ${p.category}`,
+    `  الصفحات:   ${p.pages} صفحة PDF`,
+    `  التقييم:   ${"★".repeat(Math.round(p.rating))}${"☆".repeat(5 - Math.round(p.rating))} (${p.rating})`,
+    `  التحميلات: ${p.downloads.toLocaleString()} تحميل`,
+    `  السعر:     ${p.price} SKZ`,
+    ``,
+    thin,
+    `  الوصف`,
+    thin,
+    ``,
+    `  ${p.desc}`,
+    ``,
+    thin,
+    `  تفاصيل الترخيص`,
+    thin,
+    ``,
+    `  ✅ مرخص للاستخدام الشخصي والتجاري`,
+    `  ✅ مصدر مفتوح / ملكية عامة`,
+    `  ✅ التوزيع مسموح به وفق شروط CC`,
+    ``,
+    thin,
+    `  تم الشراء من منصة SKZ BOT`,
+    `  تاريخ التحميل: ${new Date().toLocaleString("ar-EG")}`,
+    sep,
+    ``,
+    `  ⚡ SKZ BOT — Premium Digital Marketplace`,
+  ].join("\n");
+}
+
+function triggerDownload(p: Product) {
+  const content = buildFileContent(p);
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `SKZ_${p.id}_${p.title.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Download Overlay (portal) ────────────────────────────────────────────────
+
+function DownloadOverlay({ product, onDone }: { product: Product; onDone: () => void }) {
+  const ac = accent(product.category);
+  const [progress, setProgress] = useState(0);
+  const [done, setDone] = useState(false);
+  const started = useRef(false);
+
+  // Animate progress then trigger real download
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    let p = 0;
+    const id = setInterval(() => {
+      p += Math.random() * 18 + 8;
+      if (p >= 100) {
+        clearInterval(id);
+        triggerDownload(product);
+        setProgress(100);
+        setDone(true);
+        setTimeout(onDone, 1400);
+      } else {
+        setProgress(Math.min(p, 99));
+      }
+    }, 120);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const overlay = (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center px-6"
+      style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)" }}
+    >
+      <motion.div
+        initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.88, opacity: 0 }}
+        className="w-full max-w-[340px] rounded-3xl border p-6 flex flex-col items-center gap-4"
+        style={{ background: "#0e0b18", borderColor: `${ac}35` }}
+      >
+        {/* Icon */}
+        <motion.div
+          animate={done ? { scale: [1, 1.2, 1] } : { rotate: [0, 360] }}
+          transition={done ? { duration: 0.4 } : { repeat: Infinity, duration: 1.4, ease: "linear" }}
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ background: `${ac}20`, border: `2px solid ${ac}50` }}
+        >
+          {done
+            ? <CheckCircle size={32} className="text-green-400" />
+            : <Download size={28} style={{ color: ac }} />
+          }
+        </motion.div>
+
+        {/* Text */}
+        <div className="text-center">
+          <div className="font-display font-black text-base text-white mb-0.5">
+            {done ? "تم التحميل! ✓" : "جاري التحميل…"}
+          </div>
+          <div className="text-xs text-white/40 font-display line-clamp-1">{product.titleAr}</div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full h-2 rounded-full bg-white/8 overflow-hidden">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: `linear-gradient(90deg, ${ac}, ${ac}88)`, boxShadow: `0 0 8px ${ac}88` }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.15 }}
+          />
+        </div>
+        <div className="text-[11px] text-white/30 font-display font-bold -mt-2">
+          {Math.round(progress)}%
+        </div>
+
+        {/* File info */}
+        <div className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8">
+          <FileText size={16} className="text-white/30 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] text-white/60 font-display truncate">
+              SKZ_{product.id}_{product.title.slice(0, 20)}…txt
+            </div>
+            <div className="text-[10px] text-white/25 font-display">{product.pages} صفحة · ملف نصي</div>
+          </div>
+          <div className="text-[10px] text-white/25 font-display shrink-0">
+            {Math.round(product.pages * 2.4)} KB
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+
+  return createPortal(overlay, document.body);
+}
 
 const BALANCE_KEY  = "skz_balance";
 const LIBRARY_KEY  = "skz_library";
@@ -296,6 +445,7 @@ function ProductModal({ product, owned: initOwned, balance: initBalance, onClose
 
 function LibraryPanel({ library }: { library: number[] }) {
   const owned = useMemo(() => products.filter(p => library.includes(p.id)), [library]);
+  const [downloading, setDownloading] = useState<Product | null>(null);
 
   if (owned.length === 0) {
     return (
@@ -348,13 +498,25 @@ function LibraryPanel({ library }: { library: number[] }) {
             </div>
             {/* Download btn */}
             <button
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-colors"
+              onClick={() => setDownloading(p)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-all active:scale-90"
               style={{ background: `${ac}20`, borderColor: `${ac}40` }}>
               <Download size={15} style={{ color: ac }} />
             </button>
           </motion.div>
         );
       })}
+
+      {/* Download progress overlay */}
+      <AnimatePresence>
+        {downloading && (
+          <DownloadOverlay
+            key={downloading.id}
+            product={downloading}
+            onDone={() => setDownloading(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
