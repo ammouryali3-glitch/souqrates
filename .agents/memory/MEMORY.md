@@ -2,3 +2,4 @@
 - [SKZ Bot economy layer](skz-bot-economy.md) — game-economy.ts is the chokepoint; a manager control is only real if traced through there; balance is a separate localStorage key.
 - [Canvas ref null with AnimatePresence](canvas-animatepresence-null.md) — canvasRef.current is null when startGame fires if canvas is inside AnimatePresence mode="wait". Fix: RAF retry guard at top of startGame.
 - [SKZ Bot admin gating](skz-bot-admin-gating.md) — admin toggles (game/section disable, maintenance, ban) must gate at the route in App.tsx, not just hide cards; direct URLs bypass card filtering.
+- [SKZ Bot server-side admin auth](skz-bot-server-auth.md) — JWT HttpOnly cookie via /api/admin/*; DB table admin_accounts; bcrypt hashes; AdminSessionContext replaces sessionStorage.

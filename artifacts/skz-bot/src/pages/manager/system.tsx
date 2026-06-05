@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import {
   Settings2, Power, Sparkles, RotateCcw, Coins, Plus, Minus, Check, Trash2,
-  Pencil, ShieldCheck, KeyRound, DatabaseBackup, UserCog, Wrench,
+  Pencil, ShieldCheck, KeyRound, DatabaseBackup, UserCog, Wrench, Eye, EyeOff,
+  Loader2, AlertCircle,
 } from "lucide-react";
 import { useAdmin, useBalance, admin } from "../../lib/admin-store";
 import { ACCENTS } from "../../lib/games-data";
-import type { AdminRole, Permission } from "../../lib/admin-types";
+import type { Permission } from "../../lib/admin-types";
 import { ALL_PERMISSIONS } from "../../lib/admin-types";
+import {
+  useAdminSession, listAdminAccounts, createAdminAccount,
+  updateAdminAccount, deleteAdminAccount,
+} from "../../lib/admin-auth";
+import type { AdminAccountInfo } from "../../lib/admin-auth";
 import {
   Card, SectionHeader, StatCard, Label, Field, Area, Select, Toggle, Button,
   Pill, EmptyState, Modal, timeAgo,
@@ -16,7 +22,7 @@ const PERM_LABEL: Record<Permission, string> = {
   users: "المستخدمون", games: "الألعاب", economy: "الاقتصاد", finance: "المالية",
   security: "الأمان", gamification: "التحفيز", content: "المحتوى", affiliate: "الإحالة", system: "النظام",
 };
-const ROLE_LABEL: Record<AdminRole["role"], string> = {
+const ROLE_LABEL: Record<AdminAccountInfo["role"], string> = {
   owner: "المالك", moderator: "مشرف", support: "دعم", accountant: "محاسب",
 };
 
@@ -99,85 +105,275 @@ function AppSettings() {
   );
 }
 
-// ── Admin roles ───────────────────────────────────────────────────────────────
-const EMPTY_ROLE: Omit<AdminRole, "id"> = { name: "", handle: "", role: "support", permissions: [], active: true };
+// ── Admin accounts (owner only, DB-backed) ────────────────────────────────────
 
-function RoleModal({ open, initial, onClose, onSave }: {
-  open: boolean; initial: Omit<AdminRole, "id">; onClose: () => void; onSave: (r: Omit<AdminRole, "id">) => void;
+type AccountFormData = {
+  name: string;
+  handle: string;
+  role: AdminAccountInfo["role"];
+  password: string;
+  permissions: Permission[];
+  active: boolean;
+};
+
+const EMPTY_FORM: AccountFormData = {
+  name: "", handle: "", role: "support", password: "", permissions: [], active: true,
+};
+
+function AccountModal({ open, isEdit, initial, onClose, onSave }: {
+  open: boolean;
+  isEdit: boolean;
+  initial: AccountFormData;
+  onClose: () => void;
+  onSave: (data: AccountFormData) => Promise<void>;
 }) {
-  const [r, setR] = useState(initial);
-  useEffect(() => { if (open) setR(initial); }, [open, initial]);
-  const set = <K extends keyof Omit<AdminRole, "id">>(k: K, v: Omit<AdminRole, "id">[K]) => setR((s) => ({ ...s, [k]: v }));
+  const [form, setForm] = useState(initial);
+  const [showPw, setShowPw] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { if (open) { setForm(initial); setShowPw(false); setError(""); } }, [open, initial]);
+
+  const set = <K extends keyof AccountFormData>(k: K, v: AccountFormData[K]) =>
+    setForm((s) => ({ ...s, [k]: v }));
+
   function togglePerm(p: Permission) {
-    setR((s) => ({ ...s, permissions: s.permissions.includes(p) ? s.permissions.filter((x) => x !== p) : [...s.permissions, p] }));
+    setForm((s) => ({
+      ...s,
+      permissions: s.permissions.includes(p)
+        ? s.permissions.filter((x) => x !== p)
+        : [...s.permissions, p],
+    }));
   }
+
+  async function handleSave() {
+    setError("");
+    setSaving(true);
+    try {
+      await onSave(form);
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "فشل الحفظ");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const canSave = form.name.trim() !== "" &&
+    form.handle.trim() !== "" &&
+    (!isEdit || true) &&
+    (isEdit ? true : form.password.length >= 8);
+
   return (
     <Modal open={open} onClose={onClose} title="عضو إداري">
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-2">
-          <div><Label>الاسم</Label><Field value={r.name} onChange={(e) => set("name", e.target.value)} placeholder="أحمد" /></div>
-          <div><Label>المعرّف</Label><Field value={r.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@admin" /></div>
+          <div><Label>الاسم</Label><Field value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="أحمد" /></div>
+          <div><Label>المعرّف</Label><Field value={form.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@admin" /></div>
         </div>
-        <div><Label>الدور</Label><Select value={r.role} onChange={(e) => set("role", e.target.value as AdminRole["role"])}>
-          {(Object.keys(ROLE_LABEL) as AdminRole["role"][]).map((k) => <option key={k} value={k} className="bg-[#13101f]">{ROLE_LABEL[k]}</option>)}
-        </Select></div>
+        <div>
+          <Label>كلمة المرور{isEdit ? " (اختياري)" : ""}</Label>
+          <div className="relative">
+            <Field
+              type={showPw ? "text" : "password"}
+              value={form.password}
+              onChange={(e) => set("password", e.target.value)}
+              placeholder={isEdit ? "اتركه فارغاً للإبقاء على كلمة المرور الحالية" : "••••••••"}
+              className="pl-9"
+              data-testid="input-role-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+            >
+              {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+          {!isEdit && (
+            <p className="text-[10px] text-white/30 font-display mt-1">
+              الحساب الجديد سيُطلب منه تغيير كلمة المرور عند أول تسجيل دخول
+            </p>
+          )}
+        </div>
+        <div><Label>الدور</Label>
+          <Select value={form.role} onChange={(e) => set("role", e.target.value as AdminAccountInfo["role"])}>
+            {(Object.keys(ROLE_LABEL) as AdminAccountInfo["role"][]).map((k) => (
+              <option key={k} value={k} className="bg-[#13101f]">{ROLE_LABEL[k]}</option>
+            ))}
+          </Select>
+        </div>
         <div>
           <Label>الصلاحيات</Label>
-          <div className="grid grid-cols-2 gap-1.5">
-            {ALL_PERMISSIONS.map((p) => (
-              <label key={p} className="flex items-center gap-2 text-xs font-display text-white/70 rounded-lg bg-black/20 border border-white/10 px-2.5 py-1.5">
-                <input type="checkbox" checked={r.permissions.includes(p)} onChange={() => togglePerm(p)} /> {PERM_LABEL[p]}
-              </label>
-            ))}
-          </div>
+          {form.role === "owner" ? (
+            <p className="text-xs font-display text-white/40 py-1">المالك يملك جميع الصلاحيات تلقائياً</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-1.5">
+              {ALL_PERMISSIONS.map((p) => (
+                <label key={p} className="flex items-center gap-2 text-xs font-display text-white/70 rounded-lg bg-black/20 border border-white/10 px-2.5 py-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.permissions.includes(p)} onChange={() => togglePerm(p)} /> {PERM_LABEL[p]}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
+        {error && (
+          <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 font-display text-center">
+            {error}
+          </p>
+        )}
         <div className="flex gap-2 mt-1">
-          <Button variant="green" className="flex-1" onClick={() => onSave(r)} disabled={!r.name.trim()} data-testid="button-save-role">حفظ</Button>
-          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+          <Button
+            variant="green"
+            className="flex-1"
+            onClick={handleSave}
+            disabled={!canSave || saving}
+            data-testid="button-save-role"
+          >
+            {saving ? "جارٍ الحفظ…" : "حفظ"}
+          </Button>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>إلغاء</Button>
         </div>
       </div>
     </Modal>
   );
 }
 
-function Roles() {
-  const { roles } = useAdmin();
+function Roles({ accounts, onReload }: { accounts: AdminAccountInfo[]; onReload: () => void }) {
+  const session = useAdminSession();
+  const isOwner = session?.role === "owner";
   const [adding, setAdding] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const editing = roles.find((r) => r.id === editId);
+  const [editAccount, setEditAccount] = useState<AdminAccountInfo | null>(null);
+
+  async function handleCreate(data: AccountFormData) {
+    await createAdminAccount({
+      name: data.name,
+      handle: data.handle,
+      role: data.role,
+      password: data.password,
+      permissions: data.permissions,
+      active: data.active,
+    });
+    onReload();
+  }
+
+  async function handleUpdate(id: string, data: AccountFormData) {
+    await updateAdminAccount(id, {
+      name: data.name,
+      handle: data.handle,
+      role: data.role,
+      permissions: data.permissions,
+      active: data.active,
+      ...(data.password ? { password: data.password } : {}),
+    });
+    onReload();
+  }
+
+  async function handleToggleActive(account: AdminAccountInfo) {
+    try {
+      await updateAdminAccount(account.id, { active: !account.active });
+      onReload();
+    } catch {
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteAdminAccount(id);
+      onReload();
+    } catch {
+    }
+  }
+
   return (
-    <Card title="الفريق الإداري والصلاحيات" icon={ShieldCheck} action={<Button icon={Plus} onClick={() => setAdding(true)} data-testid="button-add-role">عضو</Button>}>
-      {roles.length === 0 ? <EmptyState icon={UserCog} text="لا يوجد أعضاء" /> : (
+    <Card
+      title="الفريق الإداري والصلاحيات"
+      icon={ShieldCheck}
+      action={
+        isOwner
+          ? <Button icon={Plus} onClick={() => setAdding(true)} data-testid="button-add-role">عضو</Button>
+          : undefined
+      }
+    >
+      {accounts.length === 0 ? <EmptyState icon={UserCog} text="لا يوجد أعضاء" /> : (
         <div className="grid sm:grid-cols-2 gap-3">
-          {roles.map((r) => (
-            <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+          {accounts.map((a) => (
+            <div key={a.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-yellow-600 to-amber-400 flex items-center justify-center shrink-0"><UserCog size={16} className="text-black" /></div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-display font-bold text-white truncate">{r.name}</div>
-                  <div className="text-[10px] text-white/40 font-display">{r.handle}</div>
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-yellow-600 to-amber-400 flex items-center justify-center shrink-0">
+                  <UserCog size={16} className="text-black" />
                 </div>
-                <Pill tone={r.role === "owner" ? "gold" : "purple"}>{ROLE_LABEL[r.role]}</Pill>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-display font-bold text-white truncate">{a.name}</div>
+                  <div className="text-[10px] text-white/40 font-display">{a.handle}</div>
+                </div>
+                <Pill tone={a.role === "owner" ? "gold" : "purple"}>{ROLE_LABEL[a.role]}</Pill>
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
-                {r.role === "owner" ? <span className="text-[10px] font-display text-white/40">كل الصلاحيات</span>
-                  : r.permissions.length === 0 ? <span className="text-[10px] font-display text-white/30">بدون صلاحيات</span>
-                  : r.permissions.map((p) => <span key={p} className="text-[9px] font-display text-white/55 bg-white/8 px-1.5 py-0.5 rounded-full">{PERM_LABEL[p]}</span>)}
+                {a.role === "owner"
+                  ? <span className="text-[10px] font-display text-white/40">كل الصلاحيات</span>
+                  : a.permissions.length === 0
+                    ? <span className="text-[10px] font-display text-white/30">بدون صلاحيات</span>
+                    : a.permissions.map((p) => (
+                      <span key={p} className="text-[9px] font-display text-white/55 bg-white/8 px-1.5 py-0.5 rounded-full">
+                        {PERM_LABEL[p]}
+                      </span>
+                    ))}
               </div>
+              {a.mustChangePassword && (
+                <div className="mt-1.5 flex items-center gap-1 text-[10px] font-display text-amber-400/80">
+                  <AlertCircle size={10} /> يجب تغيير كلمة المرور عند أول دخول
+                </div>
+              )}
               <div className="flex items-center gap-1.5 mt-2">
-                <Toggle on={r.active} onClick={() => admin.updateRole(r.id, { active: !r.active })} testId={`toggle-role-${r.id}`} />
-                <span className="flex-1 text-[10px] font-display text-white/40">{r.active ? "نشط" : "معطّل"}</span>
-                {r.role !== "owner" && <>
-                  <button onClick={() => setEditId(r.id)} className="w-7 h-7 rounded-lg bg-white/8 flex items-center justify-center"><Pencil size={13} className="text-white/60" /></button>
-                  <button onClick={() => admin.deleteRole(r.id)} className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center"><Trash2 size={13} className="text-red-400" /></button>
-                </>}
+                {isOwner && (
+                  <Toggle on={a.active} onClick={() => handleToggleActive(a)} testId={`toggle-role-${a.id}`} />
+                )}
+                <span className="flex-1 text-[10px] font-display text-white/40">
+                  {a.active ? "نشط" : "معطّل"}
+                </span>
+                {isOwner && a.role !== "owner" && (
+                  <>
+                    <button
+                      onClick={() => setEditAccount(a)}
+                      className="w-7 h-7 rounded-lg bg-white/8 flex items-center justify-center"
+                    >
+                      <Pencil size={13} className="text-white/60" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(a.id)}
+                      className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center"
+                    >
+                      <Trash2 size={13} className="text-red-400" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
-      <RoleModal open={adding} initial={EMPTY_ROLE} onClose={() => setAdding(false)} onSave={(r) => { admin.addRole(r); setAdding(false); }} />
-      <RoleModal open={!!editing} initial={editing ?? EMPTY_ROLE} onClose={() => setEditId(null)} onSave={(r) => { if (editId) admin.updateRole(editId, r); setEditId(null); }} />
+      {isOwner && (
+        <>
+          <AccountModal
+            open={adding}
+            isEdit={false}
+            initial={EMPTY_FORM}
+            onClose={() => setAdding(false)}
+            onSave={handleCreate}
+          />
+          <AccountModal
+            open={!!editAccount}
+            isEdit={true}
+            initial={
+              editAccount
+                ? { name: editAccount.name, handle: editAccount.handle, role: editAccount.role, password: "", permissions: editAccount.permissions, active: editAccount.active }
+                : EMPTY_FORM
+            }
+            onClose={() => setEditAccount(null)}
+            onSave={(data) => handleUpdate(editAccount!.id, data)}
+          />
+        </>
+      )}
     </Card>
   );
 }
@@ -208,7 +404,9 @@ function ApiKeys() {
                   <Button variant="ghost" onClick={() => setEditId(null)}>إلغاء</Button>
                 </>
               ) : (
-                <button onClick={() => { setEditId(k.id); setVal(k.value); }} className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center"><Pencil size={14} className="text-white/60" /></button>
+                <button onClick={() => { setEditId(k.id); setVal(k.value); }} className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center">
+                  <Pencil size={14} className="text-white/60" />
+                </button>
               )}
             </div>
             <div className="text-[10px] text-white/25 font-display mt-1">آخر تحديث {timeAgo(k.updatedAt)}</div>
@@ -261,15 +459,32 @@ function DangerZone() {
   );
 }
 
+// ── Root ──────────────────────────────────────────────────────────────────────
 export default function SystemSection() {
-  const { roles, apiKeys } = useAdmin();
-  const activeAdmins = roles.filter((r) => r.active).length;
+  const { apiKeys } = useAdmin();
+  const [accounts, setAccounts] = useState<AdminAccountInfo[]>([]);
+  const [loadError, setLoadError] = useState("");
+
+  async function loadAccounts() {
+    try {
+      const data = await listAdminAccounts();
+      setAccounts(data);
+      setLoadError("");
+    } catch {
+      setLoadError("تعذّر تحميل الفريق الإداري");
+    }
+  }
+
+  useEffect(() => { loadAccounts(); }, []);
+
+  const activeAdmins = accounts.filter((a) => a.active).length;
+
   return (
     <div>
       <SectionHeader title="النظام والإدارة" subtitle="الإعدادات، الفريق الإداري، المفاتيح، النسخ الاحتياطي، والمعاينة الحية" icon={Settings2} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard label="أعضاء الفريق" value={roles.length} icon={UserCog} tone="purple" />
+        <StatCard label="أعضاء الفريق" value={accounts.length} icon={UserCog} tone="purple" />
         <StatCard label="أعضاء نشطون" value={activeAdmins} icon={ShieldCheck} tone="green" />
         <StatCard label="مفاتيح API" value={apiKeys.length} icon={KeyRound} tone="cyan" />
         <StatCard label="إصدار اللوحة" value="2.0" icon={Settings2} tone="gold" />
@@ -281,7 +496,15 @@ export default function SystemSection() {
           <LiveBalance />
           <Backup />
         </div>
-        <Roles />
+        {loadError ? (
+          <Card title="الفريق الإداري والصلاحيات" icon={ShieldCheck}>
+            <div className="flex items-center gap-2 text-red-400 text-sm font-display py-4 justify-center">
+              <AlertCircle size={16} /> {loadError}
+            </div>
+          </Card>
+        ) : (
+          <Roles accounts={accounts} onReload={loadAccounts} />
+        )}
         <ApiKeys />
         <DangerZone />
       </div>

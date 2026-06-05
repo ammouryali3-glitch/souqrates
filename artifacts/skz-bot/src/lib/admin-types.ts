@@ -185,6 +185,7 @@ export interface AdminRole {
   role: "owner" | "support" | "accountant" | "moderator";
   permissions: Permission[]; // "owner" implicitly has all
   active: boolean;
+  password?: string; // hashed via btoa for storage (plaintext comparison in proto)
 }
 
 export interface ApiKey {

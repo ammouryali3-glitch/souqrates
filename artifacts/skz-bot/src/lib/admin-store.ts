@@ -199,7 +199,15 @@ function load(): AdminState {
       promoCodes: parsed.promoCodes ?? seeded.promoCodes,
       broadcasts: parsed.broadcasts ?? seeded.broadcasts,
       tickets: parsed.tickets ?? seeded.tickets,
-      roles: parsed.roles ?? seeded.roles,
+      roles: (() => {
+        const stored = parsed.roles ?? seeded.roles;
+        // Migrate: if stored roles are missing passwords, backfill from seed defaults.
+        return stored.map((r) => {
+          if (r.password) return r;
+          const seed = seeded.roles.find((s) => s.id === r.id);
+          return seed?.password ? { ...r, password: seed.password } : r;
+        });
+      })(),
       apiKeys: parsed.apiKeys ?? seeded.apiKeys,
       cms: { ...seeded.cms, ...(parsed.cms ?? {}) },
       finance: { ...seeded.finance, ...(parsed.finance ?? {}) },
