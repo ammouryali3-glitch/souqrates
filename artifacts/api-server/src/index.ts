@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded } from "./lib/seed";
 import { startDepositPoller } from "./lib/ton-poller";
+import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 
 const rawPort = process.env["PORT"];
 
@@ -37,4 +38,7 @@ app.listen(port, (err) => {
 
   // Start the blockchain deposit poller (TON + USDT TRC20)
   startDepositPoller();
+
+  // Purge stale leaderboard rows and schedule recurring resets at UTC midnight
+  startLeaderboardResetScheduler();
 });
