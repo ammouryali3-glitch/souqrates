@@ -6,7 +6,7 @@ import {
   getPool, getEntries, hasPlayed, markPlayed,
   getLeaderboard, submitScore, getCountdown, formatTime,
   fetchLeaderboard, submitScoreToServer,
-  ArenaPeriod, LeaderEntry,
+  ArenaPeriod, LeaderEntry, LeaderboardPeriod,
 } from "@/lib/arena";
 import { useArenaEconomy } from "@/lib/game-economy";
 import { useTelegramUser } from "@/lib/telegram-user";
@@ -61,6 +61,10 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
   const [myRank, setMyRank] = useState(0);
   const [countdown, setCountdown] = useState(() => getCountdown(period));
   const [alreadyPlayed] = useState(() => hasPlayed(gameId, period));
+  const [lbTab, setLbTab] = useState<LeaderboardPeriod>(period);
+  const [alltimeLeaders, setAlltimeLeaders] = useState<LeaderEntry[]>([]);
+  const [alltimeEntries, setAlltimeEntries] = useState(0);
+  const [alltimeLoading, setAlltimeLoading] = useState(false);
   const { fee: effEntry, prizeFactor, winnerCut } = useArenaEconomy(gameId, entryFee);
   const winnerTake = Math.floor(pool * winnerCut * prizeFactor);
 
@@ -73,6 +77,19 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
       setEntries(data.entries); // always trust server value
     });
   }, [gameId, period]);
+
+  // Fetch all-time leaderboard when tab switches to alltime
+  useEffect(() => {
+    if (lbTab !== "alltime") return;
+    setAlltimeLoading(true);
+    fetchLeaderboard(gameId, "alltime").then((data) => {
+      if (data) {
+        setAlltimeLeaders(data.leaders);
+        setAlltimeEntries(data.entries);
+      }
+      setAlltimeLoading(false);
+    });
+  }, [lbTab, gameId]);
 
   // Countdown refresh (period display only — no pool simulation)
   useEffect(() => {
@@ -294,55 +311,102 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               <button onClick={() => setShell("lobby")} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
                 <ArrowLeft size={17} className="text-white/70" />
               </button>
-              <div>
+              <div className="flex-1 min-w-0">
                 <div className="font-display font-black text-lg text-white uppercase">{title}</div>
-                <div className="text-xs text-white/30 font-display">{entries} players · Resets in {countdown}</div>
-              </div>
-            </div>
-
-            {/* Live pool banner */}
-            <div className="mx-4 mb-3 px-4 py-3 rounded-2xl flex items-center justify-between"
-              style={{ background: `linear-gradient(135deg, ${color}20, ${color}08)`, border: `1px solid ${color}40` }}>
-              <div>
-                <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">🔥 Live Prize Pool</div>
-                <div className="font-display font-black text-xl flex items-center gap-1.5" style={{ color }}>
-                  <Coins size={16} /><AnimatedNumber value={pool} suffix=" SKZ" />
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">Winner Takes</div>
-                <div className="font-display font-black text-xl text-yellow-400">
-                  <AnimatedNumber value={winnerTake} suffix=" SKZ" />
+                <div className="text-xs text-white/30 font-display">
+                  {lbTab === "alltime"
+                    ? `${alltimeEntries} all-time players`
+                    : `${entries} players · Resets in ${countdown}`}
                 </div>
               </div>
             </div>
 
-            {/* Leaderboard */}
+            {/* Tab toggle */}
+            <div className="mx-4 mb-3 flex rounded-xl overflow-hidden border border-white/10 bg-white/5">
+              <button
+                onClick={() => setLbTab(period)}
+                className="flex-1 py-2.5 text-xs font-display font-bold tracking-wide uppercase transition-all"
+                style={lbTab !== "alltime"
+                  ? { background: color, color: "#000" }
+                  : { color: "rgba(255,255,255,0.4)" }}>
+                {period === "weekly" ? "This Week" : "Today"}
+              </button>
+              <button
+                onClick={() => setLbTab("alltime")}
+                className="flex-1 py-2.5 text-xs font-display font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-1"
+                style={lbTab === "alltime"
+                  ? { background: color, color: "#000" }
+                  : { color: "rgba(255,255,255,0.4)" }}>
+                <Trophy size={12} /> All Time
+              </button>
+            </div>
+
+            {/* Live pool banner — only for current-period tab */}
+            {lbTab !== "alltime" && (
+              <div className="mx-4 mb-3 px-4 py-3 rounded-2xl flex items-center justify-between"
+                style={{ background: `linear-gradient(135deg, ${color}20, ${color}08)`, border: `1px solid ${color}40` }}>
+                <div>
+                  <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">🔥 Live Prize Pool</div>
+                  <div className="font-display font-black text-xl flex items-center gap-1.5" style={{ color }}>
+                    <Coins size={16} /><AnimatedNumber value={pool} suffix=" SKZ" />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">Winner Takes</div>
+                  <div className="font-display font-black text-xl text-yellow-400">
+                    <AnimatedNumber value={winnerTake} suffix=" SKZ" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* All-time banner */}
+            {lbTab === "alltime" && (
+              <div className="mx-4 mb-3 px-4 py-3 rounded-2xl flex items-center gap-3"
+                style={{ background: `linear-gradient(135deg, ${color}15, ${color}05)`, border: `1px solid ${color}30` }}>
+                <Trophy size={18} style={{ color }} className="shrink-0" />
+                <div>
+                  <div className="font-display font-bold text-sm text-white">Hall of Fame</div>
+                  <div className="text-[11px] text-white/40 font-display">Best score ever achieved by each player</div>
+                </div>
+              </div>
+            )}
+
+            {/* Leaderboard list */}
             <div className="px-4 flex flex-col gap-0 pb-8">
-              {leaders.map((l, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-1.5 border transition-all ${l.isYou ? "border-yellow-400/40" : "border-transparent hover:bg-white/5"}`}
-                  style={l.isYou ? { background: `${color}15`, borderColor: `${color}50` } : { background: "rgba(255,255,255,0.03)" }}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-display font-black text-sm shrink-0"
-                    style={{ background: i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "rgba(255,255,255,0.1)", color: i < 3 ? "#000" : "#fff" }}>
-                    {i === 0 ? <Crown size={16} /> : l.rank}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-display font-bold text-sm text-white flex items-center gap-1">
-                      {l.name}{l.isYou && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-display" style={{ background: `${color}30`, color }}>YOU</span>}
-                    </div>
-                    <div className="text-xs text-white/30 font-display">{formatTime(l.time)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-display font-bold text-sm" style={{ color: i === 0 ? "#ffd700" : "rgba(255,255,255,0.8)" }}>{l.score} pts</div>
-                    {i === 0 && <div className="text-[10px] text-yellow-400 font-display flex items-center justify-end gap-0.5"><Star size={9} />Leader</div>}
-                  </div>
-                </motion.div>
-              ))}
-              {leaders.length === 0 && (
-                <div className="text-center text-white/30 text-sm font-display py-12">
-                  No entries yet — be the first!
-                </div>
+              {alltimeLoading && lbTab === "alltime" ? (
+                <div className="text-center text-white/30 text-sm font-display py-12">Loading…</div>
+              ) : (
+                (() => {
+                  const list = lbTab === "alltime" ? alltimeLeaders : leaders;
+                  if (list.length === 0) {
+                    return (
+                      <div className="text-center text-white/30 text-sm font-display py-12">
+                        {lbTab === "alltime" ? "No records yet — be the first legend!" : "No entries yet — be the first!"}
+                      </div>
+                    );
+                  }
+                  return list.map((l, i) => (
+                    <motion.div key={`${lbTab}-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-1.5 border transition-all ${l.isYou ? "border-yellow-400/40" : "border-transparent hover:bg-white/5"}`}
+                      style={l.isYou ? { background: `${color}15`, borderColor: `${color}50` } : { background: "rgba(255,255,255,0.03)" }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center font-display font-black text-sm shrink-0"
+                        style={{ background: i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "rgba(255,255,255,0.1)", color: i < 3 ? "#000" : "#fff" }}>
+                        {i === 0 ? <Crown size={16} /> : l.rank}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-display font-bold text-sm text-white flex items-center gap-1">
+                          {l.name}{l.isYou && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-display" style={{ background: `${color}30`, color }}>YOU</span>}
+                        </div>
+                        <div className="text-xs text-white/30 font-display">{formatTime(l.time)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-display font-bold text-sm" style={{ color: i === 0 ? "#ffd700" : "rgba(255,255,255,0.8)" }}>{l.score} pts</div>
+                        {i === 0 && <div className="text-[10px] text-yellow-400 font-display flex items-center justify-end gap-0.5"><Star size={9} />{lbTab === "alltime" ? "Legend" : "Leader"}</div>}
+                      </div>
+                    </motion.div>
+                  ));
+                })()
               )}
             </div>
           </motion.div>

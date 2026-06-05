@@ -9,6 +9,7 @@ export interface LeaderEntry {
 }
 
 export type ArenaPeriod = "daily" | "weekly";
+export type LeaderboardPeriod = ArenaPeriod | "alltime";
 
 export function getDefaultLeaders(_gameId: string): LeaderEntry[] {
   return [];
@@ -115,9 +116,10 @@ export interface LeaderboardResponse {
 
 /**
  * Fetch the server-side leaderboard for a game.
+ * Accepts "daily", "weekly", or "alltime".
  * Returns null if the network request fails (caller falls back to local data).
  */
-export async function fetchLeaderboard(gameId: string, period: ArenaPeriod): Promise<LeaderboardResponse | null> {
+export async function fetchLeaderboard(gameId: string, period: LeaderboardPeriod): Promise<LeaderboardResponse | null> {
   try {
     const res = await apiFetch(`/api/user/leaderboard/${encodeURIComponent(gameId)}?period=${period}`);
     if (!res.ok) return null;

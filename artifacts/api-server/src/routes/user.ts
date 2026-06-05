@@ -841,18 +841,20 @@ router.post("/withdraw", async (req: Request, res: Response) => {
 // ── GET /api/user/leaderboard/:gameId ─────────────────────────────────────────
 
 /**
- * Returns the top-20 leaderboard for a game in the current period.
+ * Returns the top-20 leaderboard for a game.
  * Auth is optional: if a valid session cookie is present the caller's entry
  * gets { isYou: true } and yourRank is populated.
  *
- * Query: ?period=daily|weekly  (defaults to "daily")
+ * Query: ?period=daily|weekly|alltime  (defaults to "daily")
+ *   - alltime: best score per user across all recorded history; pool is always 0.
  * Returns: { leaders: LeaderEntry[], pool: number, entries: number, yourRank: number | null }
  */
 router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
   const gameId = String(req.params.gameId);
   const periodParam = req.query.period as string;
+  const isAllTime = periodParam === "alltime";
   const period: "daily" | "weekly" = periodParam === "weekly" ? "weekly" : "daily";
-  const since = periodStart(period);
+  const since = isAllTime ? null : periodStart(period);
 
   // Optionally identify the caller for isYou/yourRank
   let myTgId: string | null = null;
@@ -865,9 +867,15 @@ router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
   } catch { /* anonymous */ }
 
   try {
-    // Best score per user in the current period (both date AND period column must match)
-    const [rows, statsResult] = await Promise.all([
-      db.execute(sql`
+    type RawRow = { user_id: string; name: string; score: number; time_sec: number };
+
+    let allSorted: RawRow[];
+    let entries: number;
+    let pool: number;
+
+    if (isAllTime) {
+      // All-time: best score per user across entire history (no date/period filter)
+      const rows = await db.execute(sql`
         SELECT DISTINCT ON (user_id)
           user_id,
           name,
@@ -875,24 +883,46 @@ router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
           time_sec
         FROM game_results
         WHERE game_id = ${gameId}
-          AND period = ${period}
-          AND created_at >= ${since}
         ORDER BY user_id, score DESC, time_sec ASC
-      `),
-      db.execute(sql`
-        SELECT COUNT(DISTINCT user_id)::int AS entries,
-               COALESCE(SUM(fee_paid), 0)::int AS total_fees
-        FROM game_results
-        WHERE game_id = ${gameId}
-          AND period = ${period}
-          AND created_at >= ${since}
-      `),
-    ]);
+      `);
+      allSorted = (rows.rows as RawRow[])
+        .sort((a, b) => b.score - a.score || a.time_sec - b.time_sec);
+      entries = allSorted.length;
+      pool = 0;
+    } else {
+      // Current-period leaderboard with pool calculation
+      const [rows, statsResult] = await Promise.all([
+        db.execute(sql`
+          SELECT DISTINCT ON (user_id)
+            user_id,
+            name,
+            score,
+            time_sec
+          FROM game_results
+          WHERE game_id = ${gameId}
+            AND period = ${period}
+            AND created_at >= ${since!}
+          ORDER BY user_id, score DESC, time_sec ASC
+        `),
+        db.execute(sql`
+          SELECT COUNT(DISTINCT user_id)::int AS entries,
+                 COALESCE(SUM(fee_paid), 0)::int AS total_fees
+          FROM game_results
+          WHERE game_id = ${gameId}
+            AND period = ${period}
+            AND created_at >= ${since!}
+        `),
+      ]);
 
-    type RawRow = { user_id: string; name: string; score: number; time_sec: number };
-    // Sort ALL best-per-user results for global rank computation
-    const allSorted = (rows.rows as RawRow[])
-      .sort((a, b) => b.score - a.score || a.time_sec - b.time_sec);
+      allSorted = (rows.rows as RawRow[])
+        .sort((a, b) => b.score - a.score || a.time_sec - b.time_sec);
+
+      const stats = (statsResult.rows as Array<{ entries: number; total_fees: number }>)[0];
+      entries = stats?.entries ?? 0;
+      const totalFees = stats?.total_fees ?? 0;
+      const { poolShare } = await getGameEconomy(gameId);
+      pool = Math.floor(totalFees * poolShare);
+    }
 
     // yourRank is derived from full global list (not limited to top-20)
     const yourRank = myTgId !== null
@@ -911,14 +941,6 @@ router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
       time: Number(r.time_sec),
       isYou: myTgId !== null && r.user_id === myTgId,
     }));
-
-    // Total unique entries and pool for the period
-    const stats = (statsResult.rows as Array<{ entries: number; total_fees: number }>)[0];
-    const entries = stats?.entries ?? 0;
-    const totalFees = stats?.total_fees ?? 0;
-
-    const { poolShare } = await getGameEconomy(gameId);
-    const pool = Math.floor(totalFees * poolShare);
 
     res.json({ leaders, pool, entries, yourRank });
   } catch (err) {
