@@ -3,18 +3,13 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_fracsort_best";
 const BALANCE_KEY = "skz_balance";
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 12, time: 60 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 20, time: 55 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 30, time: 50 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 45, time: 45 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 65, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.fracsort;
 
 interface Frac { num: number; den: number; val: number; }
 // Pool of fractions (avoid exactly 1/2)

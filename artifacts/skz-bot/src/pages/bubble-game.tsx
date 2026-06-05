@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -11,13 +12,7 @@ const BEST_KEY = "skz_bubble_best";
 const BALANCE_KEY = "skz_balance";
 const START_BALANCE = 1000;
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 40,  time: 60 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 65,  time: 55 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 90,  time: 50 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 120, time: 48 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 160, time: 45 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.bubble;
 
 const COLORS = ["#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#1abc9c"];
 const COLOR_GLOW = ["rgba(231,76,60,0.7)","rgba(52,152,219,0.7)","rgba(46,204,113,0.7)","rgba(243,156,18,0.7)","rgba(155,89,182,0.7)","rgba(26,188,156,0.7)"];

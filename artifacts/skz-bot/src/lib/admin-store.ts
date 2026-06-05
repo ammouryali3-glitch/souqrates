@@ -23,6 +23,14 @@ export interface GameOverride {
   timeFactor?: number; // default 1 — scales time limit (higher = more time)
 }
 
+/** Absolute per-ticket override values (replace the game's defaults when set). */
+export interface TicketPatch {
+  price?: number;
+  prize?: number;
+  target?: number;
+  time?: number;
+}
+
 export type NotifType = "info" | "success" | "warning" | "promo";
 
 export interface AppNotification {
@@ -58,6 +66,8 @@ export interface AdminSettings {
 export interface AdminState {
   products: Product[];
   gameOverrides: Record<string, GameOverride>;
+  /** Per-game, per-ticket absolute overrides: ticketOverrides[gameId][ticketId] */
+  ticketOverrides: Record<string, Record<string, TicketPatch>>;
   notifications: AppNotification[];
   banned: boolean;
   settings: AdminSettings;
@@ -84,6 +94,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
 const DEFAULT_STATE: AdminState = {
   products: [],
   gameOverrides: {},
+  ticketOverrides: {},
   notifications: [],
   banned: false,
   settings: DEFAULT_SETTINGS,
@@ -98,6 +109,7 @@ function load(): AdminState {
     return {
       products: Array.isArray(parsed.products) ? parsed.products : [],
       gameOverrides: parsed.gameOverrides ?? {},
+      ticketOverrides: parsed.ticketOverrides ?? {},
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
       banned: !!parsed.banned,
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
@@ -238,7 +250,46 @@ export const admin = {
     update((s) => {
       const next = { ...s.gameOverrides };
       delete next[id];
-      return { ...s, gameOverrides: next };
+      const nextTickets = { ...s.ticketOverrides };
+      delete nextTickets[id];
+      return { ...s, gameOverrides: next, ticketOverrides: nextTickets };
+    });
+  },
+
+  // Per-ticket economy — set one absolute field for one tier of one game.
+  setTicketField(gameId: string, ticketId: string, field: keyof TicketPatch, value: number) {
+    update((s) => {
+      const game = s.ticketOverrides[gameId] ?? {};
+      const tier = game[ticketId] ?? {};
+      return {
+        ...s,
+        ticketOverrides: {
+          ...s.ticketOverrides,
+          [gameId]: { ...game, [ticketId]: { ...tier, [field]: value } },
+        },
+      };
+    });
+  },
+  // Clear a single overridden field (revert that field to the game default).
+  clearTicketField(gameId: string, ticketId: string, field: keyof TicketPatch) {
+    update((s) => {
+      const game = s.ticketOverrides[gameId];
+      if (!game || !game[ticketId]) return s;
+      const tier = { ...game[ticketId] };
+      delete tier[field];
+      const nextGame = { ...game, [ticketId]: tier };
+      if (Object.keys(tier).length === 0) delete nextGame[ticketId];
+      const nextTickets = { ...s.ticketOverrides, [gameId]: nextGame };
+      if (Object.keys(nextGame).length === 0) delete nextTickets[gameId];
+      return { ...s, ticketOverrides: nextTickets };
+    });
+  },
+  // Revert all tiers of a game to their defaults.
+  resetGameTickets(gameId: string) {
+    update((s) => {
+      const next = { ...s.ticketOverrides };
+      delete next[gameId];
+      return { ...s, ticketOverrides: next };
     });
   },
 

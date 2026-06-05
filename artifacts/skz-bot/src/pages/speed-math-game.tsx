@@ -3,18 +3,13 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_speedmath_best";
 const BALANCE_KEY = "skz_balance";
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 100, time: 60 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 180, time: 55 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 280, time: 50 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 420, time: 45 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 600, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.speedmath;
 
 interface Question { eq: string; answer: number; choices: [number,number,number,number]; }
 

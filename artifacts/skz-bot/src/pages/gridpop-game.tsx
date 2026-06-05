@@ -3,18 +3,13 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins, Grid2x2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_gridpop_best";
 const BALANCE_KEY = "skz_balance";
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 200,  time: 60 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 450,  time: 55 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 850,  time: 50 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 1500, time: 45 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 2500, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.gridpop;
 const COLS = 6, ROWS = 9;
 const COLORS = ["#ff4da6", "#00d4ff", "#ffdd00", "#4dff91", "#ff7a00", "#cc88ff"];
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; color: string; r: number; }

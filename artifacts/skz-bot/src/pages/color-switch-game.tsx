@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -33,13 +34,7 @@ const TWO_PI = Math.PI * 2;
 const NEONS = ["#00d4ff", "#ff0099", "#ffee00", "#39ff14"] as const;
 const NEON_DARK = ["#005577", "#660040", "#665c00", "#006600"] as const;
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 8,  time: 35 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 12, time: 33 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 16, time: 31 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 20, time: 30 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 25, time: 28 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.color;
 
 const RING_O = 76; const RING_I = 50; // outer/inner radius of ring
 const INNER_O = 40; const INNER_I = 20; // inner decoy ring

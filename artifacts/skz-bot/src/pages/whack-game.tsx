@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -37,13 +38,7 @@ const GRID = 3;
 const POP_DUR = 0.22; // seconds to fully pop in
 const HIDE_DUR = 0.18; // seconds to pop out
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 8,  time: 35 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 12, time: 33 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 16, time: 31 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 20, time: 30 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 25, time: 28 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.whack;
 
 const SPAWN_DELAYS = [0.6, 1.1, 0.85, 1.4, 0.95, 1.2, 0.7, 1.05, 0.8]; // initial delays per cell
 

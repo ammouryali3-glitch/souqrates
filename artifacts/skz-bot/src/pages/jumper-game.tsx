@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -19,13 +20,7 @@ const PLATFORM_SPEED_X = 90;
 const PLAYER_R = 14;
 const MOVE_SPEED = 240;
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 20, time: 50 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 35, time: 48 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 55, time: 45 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 80, time: 42 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 120, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.hopper;
 
 type PlatType = "solid" | "moving" | "spring" | "breaking" | "cloud";
 interface Platform { x: number; y: number; w: number; type: PlatType; vx: number; bounced: boolean; breakTimer: number; broken: boolean; springs: boolean; glowT: number; }

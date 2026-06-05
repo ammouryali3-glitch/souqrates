@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -60,13 +61,7 @@ const START_BALANCE = 1000;
 // ---- Ticket tiers: pick one to play. Reach the target score (the interactive
 // progress line) before the timer runs out to win the prize; otherwise you lose
 // the entry price. (UI-only mock economy.)
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie", name: "Rookie", price: 25, prize: 45, target: 8, time: 24 },
-  { id: "bronze", name: "Bronze", price: 50, prize: 95, target: 12, time: 26 },
-  { id: "silver", name: "Silver", price: 120, prize: 255, target: 16, time: 28 },
-  { id: "gold", name: "Gold", price: 300, prize: 680, target: 22, time: 30 },
-  { id: "diamond", name: "Diamond", price: 750, prize: 1850, target: 30, time: 32 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.stack;
 
 // ---- Audio engine (Web Audio API, no asset files) ----
 class AudioEngine {

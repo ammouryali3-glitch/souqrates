@@ -3,18 +3,13 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_match3_best";
 const BALANCE_KEY = "skz_balance";
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 150,  time: 60 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 300,  time: 60 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 550,  time: 60 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 900,  time: 55 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 1400, time: 55 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.match3;
 const COLS = 7, ROWS = 7;
 const GEM_COLORS = ["#ff4444", "#4488ff", "#44ff88", "#ffdd00", "#cc44ff"];
 const GEM_GLOW   = ["#ff222288", "#2266ff88", "#22ff6688", "#ffcc0088", "#aa22ff88"];

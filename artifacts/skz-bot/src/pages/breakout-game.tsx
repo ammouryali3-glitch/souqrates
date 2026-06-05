@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -12,13 +13,7 @@ const BALANCE_KEY = "skz_balance";
 const START_BALANCE = 1000;
 const TWO_PI = Math.PI * 2;
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 50,  time: 50 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 80,  time: 48 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 110, time: 45 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 150, time: 42 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 200, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.breakout;
 
 const BRICK_ROWS = 6; const BRICK_COLS = 8;
 const BRICK_COLORS = [

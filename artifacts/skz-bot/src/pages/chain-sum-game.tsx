@@ -3,18 +3,13 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; targetSum: number; }
 const BEST_KEY = "skz_chainsum_best";
 const BALANCE_KEY = "skz_balance";
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 6,  time: 60, targetSum: 10 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 10, time: 55, targetSum: 12 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 15, time: 50, targetSum: 15 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 22, time: 45, targetSum: 18 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 30, time: 40, targetSum: 20 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.chainsum;
 const COLS = 5, ROWS = 5;
 interface Cell { val: number; x: number; y: number; r: number; inChain: boolean; clearing: boolean; clearT: number; }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; }

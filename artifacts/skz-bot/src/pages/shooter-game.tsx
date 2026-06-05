@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -15,13 +16,7 @@ const PLAYER_SPEED = 320;
 const BULLET_SPEED = 560;
 const FIRE_RATE = 0.14; // seconds between bullets
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 20, time: 40 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 35, time: 38 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 55, time: 36 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 80, time: 34 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 120, time: 32 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.striker;
 
 interface Enemy { x: number; y: number; vx: number; vy: number; type: number; hp: number; maxHp: number; r: number; phase: number; dead?: boolean; }
 interface Bullet { x: number; y: number; vx: number; vy: number; power: number; }

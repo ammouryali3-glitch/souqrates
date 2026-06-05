@@ -3,17 +3,12 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
 const BEST_KEY = "skz_swiperush_best", BALANCE_KEY = "skz_balance";
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie",  name: "Rookie",  price: 30,  prize: 55,   target: 150,  time: 60 },
-  { id: "bronze",  name: "Bronze",  price: 75,  prize: 140,  target: 300,  time: 55 },
-  { id: "silver",  name: "Silver",  price: 150, prize: 320,  target: 500,  time: 50 },
-  { id: "gold",    name: "Gold",    price: 350, prize: 800,  target: 800,  time: 45 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 1200, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.swiperush;
 const DIRS = ["up","down","left","right"] as const;
 type Dir = typeof DIRS[number];
 const DIR_COLOR:Record<Dir,string> = {up:"#4dff91",down:"#ff4da6",left:"#ffdd00",right:"#00d4ff"};

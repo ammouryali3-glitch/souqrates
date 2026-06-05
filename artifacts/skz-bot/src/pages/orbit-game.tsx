@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -79,13 +80,7 @@ const GEM_HUES = [280, 320, 48];
 // ---- Ticket tiers: pick one to play. Collect the target number of gems (the
 // interactive progress line) before the timer runs out to win the prize; crash
 // into an obstacle or run out of time and you lose the entry. (UI-only mock economy.)
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie", name: "Rookie", price: 25, prize: 45, target: 6, time: 30 },
-  { id: "bronze", name: "Bronze", price: 50, prize: 95, target: 9, time: 32 },
-  { id: "silver", name: "Silver", price: 120, prize: 255, target: 12, time: 34 },
-  { id: "gold", name: "Gold", price: 300, prize: 680, target: 16, time: 36 },
-  { id: "diamond", name: "Diamond", price: 750, prize: 1850, target: 20, time: 40 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.orbit;
 
 // smallest signed angular difference in [-PI, PI]
 const angDiff = (a: number, b: number) => {

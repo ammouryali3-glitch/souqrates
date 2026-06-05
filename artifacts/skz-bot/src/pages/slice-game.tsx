@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
 
@@ -81,13 +82,7 @@ const BALANCE_KEY = "skz_balance";
 const START_BALANCE = 1000;
 const TWO_PI = Math.PI * 2;
 
-const RAW_TICKETS: Ticket[] = [
-  { id: "rookie", name: "Rookie", price: 30, prize: 55, target: 8, time: 35 },
-  { id: "bronze", name: "Bronze", price: 75, prize: 140, target: 12, time: 33 },
-  { id: "silver", name: "Silver", price: 150, prize: 320, target: 16, time: 31 },
-  { id: "gold", name: "Gold", price: 350, prize: 800, target: 20, time: 30 },
-  { id: "diamond", name: "Diamond", price: 800, prize: 2000, target: 26, time: 28 },
-];
+const RAW_TICKETS: Ticket[] = GAME_TICKETS.slice;
 
 const SLICE_COLORS = ["#FF6B9D", "#FFD93D", "#6BCB77", "#4ECDC4", "#FF6B35", "#C77DFF", "#4CC9F0", "#FF9F43"];
 const SHAPES: ShapeType[] = ["circle", "rect", "diamond", "star"];
