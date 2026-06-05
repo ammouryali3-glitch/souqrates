@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBalance, writeBalance } from "@/lib/admin-store";
 import { useLang, t } from "@/lib/i18n";
 import { fetchUserWallet, submitWithdrawal, type WalletData } from "@/lib/user-api";
+import { useTelegramUser } from "@/lib/telegram-user";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ function statusColor(status: string): string {
 
 export default function Wallet() {
   const skzBalance = useBalance();
+  const { loading: balanceLoading } = useTelegramUser();
   const lang = useLang();
   const s = t[lang];
 
@@ -183,9 +185,13 @@ export default function Wallet() {
         <div className="relative z-10 flex flex-col gap-1">
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">{s.availableSkz}</span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-4xl font-display font-bold text-white tracking-tight drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
-              <NumberTicker value={skzBalance} decimals={0} />
-            </span>
+            {balanceLoading ? (
+              <div className="h-10 w-32 rounded-xl bg-white/10 animate-pulse" />
+            ) : (
+              <span className="text-4xl font-display font-bold text-white tracking-tight drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
+                <NumberTicker value={skzBalance} decimals={0} />
+              </span>
+            )}
             <span className="text-lg font-display font-black text-primary tracking-widest">SKZ</span>
           </div>
         </div>
@@ -328,7 +334,7 @@ export default function Wallet() {
             <Button
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl h-12 mt-2"
               onClick={handleWithdraw}
-              disabled={wdLoading || wdSuccess}
+              disabled={wdLoading || wdSuccess || balanceLoading}
             >
               {wdLoading ? <Loader2 size={16} className="animate-spin" /> : s.confirmWithdraw}
             </Button>

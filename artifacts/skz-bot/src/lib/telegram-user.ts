@@ -81,7 +81,23 @@ const initialState: TelegramUserState = {
   ready: false,
 };
 
-let tgState: TelegramUserState = { ...initialState };
+// Synchronously detect Telegram at module load so the very first render already
+// shows loading=true — avoids showing the stale localStorage balance while the
+// API call is pending (the 50 ms delay in admin-store + the network round-trip).
+function buildInitialTgState(): TelegramUserState {
+  if (typeof window === "undefined") return { ...initialState };
+  const twa = getTelegramWebApp();
+  if (!twa?.initData) return { ...initialState };
+  return {
+    loading: true,
+    inTelegram: true,
+    tgUser: twa.initDataUnsafe?.user ?? null,
+    dbUser: null,
+    ready: false,
+  };
+}
+
+let tgState: TelegramUserState = buildInitialTgState();
 const tgListeners = new Set<() => void>();
 
 function emitTg() {

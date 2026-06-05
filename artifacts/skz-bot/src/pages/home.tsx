@@ -13,7 +13,7 @@ export default function Home() {
   const lang = useLang();
   const s = t[lang];
   const canClaim = settings.dailyBonus > 0 && admin.canClaimDailyBonus();
-  const { tgUser, inTelegram } = useTelegramUser();
+  const { tgUser, inTelegram, loading: balanceLoading } = useTelegramUser();
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,17 +102,21 @@ export default function Home() {
         >
           <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
           <h2 className="text-muted-foreground text-sm font-medium tracking-widest uppercase mb-1 text-center">{s.totalBalance}</h2>
-          <div className="flex items-center gap-2 relative">
-            <span className="text-5xl font-display font-bold tracking-tight text-white drop-shadow-[0_0_15px_rgba(212,175,55,0.6)]">
-              <NumberTicker value={skzBalance} decimals={0} />
-            </span>
+          <div className="flex items-center gap-2 relative justify-center">
+            {balanceLoading ? (
+              <div className="h-12 w-36 rounded-xl bg-white/10 animate-pulse" />
+            ) : (
+              <span className="text-5xl font-display font-bold tracking-tight text-white drop-shadow-[0_0_15px_rgba(212,175,55,0.6)]">
+                <NumberTicker value={skzBalance} decimals={0} />
+              </span>
+            )}
             <span className="text-xl font-display font-black text-primary mt-3 tracking-widest drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]">SKZ</span>
           </div>
         </motion.div>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid grid-cols-3 gap-3 transition-opacity duration-300 ${balanceLoading ? "opacity-40 pointer-events-none" : ""}`}>
         <Link href="/games" className="group">
           <div className="flex flex-col items-center justify-center bg-card/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 gap-2 transition-all hover:bg-card/60 hover:border-primary/30">
             <div className="w-10 h-10 rounded-full bg-accent/20 text-accent flex items-center justify-center group-hover:scale-110 transition-transform">

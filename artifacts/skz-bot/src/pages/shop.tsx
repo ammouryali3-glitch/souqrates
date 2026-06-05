@@ -7,7 +7,8 @@ import {
   CheckCircle, Package,
 } from "lucide-react";
 import { CATEGORIES, type Category, type Product } from "@/lib/shop-products";
-import { useAdmin } from "@/lib/admin-store";
+import { useAdmin, useBalance } from "@/lib/admin-store";
+import { useTelegramUser } from "@/lib/telegram-user";
 
 // ── Content generator per category ───────────────────────────────────────────
 
@@ -567,14 +568,14 @@ function ProductCard({ product, owned, onOpen }: { product: Product; owned: bool
 
 // ── Product Modal (rendered via Portal to escape overflow:hidden) ─────────────
 
-function ProductModal({ product, owned: initOwned, balance: initBalance, onClose, onBuy }: {
-  product: Product; owned: boolean; balance: number;
+function ProductModal({ product, owned: initOwned, balance: initBalance, balanceLoading, onClose, onBuy }: {
+  product: Product; owned: boolean; balance: number; balanceLoading?: boolean;
   onClose: () => void; onBuy: (p: Product) => void;
 }) {
   const [bought, setBought] = useState(initOwned);
   const [bal, setBal] = useState(initBalance);
   const ac = accent(product.category);
-  const canAfford = bal >= product.price;
+  const canAfford = !balanceLoading && bal >= product.price;
 
   function handleBuy() {
     if (bought || !canAfford) return;
@@ -806,12 +807,12 @@ export default function Shop() {
   const [sort, setSort] = useState<SortKey>("popular");
   const [showSort, setShowSort] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
-  const [balance, setBalance] = useState(() => parseInt(localStorage.getItem(BALANCE_KEY) || "1000"));
+  const balance = useBalance();
   const [library, setLibrary] = useState<number[]>(() => getLibrary());
   const { products, settings } = useAdmin();
+  const { loading: balanceLoading } = useTelegramUser();
 
-  const handleBuy = useCallback((p: Product) => {
-    setBalance(b => b - p.price);
+  const handleBuy = useCallback((_p: Product) => {
     setLibrary(getLibrary());
   }, []);
 
@@ -864,7 +865,11 @@ export default function Shop() {
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-1.5 bg-yellow-400/10 border border-yellow-400/30 px-2.5 py-1 rounded-full">
               <Coins size={11} className="text-yellow-400" />
-              <span className="text-[11px] text-yellow-300 font-display font-bold">{balance} SKZ</span>
+              {balanceLoading ? (
+                <div className="h-3 w-14 rounded bg-white/10 animate-pulse" />
+              ) : (
+                <span className="text-[11px] text-yellow-300 font-display font-bold">{balance} SKZ</span>
+              )}
             </div>
             {library.length > 0 && (
               <button onClick={() => setTab("library")}
@@ -1015,6 +1020,7 @@ export default function Shop() {
             product={selected}
             owned={library.includes(selected.id)}
             balance={balance}
+            balanceLoading={balanceLoading}
             onClose={() => setSelected(null)}
             onBuy={handleBuy}
           />

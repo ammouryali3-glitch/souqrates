@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Ban, Wrench } from "lucide-react";
 import { useAdmin } from "@/lib/admin-store";
 import { ALL_GAMES, getGameById } from "@/lib/games-data";
-import { setCurrentGameContext } from "@/lib/telegram-user";
+import { setCurrentGameContext, useTelegramUser } from "@/lib/telegram-user";
 import { useEffect, useRef } from "react";
 
 // Pages
@@ -88,13 +88,29 @@ const GAME_COMPONENTS: Record<string, React.ComponentType> = {
 };
 
 // Gate a game route: redirect to /games if the game is disabled or its section is off.
+// Also shows a loading overlay while the server balance is being confirmed, so the
+// ticket-selection screen cannot be interacted with before the authoritative balance arrives.
 function GameGate({ id, children }: { id: string; children: React.ReactNode }) {
   const { gameOverrides, settings } = useAdmin();
+  const { loading: balanceLoading } = useTelegramUser();
   const game = getGameById(id);
   const enabled = gameOverrides[id]?.enabled !== false;
   const sectionOn = game?.type === "arena" ? settings.arenaEnabled : settings.skillEnabled;
   if (!game || !enabled || !sectionOn) return <Redirect to="/games" />;
-  return <>{children}</>;
+  return (
+    <div className="relative flex-1 flex flex-col h-full">
+      {children}
+      {balanceLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <span className="text-xs text-white/60 font-display">جارٍ تحميل الرصيد…</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MaintenanceScreen() {
