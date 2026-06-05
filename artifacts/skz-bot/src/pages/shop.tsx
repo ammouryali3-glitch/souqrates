@@ -8,54 +8,328 @@ import {
 } from "lucide-react";
 import { products, CATEGORIES, type Category, type Product } from "@/lib/shop-products";
 
-// ── Download helper ──────────────────────────────────────────────────────────
+// ── Content generator per category ───────────────────────────────────────────
 
-function buildFileContent(p: Product): string {
-  const sep = "═".repeat(60);
-  const thin = "─".repeat(60);
+const BOOK_CONTENT: Record<number, { toc: string[]; body: string }> = {
+  1: {
+    toc: ["الكتاب الأول: ديون الامتنان","الكتاب الثاني: على نهر الغرانيكوس","الكتاب الثالث: في وحدة العاقل","الكتاب الرابع: في فناء الأشياء","الكتاب الخامس: في الواجب اليومي"],
+    body: `<h2>الكتاب الأول — ديون الامتنان</h2>
+<p>من جدي فيروس تعلمت الرفق ووقار الطبع.</p>
+<p>من أبي — بالسمعة والذكرى — تعلمت الحياء وشجاعة الرجال.</p>
+<p>من أمي تعلمت التقوى والكرم، والامتناع ليس فقط عن الأفعال الشريرة بل عن الأفكار الشريرة أيضاً، وتعلمت البساطة في أسلوب الحياة بعيداً عن ثراء الأثرياء.</p>
+<p>من جدي الأكبر تعلمت ألا أتردد في الذهاب إلى المدارس العامة، وأن أعتقد أن المعلمين الجيدين تستحق خدمتهم النفقات الكبيرة، وأن أحمل هذا دون شكوى.</p>
+<h2>الكتاب الثاني — في وحدة العاقل</h2>
+<p>في الفجر حين تستيقظ، كن مستعداً لأن يكون يومك صعباً: ستلتقي بالمتطفلين، والجاحدين، والوقحين، والكذابين، والحاسدين والمعادين للمجتمع.</p>
+<p>كل هذه العيوب تنبع من جهلهم بالخير والشر. أما أنا فقد أدركت طبيعة الخير — أنه جميل — وطبيعة الشر — أنه قبيح — وطبيعة الخاطئ نفسه — أنه مرتبط بي، لا بالدم أو بالنسب، بل بالمشاركة في نفس العقل والشرارة الإلهية.</p>
+<p>لذلك لا يمكن أن يؤذيني أيٌّ منهم، لأن لا أحد يستطيع أن يجعلني أشارك في ما هو قبيح. كما لا يمكنني أن أغضب من أخي أو أكرهه.</p>
+<blockquote>«أخضع قيادي للعقل، لأن العقل هو الطريق إلى الفضيلة.»</blockquote>
+<h2>الكتاب الثالث — في فناء الأشياء</h2>
+<p>لا تُضيّع ما تبقى من حياتك في التفكير في الآخرين... إلا إذا كان ذلك يخدم مصلحة مشتركة. لأنك إذا انشغلت بما يفكر فيه فلان أو يفعله، تحرم نفسك من عمل آخر.</p>
+<p>اصرف ذهنك عن كل ما هو عشوائي وغير ضروري، وفوق كل شيء، عن كل ما يقصد الإضرار أو المديح.</p>`
+  },
+  2: {
+    toc: ["الفصل الأول: التخطيط الاستراتيجي","الفصل الثاني: خوض المعارك","الفصل الثالث: استراتيجية الهجوم","الفصل الرابع: التكتيك","الفصل الخامس: الطاقة"],
+    body: `<h2>الفصل الأول — التخطيط الاستراتيجي (始計)</h2>
+<p>قال سون تزو: فن الحرب ذو أهمية حيوية للدولة. إنه مسألة حياة أو موت، طريق إلى السلامة أو إلى الخراب. ولذلك فهو موضوع بحث لا يمكن إهماله بأي حال.</p>
+<p>يتحكم في فن الحرب خمسة عوامل ثابتة يجب أخذها بعين الاعتبار في تقييراتك حين تسعى لتحديد الظروف السائدة في الميدان:</p>
+<ol>
+  <li><strong>القانون الأخلاقي</strong> — يجعل الشعب في توافق تام مع حاكمه، حتى يتبعوه دون اعتبار لحياتهم.</li>
+  <li><strong>السماء</strong> — تعني الليل والنهار، البرد والحر، الأوقات والفصول.</li>
+  <li><strong>الأرض</strong> — تشمل المسافات الكبيرة والصغيرة، الخطر والأمان، الأماكن المفتوحة والضيقة.</li>
+  <li><strong>القائد</strong> — يمثل الفضائل الحكمة والصدق والرحمة والشجاعة والصرامة.</li>
+  <li><strong>النظام</strong> — يُفهم على أنه تنظيم الجيش، تدرج الضباط، وإدارة الطرق التي يُمدّ بها الجيش.</li>
+</ol>
+<blockquote>«كل الحروب تقوم على الخداع. لذلك حين قادرون على الهجوم تظاهر بالعجز؛ وحين تستخدم قواتك اجعل العدو يظن أنك خامل.»</blockquote>
+<h2>الفصل الثاني — خوض المعارك</h2>
+<p>في العمليات الحربية، حين تُشغّل ألف مركبة خفيفة، وعدداً مماثلاً من المركبات الثقيلة، ومئة ألف جندي مسلح، مع إمدادات على مسافة ألف لي، فإن النفقات في الداخل والخارج ستشمل نفقات الضيافة ومواد الصمغ والطلاء والمركبات والأدرع ستبلغ ألف قطعة من الذهب يومياً. هذا هو تكلفة رفع مئة ألف جندي.</p>`
+  },
+  7: {
+    toc: ["المقدمة","القانون الأول: ادخر جزءاً مما تكسب","القانون الثاني: تحكم في إنفاقك","القانون الثالث: اجعل مالك يعمل لك","القانون الرابع: احمِ مالك من الخسارة","القانون الخامس: اجعل مسكنك استثماراً"],
+    body: `<h2>أرقش البابلي — أغنى رجل في بابل</h2>
+<p>في مدينة بابل القديمة، حيث يقف معبد بيل شامخاً وتزدهر الأسواق، كان أرقش رجلاً حكيماً يعرف أسرار المال.</p>
+<p>جاءه يوماً صديقه القديم بنسير قائلاً: "يا أرقش، لماذا أنت غني بينما نحن الذين عملنا معك جميعاً فقراء؟"</p>
+<p>ابتسم أرقش وقال: "لأنني تعلمت قانوناً واحداً لم تتعلموه."</p>
+<h2>القانون الأول — ادخر جزءاً مما تكسب</h2>
+<p>من كل عشرة قطع ذهبية تكسبها، لا تنفق أكثر من تسع. احتفظ بالعاشرة لبناء ثروتك.</p>
+<blockquote>«المحفظة تبدأ بالامتلاء متى كنت تضع فيها جزءاً من كسبك، وتبدأ بالفراغ متى أنفقت منها دون أن تردّ ما أخذت.»</blockquote>
+<p>قد يبدو هذا بسيطاً، بل تافهاً. لكن دعني أسألك: إذا كنت تعمل عشر سنوات وتكسب ثلاثة آلاف دينار في السنة، أين ذهب الثلاثون ألفاً؟ أين هو الآن؟</p>
+<h2>القانون الثاني — تحكم في إنفاقك</h2>
+<p>لا تخلط بين رغباتك وضرورياتك. الضروريات قليلة، لكن الرغبات لا نهاية لها.</p>
+<p>ضع لنفسك ميزانية: كم تحتاج للطعام؟ للملبس؟ للمسكن؟ للمتعة الضرورية؟ خصص لكل منها مقداراً محدداً ولا تتجاوزه.</p>`
+  },
+  8: {
+    toc: ["الفصل الأول: العقل يشكّل الإنسان","الفصل الثاني: التأثير على النفس","الفصل الثالث: الفكر والغرض","الفصل الرابع: الفكر والعمل","الفصل الخامس: عوامل الإنجاز"],
+    body: `<h2>كما يفكر الإنسان — جيمس ألن</h2>
+<p>العقل هو العامل المتحكم، يصنع ويُشكّل. والإنسان هو العقل، وهو دائماً يأخذ أداة الفكر ويُشكّل ما يريد، فيُخرج ألف فرحة وألف ألم.</p>
+<h2>الفصل الأول — العقل يشكّل الإنسان</h2>
+<p>الإنسان هو حرفياً ما يفكر فيه، وشخصيته هي مجموع كل أفكاره.</p>
+<p>كما لا يمكن للنبتة أن تنمو دون بذرة، كذلك لا يمكن لأي فعل أن يحدث دون بذرة فكرية مسبقة.</p>
+<p>هذا ينطبق على الأفعال الطيبة والسيئة على حد سواء. الشعلة الإلهية تحترق بالتطهير عند كل إنسان، وتتجلى في طريقة تفكيره.</p>
+<blockquote>«الإنسان هو سيد أفكاره، ومهندس شخصيته، وصانع بيئته وقدره.»</blockquote>
+<h2>الفصل الثاني — التأثير على النفس</h2>
+<p>الجسم هو خادم العقل. يطيع العقل — سواء كانت الأفكار المُختارة عن قصد أو تلك التي قُبلت بتهاون وسلبية.</p>
+<p>عند أوامر الأفكار غير النظيفة والمخاوف، يتراجع الجسم بسرعة إلى المرض والتدهور.</p>
+<p>عند أوامر الأفكار البهيجة وأفكار الجمال، يرتدي الجسم شباباً وجمالاً.</p>`
+  },
+};
+
+function getTOC(p: Product): string[] {
+  if (BOOK_CONTENT[p.id]) return BOOK_CONTENT[p.id].toc;
+  const cat = p.category;
+  if (cat === "📚 كتب مترجمة") return [
+    "مقدمة المترجم", "الفصل الأول: البداية", "الفصل الثاني: التطور",
+    "الفصل الثالث: الذروة", "الفصل الرابع: الخاتمة", "ملاحظات وتعليقات",
+  ];
+  if (cat === "🎓 كورسات") return [
+    "مقدمة الكورس وأهدافه", "الوحدة الأولى: الأساسيات", "الوحدة الثانية: المفاهيم المتوسطة",
+    "الوحدة الثالثة: التطبيق العملي", "الوحدة الرابعة: المشاريع", "الوحدة الخامسة: الاحتراف",
+    "تمارين ومسائل محلولة", "موارد إضافية",
+  ];
+  if (cat === "📐 قوالب") return [
+    "دليل الاستخدام", "القالب الرئيسي", "نماذج مكتملة", "تخصيص القالب", "أمثلة تطبيقية",
+  ];
+  if (cat === "💻 برمجة") return [
+    "المقدمة والمتطلبات", "المفاهيم الأساسية", "الهياكل والخوارزميات",
+    "التطبيق العملي", "أنماط التصميم", "التحسين والأداء", "مسائل وحلول",
+  ];
   return [
-    sep,
-    `  SKZ MARKETPLACE — ملف رقمي`,
-    sep,
-    ``,
-    `  الاسم:     ${p.titleAr}`,
-    `  العنوان:   ${p.title}`,
-    `  الفئة:     ${p.category}`,
-    `  الصفحات:   ${p.pages} صفحة PDF`,
-    `  التقييم:   ${"★".repeat(Math.round(p.rating))}${"☆".repeat(5 - Math.round(p.rating))} (${p.rating})`,
-    `  التحميلات: ${p.downloads.toLocaleString()} تحميل`,
-    `  السعر:     ${p.price} SKZ`,
-    ``,
-    thin,
-    `  الوصف`,
-    thin,
-    ``,
-    `  ${p.desc}`,
-    ``,
-    thin,
-    `  تفاصيل الترخيص`,
-    thin,
-    ``,
-    `  ✅ مرخص للاستخدام الشخصي والتجاري`,
-    `  ✅ مصدر مفتوح / ملكية عامة`,
-    `  ✅ التوزيع مسموح به وفق شروط CC`,
-    ``,
-    thin,
-    `  تم الشراء من منصة SKZ BOT`,
-    `  تاريخ التحميل: ${new Date().toLocaleString("ar-EG")}`,
-    sep,
-    ``,
-    `  ⚡ SKZ BOT — Premium Digital Marketplace`,
-  ].join("\n");
+    "المقدمة", "الفصل الأول", "الفصل الثاني", "الفصل الثالث",
+    "التطبيق العملي", "الخلاصة والموارد",
+  ];
+}
+
+function getBody(p: Product): string {
+  if (BOOK_CONTENT[p.id]) return BOOK_CONTENT[p.id].body;
+  const cat = p.category;
+
+  if (cat === "🎓 كورسات") return `
+<h2>مقدمة الكورس</h2>
+<p>مرحباً بك في <strong>${p.titleAr}</strong>. هذا الكورس مصمم خصيصاً ليأخذك من مستوى المبتدئ إلى الاحتراف الكامل خلال ${Math.ceil(p.pages / 30)} أسابيع من الدراسة المنتظمة.</p>
+<h2>الوحدة الأولى — الأساسيات</h2>
+<p>${p.desc}</p>
+<p>قبل أن نبدأ، دعنا نفهم لماذا هذا المجال مهم جداً اليوم:</p>
+<ul>
+  <li>الطلب العالمي في سوق العمل يتضاعف سنوياً.</li>
+  <li>يمكنك العمل من أي مكان في العالم.</li>
+  <li>الدخل المتوسط في هذا المجال أعلى بكثير من المجالات التقليدية.</li>
+</ul>
+<h3>المفاهيم الأساسية التي ستتعلمها:</h3>
+<ol>
+  <li><strong>المفهوم الأول</strong> — الأساس النظري والخلفية العلمية.</li>
+  <li><strong>المفهوم الثاني</strong> — التطبيق العملي في البيئات الحقيقية.</li>
+  <li><strong>المفهوم الثالث</strong> — ربط كل شيء في مشاريع متكاملة.</li>
+</ol>
+<h2>الوحدة الثانية — التطبيق العملي</h2>
+<p>في هذه الوحدة سنطبق كل ما تعلمناه في مشاريع حقيقية. ستخرج بـ <strong>3 مشاريع احترافية</strong> تضيفها لملفك الشخصي.</p>
+<h3>تمرين عملي:</h3>
+<p>ابدأ بحل المسألة التالية قبل الانتقال للوحدة التالية — هذا يضمن أنك فهمت المحتوى بعمق.</p>
+<blockquote>«الخبرة هي المعلم الحقيقي. كل مشروع تبنيه يساوي عشرة كتب قرأتها.»</blockquote>`;
+
+  if (cat === "📐 قوالب") return `
+<h2>دليل الاستخدام</h2>
+<p>هذا القالب جاهز للاستخدام الفوري. اتبع الخطوات التالية:</p>
+<ol>
+  <li>افتح الملف في التطبيق المناسب (Word / Excel / Figma / Notion).</li>
+  <li>استبدل النصوص الموجودة بمعلوماتك الخاصة.</li>
+  <li>قم بتخصيص الألوان والخطوط لتناسب هويتك البصرية.</li>
+  <li>احفظ نسخة باسمك قبل التعديل للرجوع إليها.</li>
+</ol>
+<h2>${p.titleAr}</h2>
+<p>${p.desc}</p>
+<h2>هيكل القالب</h2>
+<table style="width:100%;border-collapse:collapse;margin:1rem 0">
+  <tr style="background:rgba(255,255,255,0.1)"><th style="padding:0.5rem;border:1px solid rgba(255,255,255,0.2)">القسم</th><th style="padding:0.5rem;border:1px solid rgba(255,255,255,0.2)">الوصف</th><th style="padding:0.5rem;border:1px solid rgba(255,255,255,0.2)">الحجم</th></tr>
+  <tr><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">الغلاف</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">العنوان والبيانات الرئيسية</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">1 صفحة</td></tr>
+  <tr><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">المحتوى الرئيسي</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">المحتوى التفصيلي المطلوب</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">${Math.floor(p.pages * 0.8)} صفحة</td></tr>
+  <tr><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">الملاحق</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">جداول وأدوات إضافية</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">${Math.floor(p.pages * 0.2)} صفحة</td></tr>
+</table>
+<blockquote>«نصيحة: لا تعدّل القالب الأصلي مباشرة — احفظ نسخة أولاً.»</blockquote>`;
+
+  if (cat === "💻 برمجة") return `
+<h2>مقدمة</h2>
+<p>${p.desc}</p>
+<h2>المفاهيم الأساسية</h2>
+<p>قبل الغوص في التفاصيل، يجب فهم المبادئ الجوهرية التي يقوم عليها هذا المجال:</p>
+<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:1rem;font-family:monospace;direction:ltr;text-align:left;margin:1rem 0;font-size:0.85rem;">
+<span style="color:#94a3b8"># مثال على الكود الأساسي</span><br/>
+<span style="color:#38bdf8">def</span> <span style="color:#e2e8f0">main</span>():<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#34d399">print</span>(<span style="color:#f59e0b">"مرحباً بك في ${p.title}"</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#94a3b8"># ابدأ رحلتك هنا</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#94a3b8">pass</span><br/><br/>
+<span style="color:#38bdf8">if</span> __name__ == <span style="color:#f59e0b">"__main__"</span>:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;main()
+</div>
+<h2>الفصل الأول — الأساسيات</h2>
+<p>نبدأ بالمفاهيم الأساسية التي يجب إتقانها قبل الانتقال لأي مستوى أعلى:</p>
+<ul>
+  <li>المفهوم الأساسي الأول وكيف يعمل في الواقع.</li>
+  <li>الأخطاء الشائعة التي يقع فيها المبتدئون وكيف تتجنبها.</li>
+  <li>أفضل الممارسات المعتمدة في الصناعة.</li>
+</ul>
+<blockquote>«الكود الجيد هو الكود الذي يفهمه إنسان، وليس فقط الكود الذي ينفذه حاسوب.»</blockquote>`;
+
+  if (cat === "🤖 ذكاء اصطناعي") return `
+<h2>مقدمة في ${p.titleAr}</h2>
+<p>${p.desc}</p>
+<h2>كيف تعمل نماذج الذكاء الاصطناعي؟</h2>
+<p>نماذج اللغة الكبيرة (LLMs) مثل GPT و Claude و Gemini تعمل بآلية الـ Transformer التي تحلل العلاقات بين الكلمات في سياق واسع.</p>
+<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(167,139,250,0.3);border-radius:12px;padding:1rem;font-family:monospace;direction:ltr;text-align:left;margin:1rem 0;font-size:0.8rem;">
+<span style="color:#a78bfa">System:</span> <span style="color:#e2e8f0">You are a helpful assistant.</span><br/><br/>
+<span style="color:#34d399">User:</span> <span style="color:#e2e8f0">Summarize this in 3 bullets:</span><br/>
+<span style="color:#e2e8f0">[your content here]</span><br/><br/>
+<span style="color:#f59e0b">Assistant:</span> <span style="color:#94a3b8">• First key point...</span><br/>
+<span style="color:#94a3b8">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Second key point...</span><br/>
+<span style="color:#94a3b8">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Third key point...</span>
+</div>
+<h2>أبرز تقنيات البرومبت</h2>
+<ul>
+  <li><strong>Zero-Shot</strong> — طرح السؤال مباشرة دون أمثلة.</li>
+  <li><strong>Few-Shot</strong> — تقديم 2-3 أمثلة قبل السؤال لتوجيه الإجابة.</li>
+  <li><strong>Chain-of-Thought</strong> — طلب التفكير خطوة بخطوة للمسائل المعقدة.</li>
+  <li><strong>Role Prompting</strong> — تعيين دور محدد للنموذج قبل طرح السؤال.</li>
+</ul>
+<blockquote>«جودة إخراجك تساوي جودة مدخلاتك. برومبت واضح = إجابة رائعة.»</blockquote>`;
+
+  if (cat === "📊 مالية") return `
+<h2>${p.titleAr}</h2>
+<p>${p.desc}</p>
+<h2>المبادئ المالية الأساسية</h2>
+<p>قبل أي استثمار، هناك ثلاث قواعد ذهبية يجب حفظها:</p>
+<ol>
+  <li><strong>قاعدة الطوارئ:</strong> احتفظ دائماً بـ 3-6 أشهر من مصاريفك سائلة قبل أي استثمار.</li>
+  <li><strong>قاعدة 50/30/20:</strong> 50% للضروريات، 30% للرغبات، 20% للادخار والاستثمار.</li>
+  <li><strong>قاعدة المخاطر:</strong> لا تستثمر مالاً لا تتحمل خسارته.</li>
+</ol>
+<h2>جدول التخطيط المالي</h2>
+<table style="width:100%;border-collapse:collapse;margin:1rem 0">
+  <tr style="background:rgba(74,222,128,0.15)"><th style="padding:0.6rem;border:1px solid rgba(74,222,128,0.3)">البند</th><th style="padding:0.6rem;border:1px solid rgba(74,222,128,0.3)">النسبة المثالية</th><th style="padding:0.6rem;border:1px solid rgba(74,222,128,0.3)">مثال (10,000 ريال)</th></tr>
+  <tr><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">الضروريات</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">50%</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">5,000</td></tr>
+  <tr><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">الرغبات</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">30%</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">3,000</td></tr>
+  <tr><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">الاستثمار</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">20%</td><td style="padding:0.5rem;border:1px solid rgba(255,255,255,0.1)">2,000</td></tr>
+</table>
+<blockquote>«أفضل وقت لبدء الاستثمار كان منذ 20 عاماً. أفضل وقت ثانٍ هو الآن.»</blockquote>`;
+
+  if (cat === "🎨 تصميم") return `
+<h2>${p.titleAr}</h2>
+<p>${p.desc}</p>
+<h2>المبادئ الأساسية للتصميم</h2>
+<p>كل تصميم احترافي يقوم على ستة مبادئ لا غنى عنها:</p>
+<ol>
+  <li><strong>التوازن (Balance)</strong> — توزيع العناصر البصرية بطريقة تخلق شعوراً بالاستقرار.</li>
+  <li><strong>التباين (Contrast)</strong> — الاختلاف بين العناصر لجذب الانتباه وإنشاء تسلسل بصري.</li>
+  <li><strong>التكرار (Repetition)</strong> — تكرار العناصر البصرية يخلق الوحدة والاتساق.</li>
+  <li><strong>المحاذاة (Alignment)</strong> — ربط العناصر ببعضها بصرياً ينظّم المساحة.</li>
+  <li><strong>القرب (Proximity)</strong> — تجميع العناصر المتعلقة يوضح علاقتها ببعضها.</li>
+  <li><strong>الفضاء الأبيض (White Space)</strong> — المساحة الفارغة ليست فارغة بل تتنفس.</li>
+</ol>
+<blockquote>«التصميم الجيد واضح. التصميم الرائع غير مرئي.»</blockquote>`;
+
+  // Business
+  return `
+<h2>${p.titleAr}</h2>
+<p>${p.desc}</p>
+<h2>الإطار العام</h2>
+<p>يستخدم هذا الدليل منهجية مثبتة تعتمد على ثلاث مراحل رئيسية:</p>
+<ol>
+  <li><strong>التشخيص</strong> — فهم الوضع الحالي بدقة قبل اتخاذ أي خطوة.</li>
+  <li><strong>التخطيط</strong> — بناء خارطة طريق واضحة قابلة للقياس.</li>
+  <li><strong>التنفيذ</strong> — التطبيق الفعلي مع مراقبة مستمرة وتعديل دوري.</li>
+</ol>
+<blockquote>«الاستراتيجية بدون تنفيذ وهم. والتنفيذ بدون استراتيجية كابوس.»</blockquote>
+<h2>الأدوات والأطر العملية</h2>
+<p>في الصفحات التالية ستجد أدوات عملية جاهزة للتطبيق الفوري في مجالك.</p>`;
+}
+
+// ── HTML document builder ─────────────────────────────────────────────────────
+
+function buildHtmlContent(p: Product): string {
+  const ac = CAT_COLOR[p.category] ?? "#d4af37";
+  const toc = getTOC(p);
+  const body = getBody(p);
+  const stars = "★".repeat(Math.round(p.rating)) + "☆".repeat(5 - Math.round(p.rating));
+  const date = new Date().toLocaleDateString("ar-EG", { year:"numeric", month:"long", day:"numeric" });
+
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${p.titleAr}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Tajawal',sans-serif;background:#07050f;color:#e2e8f0;min-height:100vh;direction:rtl}
+  .cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:3rem 2rem;background:radial-gradient(ellipse at center, ${ac}18 0%, transparent 70%);border-bottom:1px solid ${ac}30;position:relative}
+  .cover::before{content:'';position:absolute;inset:0;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><circle cx="30" cy="30" r="1" fill="${encodeURIComponent(ac)}" opacity="0.15"/></svg>') repeat;pointer-events:none}
+  .badge{display:inline-block;background:${ac}22;border:1px solid ${ac}55;color:${ac};font-size:.75rem;font-weight:700;padding:.3rem .8rem;border-radius:999px;letter-spacing:.05em;margin-bottom:1.5rem}
+  .cover h1{font-size:clamp(1.8rem,6vw,3rem);font-weight:900;color:#fff;line-height:1.2;margin-bottom:.5rem;max-width:700px}
+  .cover .sub{font-size:1rem;color:rgba(255,255,255,.45);font-style:italic;margin-bottom:2rem}
+  .meta-row{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;margin-bottom:2rem}
+  .meta-chip{display:flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:.35rem .9rem;font-size:.8rem;color:rgba(255,255,255,.6)}
+  .stars{color:#f59e0b;letter-spacing:.1em}
+  .skz-brand{font-size:.75rem;color:rgba(255,255,255,.2);border-top:1px solid rgba(255,255,255,.08);padding-top:1.5rem;margin-top:1.5rem;width:100%;text-align:center}
+  .skz-brand strong{color:${ac}}
+  main{max-width:780px;margin:0 auto;padding:3rem 1.5rem 6rem}
+  .toc{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:1.5rem 2rem;margin-bottom:3rem}
+  .toc h3{font-size:1rem;font-weight:700;color:${ac};margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+  .toc ol{padding-right:1.2rem}
+  .toc li{padding:.3rem 0;color:rgba(255,255,255,.65);font-size:.9rem;border-bottom:1px solid rgba(255,255,255,.05)}
+  .toc li:last-child{border:none}
+  .content h2{font-size:1.35rem;font-weight:700;color:#fff;margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:1px solid ${ac}40;position:relative}
+  .content h2::before{content:'';position:absolute;bottom:-1px;right:0;width:3rem;height:2px;background:${ac}}
+  .content h3{font-size:1.05rem;font-weight:600;color:${ac};margin:1.5rem 0 .7rem}
+  .content p{margin-bottom:1rem;color:rgba(255,255,255,.78);line-height:1.9;font-size:.95rem}
+  .content ul,.content ol{margin:.5rem 0 1rem 1.5rem;color:rgba(255,255,255,.72);line-height:1.8;font-size:.95rem}
+  .content li{margin-bottom:.35rem}
+  .content blockquote{border-right:3px solid ${ac};padding:1rem 1.2rem;margin:1.5rem 0;background:${ac}10;border-radius:0 12px 12px 0;color:rgba(255,255,255,.85);font-style:italic;font-size:1rem}
+  .content table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.88rem}
+  .chapter-num{font-size:.75rem;color:${ac};font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem;display:block}
+  .preview-notice{margin-top:4rem;padding:1.5rem;background:${ac}12;border:1px solid ${ac}35;border-radius:16px;text-align:center}
+  .preview-notice p{color:rgba(255,255,255,.55);font-size:.85rem;margin:0}
+  .preview-notice strong{color:${ac}}
+</style>
+</head>
+<body>
+<div class="cover">
+  <div class="badge">${p.category}</div>
+  <h1>${p.titleAr}</h1>
+  <div class="sub">${p.title}</div>
+  <div class="meta-row">
+    <div class="meta-chip"><span class="stars">${stars}</span>${p.rating}/5</div>
+    <div class="meta-chip">📄 ${p.pages} صفحة</div>
+    <div class="meta-chip">⬇ ${p.downloads.toLocaleString()} تحميل</div>
+    <div class="meta-chip">💰 ${p.price} SKZ</div>
+  </div>
+  <div class="skz-brand">
+    مكتسب من <strong>SKZ BOT Marketplace</strong> · ${date}
+  </div>
+</div>
+
+<main>
+  <div class="toc">
+    <h3>📋 فهرس المحتويات</h3>
+    <ol>${toc.map(t => `<li>${t}</li>`).join("")}</ol>
+  </div>
+
+  <div class="content">
+    ${body}
+    <div class="preview-notice">
+      <p>هذا الملف عرض تقديمي من <strong>${p.titleAr}</strong>.<br/>
+      النسخة الكاملة (<strong>${p.pages} صفحة</strong>) متاحة عبر منصة SKZ BOT.</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>`;
 }
 
 function triggerDownload(p: Product) {
-  const content = buildFileContent(p);
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const html = buildHtmlContent(p);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
-  a.download = `SKZ_${p.id}_${p.title.replace(/[^a-z0-9]/gi, "_").slice(0, 40)}.txt`;
+  a.download = `${p.titleAr.replace(/[^\u0600-\u06FFa-z0-9 ]/gi, "").trim().slice(0, 40)}.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
