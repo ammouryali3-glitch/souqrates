@@ -1,16 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { Home, Gamepad2, ShoppingCart, Wallet, Users } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLang, setLang, t } from "@/lib/i18n";
 
 export function BottomNav() {
   const [location] = useLocation();
+  const lang = useLang();
+  const s = t[lang];
 
   const tabs = [
-    { path: "/", icon: Home, label: "Home" },
-    { path: "/games", icon: Gamepad2, label: "Games" },
-    { path: "/shop", icon: ShoppingCart, label: "Shop" },
-    { path: "/wallet", icon: Wallet, label: "Wallet" },
-    { path: "/referrals", icon: Users, label: "Referrals" },
+    { path: "/", icon: Home, label: s.home },
+    { path: "/games", icon: Gamepad2, label: s.games },
+    { path: "/shop", icon: ShoppingCart, label: s.shop },
+    { path: "/wallet", icon: Wallet, label: s.wallet },
+    { path: "/referrals", icon: Users, label: s.referrals },
   ];
 
   return (
@@ -50,6 +53,16 @@ export function BottomNav() {
             </Link>
           );
         })}
+      </div>
+
+      {/* Language toggle — small pill below the nav tabs */}
+      <div className="flex justify-center mt-2">
+        <button
+          onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+          className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/6 border border-white/10 text-white/40 text-[10px] font-bold tracking-wider hover:text-white/70 hover:border-white/20 transition-all"
+        >
+          {s.langSwitch}
+        </button>
       </div>
     </div>
   );

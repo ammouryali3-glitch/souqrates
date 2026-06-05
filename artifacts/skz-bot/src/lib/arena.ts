@@ -10,47 +10,16 @@ export interface LeaderEntry {
 
 export type ArenaPeriod = "daily" | "weekly";
 
-const NAMES = ["CryptoWolf","NeonKing","DarkMatter","StarSlayer","PhantomX","GhostByte","SkyRaider","IronBlaze","VoidHunter","CodeBreaker","NightOwl","PulseX","ZeroGrav","QuantumZ","ShadowFox","ArcLancer","PixelGod","DataMinx","HexByte","TurboAce"];
-
-function deterministicSeed(gameId: string): number {
-  let h = 0;
-  for (let i = 0; i < gameId.length; i++) h = (h * 31 + gameId.charCodeAt(i)) | 0;
-  return Math.abs(h);
+export function getDefaultLeaders(_gameId: string): LeaderEntry[] {
+  return [];
 }
 
-function seededRandom(seed: number, index: number): number {
-  const x = Math.sin(seed + index) * 10000;
-  return x - Math.floor(x);
+export function getBasePool(_gameId: string): number {
+  return 0;
 }
 
-export function getDefaultLeaders(gameId: string): LeaderEntry[] {
-  const seed = deterministicSeed(gameId);
-  const count = 12;
-  const entries: LeaderEntry[] = [];
-  const usedNames = new Set<string>();
-  for (let i = 0; i < count; i++) {
-    let nameIdx = Math.floor(seededRandom(seed, i * 3) * NAMES.length);
-    while (usedNames.has(NAMES[nameIdx])) nameIdx = (nameIdx + 1) % NAMES.length;
-    usedNames.add(NAMES[nameIdx]);
-    const baseScore = 950 - i * 55 + Math.floor(seededRandom(seed, i * 7 + 1) * 30);
-    const baseTime = 45 + i * 18 + Math.floor(seededRandom(seed, i * 7 + 2) * 20);
-    entries.push({ rank: i + 1, name: NAMES[nameIdx], score: Math.max(100, baseScore), time: baseTime });
-  }
-  return entries;
-}
-
-export function getBasePool(gameId: string): number {
-  const bases: Record<string, number> = {
-    detective: 18420, cipher: 9840, hiddenpath: 15200, geniusgrid: 11760, truthscale: 14340,
-  };
-  return bases[gameId] ?? 12000;
-}
-
-export function getBaseEntries(gameId: string): number {
-  const bases: Record<string, number> = {
-    detective: 82, cipher: 47, hiddenpath: 71, geniusgrid: 55, truthscale: 66,
-  };
-  return bases[gameId] ?? 50;
+export function getBaseEntries(_gameId: string): number {
+  return 0;
 }
 
 export function getPool(gameId: string): number {

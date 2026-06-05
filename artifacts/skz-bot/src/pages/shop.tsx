@@ -858,7 +858,7 @@ export default function Shop() {
           <div>
             <h1 className="text-2xl font-display font-black text-white tracking-wider uppercase">Marketplace</h1>
             <p className="text-xs text-white/40 mt-0.5 font-display">
-              {products.length} منتج رقمي · مرخص للبيع والتحميل
+              {products.length > 0 ? `${products.length} منتج رقمي · مرخص للبيع والتحميل` : "لا توجد منتجات حالياً"}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -986,7 +986,15 @@ export default function Shop() {
                   <ProductCard key={p.id} product={p} owned={library.includes(p.id)} onOpen={setSelected} />
                 ))}
               </AnimatePresence>
-              {filtered.length === 0 && (
+              {filtered.length === 0 && products.length === 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="col-span-2 text-center py-16 text-white/30 font-display">
+                  <div className="text-4xl mb-3">🛍️</div>
+                  <div className="text-sm font-bold">لا توجد منتجات بعد</div>
+                  <div className="text-xs mt-1 opacity-60">تابعنا لمعرفة آخر العروض</div>
+                </motion.div>
+              )}
+              {filtered.length === 0 && products.length > 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="col-span-2 text-center py-16 text-white/30 font-display">
                   <div className="text-4xl mb-3">🔍</div>

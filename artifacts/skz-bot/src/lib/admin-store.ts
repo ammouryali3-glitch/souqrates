@@ -172,19 +172,19 @@ const DEFAULT_CHECKIN = [50, 75, 100, 150, 200, 300, 500];
 
 function freshSlices() {
   return {
-    users: seedUsers(),
-    deposits: seedDeposits(),
-    withdrawals: seedWithdrawals(),
+    users: [] as ManagedUser[],
+    deposits: [] as Deposit[],
+    withdrawals: [] as Withdrawal[],
     referralLevels: seedReferralLevels(),
     referralTriggers: ["signup", "firstDeposit"] as ReferralTrigger[],
-    referrers: seedReferrers(),
-    tokenPackages: seedTokenPackages(),
-    inventory: seedInventory(),
-    socialTasks: seedSocialTasks(),
+    referrers: [] as Referrer[],
+    tokenPackages: [] as TokenPackage[],
+    inventory: [] as InventoryItem[],
+    socialTasks: [] as SocialTask[],
     dailyCheckin: [...DEFAULT_CHECKIN],
-    promoCodes: seedPromoCodes(),
-    broadcasts: seedBroadcasts(),
-    tickets: seedTickets(),
+    promoCodes: [] as PromoCode[],
+    broadcasts: [] as Broadcast[],
+    tickets: [] as SupportTicket[],
     roles: seedRoles(),
     apiKeys: seedApiKeys(),
     cms: seedCmsTexts(),
@@ -281,38 +281,6 @@ function getSnapshot() {
 }
 
 // ── API bootstrap ─────────────────────────────────────────────────────────────
-/**
- * Push the current seed/localStorage state to the backend on first use.
- * Called when the API returns empty data for a resource type.
- */
-async function seedApi(s: AdminState): Promise<void> {
-  // Config blobs
-  await Promise.allSettled([
-    putAdminConfig("settings", s.settings),
-    putAdminConfig("game_overrides", s.gameOverrides),
-    putAdminConfig("ticket_overrides", s.ticketOverrides),
-    putAdminConfig("cms", s.cms),
-    putAdminConfig("finance", s.finance),
-    putAdminConfig("security", s.security),
-    putAdminConfig("backup", s.backup),
-    putAdminConfig("referral_config", { levels: s.referralLevels, triggers: s.referralTriggers }),
-    putAdminConfig("daily_checkin", s.dailyCheckin),
-    putAdminConfig("api_keys", s.apiKeys),
-  ]);
-
-  // Entity lists (seed one at a time to avoid overwhelming the server)
-  for (const u of s.users) await apiUpsertUser(u);
-  for (const d of s.deposits) await apiUpsertDeposit(d);
-  for (const w of s.withdrawals) await apiUpsertWithdrawal(w);
-  for (const p of s.tokenPackages) await apiUpsertTokenPackage(p);
-  for (const i of s.inventory) await apiUpsertInventory(i);
-  for (const t of s.socialTasks) await apiUpsertSocialTask(t);
-  for (const p of s.promoCodes) await apiUpsertPromoCode(p);
-  for (const b of s.broadcasts) await apiUpsertBroadcast(b);
-  for (const t of s.tickets) await apiUpsertTicket(t);
-  for (const r of s.referrers) await apiUpsertReferrer(r);
-  for (const p of s.products) await apiUpsertProduct(p);
-}
 
 /**
  * Merge mini-app safe runtime config (public) into local state.
@@ -897,8 +865,6 @@ export const admin = {
       /* ignore */
     }
     emit();
-    // Re-seed the backend with fresh defaults
-    seedApi(state).catch(() => {});
   },
 };
 

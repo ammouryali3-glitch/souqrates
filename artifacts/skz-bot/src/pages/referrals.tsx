@@ -1,23 +1,20 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Share2, Users, Network, TrendingUp, ChevronRight, Copy, CheckCircle2 } from "lucide-react";
+import { Share2, Users, Network, TrendingUp, Copy, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const referralStats = {
-  totalEarned: 1450.50,
-  thisMonth: 320.00,
-  levels: [
-    { level: 1, count: 3, comm: "5%", earned: 850.00 },
-    { level: 2, count: 7, comm: "3%", earned: 420.50 },
-    { level: 3, count: 12, comm: "1%", earned: 180.00 },
-  ]
-};
+import { useAdmin } from "@/lib/admin-store";
+import { useLang, t } from "@/lib/i18n";
 
 export default function Referrals() {
   const [copied, setCopied] = useState(false);
-  const inviteLink = "t.me/skzbot?start=ref_9A2xK";
+  const { referralLevels } = useAdmin();
+  const lang = useLang();
+  const s = t[lang];
+
+  const inviteLink = "t.me/skzbot?start=ref_xxx";
 
   const copyLink = () => {
+    navigator.clipboard.writeText(inviteLink).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -25,24 +22,24 @@ export default function Referrals() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Syndicate</h1>
-        <p className="text-sm text-muted-foreground mt-1">Multi-tier commission network</p>
+        <h1 className="text-2xl font-bold text-white tracking-tight">{s.syndicateTitle}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{s.syndicateDesc}</p>
       </div>
 
-      {/* Hero Stats */}
+      {/* Hero Stats — zeroed until real backend */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Total Earned</span>
-          <span className="text-2xl font-bold text-primary">{referralStats.totalEarned}</span>
-          <span className="text-[10px] text-white/50">SKZ All time</span>
+          <span className="text-xs font-medium text-muted-foreground">{s.totalEarned}</span>
+          <span className="text-2xl font-bold text-primary">0</span>
+          <span className="text-[10px] text-white/50">{s.allTime}</span>
         </div>
         <div className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-1 relative overflow-hidden">
           <div className="absolute -right-4 -bottom-4 text-accent/10">
             <TrendingUp size={64} />
           </div>
-          <span className="text-xs font-medium text-muted-foreground">This Month</span>
-          <span className="text-2xl font-bold text-white">{referralStats.thisMonth}</span>
-          <span className="text-[10px] text-green-400 flex items-center gap-1">+12% from last</span>
+          <span className="text-xs font-medium text-muted-foreground">{s.thisMonth}</span>
+          <span className="text-2xl font-bold text-white">0</span>
+          <span className="text-[10px] text-muted-foreground">SKZ</span>
         </div>
       </div>
 
@@ -53,11 +50,11 @@ export default function Referrals() {
             <Share2 size={20} />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Your Invite Link</h3>
-            <p className="text-xs text-accent/80">Share to build your syndicate</p>
+            <h3 className="text-sm font-bold text-white">{s.inviteLink}</h3>
+            <p className="text-xs text-accent/80">{s.inviteSub}</p>
           </div>
         </div>
-        
+
         <div className="flex gap-2">
           <div className="flex-1 bg-black/40 border border-accent/20 rounded-xl px-3 py-3 text-sm font-mono text-white/80 truncate">
             {inviteLink}
@@ -68,15 +65,15 @@ export default function Referrals() {
         </div>
       </div>
 
-      {/* Network Structure */}
+      {/* Network Tiers — from admin config, real commissions */}
       <div className="flex flex-col gap-3 mt-2">
         <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
           <Network size={16} className="text-muted-foreground" />
-          Network Tiers
+          {s.networkTiers}
         </h3>
-        
+
         <div className="flex flex-col gap-3">
-          {referralStats.levels.map((level, i) => (
+          {referralLevels.filter(l => l.enabled).map((level, i) => (
             <motion.div
               key={level.level}
               initial={{ opacity: 0, x: -10 }}
@@ -84,34 +81,31 @@ export default function Referrals() {
               transition={{ delay: i * 0.1 }}
               className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden group"
             >
-              {/* Decorative line connecting levels conceptually */}
-              <div className="absolute left-6 top-10 bottom-0 w-[1px] bg-white/5 group-last:hidden" />
-              
               <div className="flex justify-between items-center z-10">
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm z-10
-                    ${level.level === 1 ? 'bg-primary/20 text-primary border border-primary/30' : 
-                      level.level === 2 ? 'bg-white/10 text-white/80 border border-white/20' : 
+                    ${level.level === 1 ? 'bg-primary/20 text-primary border border-primary/30' :
+                      level.level === 2 ? 'bg-white/10 text-white/80 border border-white/20' :
                       'bg-white/5 text-white/50 border border-white/10'}`}
                   >
                     L{level.level}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-white">Tier {level.level}</span>
-                    <span className="text-[10px] text-muted-foreground">{level.comm} Commission</span>
+                    <span className="text-sm font-bold text-white">{s.tier} {level.level}</span>
+                    <span className="text-[10px] text-muted-foreground">{level.commission}% {s.commission}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col items-end">
                   <span className="text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded-md flex items-center gap-1">
-                    <Users size={10} /> {level.count} active
+                    <Users size={10} /> 0 {s.active}
                   </span>
                 </div>
               </div>
-              
+
               <div className="flex justify-between items-center pt-3 border-t border-white/5 mt-1 z-10">
-                <span className="text-xs text-muted-foreground">Generated Revenue</span>
-                <span className="text-sm font-bold text-primary">{level.earned} SKZ</span>
+                <span className="text-xs text-muted-foreground">{s.generatedRevenue}</span>
+                <span className="text-sm font-bold text-primary">0 {level.currency}</span>
               </div>
             </motion.div>
           ))}
