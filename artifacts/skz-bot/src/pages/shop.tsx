@@ -6,7 +6,8 @@ import {
   Coins, ChevronDown, BookOpen,
   CheckCircle, Package,
 } from "lucide-react";
-import { products, CATEGORIES, type Category, type Product } from "@/lib/shop-products";
+import { CATEGORIES, type Category, type Product } from "@/lib/shop-products";
+import { useAdmin } from "@/lib/admin-store";
 
 // ── Content generator per category ───────────────────────────────────────────
 
@@ -718,7 +719,8 @@ function ProductModal({ product, owned: initOwned, balance: initBalance, onClose
 // ── My Library Panel ──────────────────────────────────────────────────────────
 
 function LibraryPanel({ library }: { library: number[] }) {
-  const owned = useMemo(() => products.filter(p => library.includes(p.id)), [library]);
+  const { products } = useAdmin();
+  const owned = useMemo(() => products.filter(p => library.includes(p.id)), [library, products]);
   const [downloading, setDownloading] = useState<Product | null>(null);
 
   if (owned.length === 0) {
@@ -806,6 +808,7 @@ export default function Shop() {
   const [selected, setSelected] = useState<Product | null>(null);
   const [balance, setBalance] = useState(() => parseInt(localStorage.getItem(BALANCE_KEY) || "1000"));
   const [library, setLibrary] = useState<number[]>(() => getLibrary());
+  const { products, settings } = useAdmin();
 
   const handleBuy = useCallback((p: Product) => {
     setBalance(b => b - p.price);
@@ -831,7 +834,21 @@ export default function Shop() {
       case "rating":     return [...list].sort((a, b) => b.rating - a.rating);
       default:           return list;
     }
-  }, [activeCategory, search, sort]);
+  }, [activeCategory, search, sort, products]);
+
+  if (!settings.shopEnabled) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+        <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
+          <Package size={32} className="text-white/20" />
+        </div>
+        <div>
+          <div className="font-display font-black text-lg text-white/50">المتجر مغلق مؤقتاً</div>
+          <div className="text-xs text-white/30 font-display mt-1">سيعود قريباً — تابعنا</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-0">

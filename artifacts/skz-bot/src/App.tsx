@@ -1,10 +1,14 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MobileContainer } from "@/components/layout/MobileContainer";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { NotificationBanner } from "@/components/NotificationBanner";
 import { AnimatePresence, motion } from "framer-motion";
+import { Ban, Wrench } from "lucide-react";
+import { useAdmin } from "@/lib/admin-store";
+import { ALL_GAMES, getGameById } from "@/lib/games-data";
 
 // Pages
 import Home from "@/pages/home";
@@ -48,6 +52,7 @@ import CipherRushGame from "@/pages/cipher-rush-game";
 import HiddenPathGame from "@/pages/hidden-path-game";
 import GeniusGridGame from "@/pages/genius-grid-game";
 import TruthScaleGame from "@/pages/truth-scale-game";
+import Manager from "@/pages/manager";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -67,53 +72,108 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+const GAME_COMPONENTS: Record<string, React.ComponentType> = {
+  stack: StackGame, orbit: OrbitGame, knife: KnifeGame, slice: SliceGame,
+  color: ColorSwitchGame, zigzag: ZigZagGame, piano: PianoGame, whack: WhackGame,
+  bubble: BubbleGame, striker: ShooterGame, breakout: BreakoutGame, hopper: JumperGame,
+  calcblast: CalcBlastGame, numsmash: NumSmashGame, chainsum: ChainSumGame, fracsort: FracSortGame,
+  speedmath: SpeedMathGame, gridpop: GridPopGame, neonlink: NeonLinkGame, quicksum: QuickSumGame,
+  match3: Match3Game, pulsetap: PulseTapGame, swiperush: SwipeRushGame, bubblepop: BubblePopGame,
+  colorrain: ColorRainGame, stackdrop: StackDropGame, orbitaim: OrbitAimGame, echotap: EchoTapGame,
+  mergeblitz: MergeBlitzGame, numblitz: NumBlitzGame, cardflip: CardFlipGame,
+  detective: DetectiveGame, cipher: CipherRushGame, hiddenpath: HiddenPathGame,
+  geniusgrid: GeniusGridGame, truthscale: TruthScaleGame,
+};
+
+// Gate a game route: redirect to /games if the game is disabled or its section is off.
+function GameGate({ id, children }: { id: string; children: React.ReactNode }) {
+  const { gameOverrides, settings } = useAdmin();
+  const game = getGameById(id);
+  const enabled = gameOverrides[id]?.enabled !== false;
+  const sectionOn = game?.type === "arena" ? settings.arenaEnabled : settings.skillEnabled;
+  if (!game || !enabled || !sectionOn) return <Redirect to="/games" />;
+  return <>{children}</>;
+}
+
+function MaintenanceScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-5 px-8 text-center" dir="rtl">
+      <div className="w-24 h-24 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+        <Wrench size={42} className="text-amber-400" />
+      </div>
+      <div>
+        <h1 className="text-xl font-display font-black text-white">التطبيق قيد الصيانة</h1>
+        <p className="text-sm text-white/45 font-display mt-2 leading-relaxed">
+          نعمل على تحسينات سريعة. يرجى العودة بعد قليل.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BanScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-5 px-8 text-center" dir="rtl">
+      <div className="w-24 h-24 rounded-3xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
+        <Ban size={44} className="text-red-400" />
+      </div>
+      <div>
+        <h1 className="text-xl font-display font-black text-white">تم حظر حسابك</h1>
+        <p className="text-sm text-white/45 font-display mt-2 leading-relaxed">
+          تم تعليق وصولك إلى التطبيق. يرجى التواصل مع الدعم لمزيد من المعلومات.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
   const [location] = useLocation();
-  const immersive = (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
+  const { banned, settings } = useAdmin();
+  const isManager = location === "/manager";
+  const immersive = isManager || (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
+
+  if (banned && !isManager) {
+    return (
+      <MobileContainer hideHeader>
+        <BanScreen />
+      </MobileContainer>
+    );
+  }
+
+  if (isManager) {
+    return (
+      <MobileContainer hideHeader>
+        <Manager />
+      </MobileContainer>
+    );
+  }
+
+  if (settings.maintenance) {
+    return (
+      <MobileContainer hideHeader>
+        <MaintenanceScreen />
+      </MobileContainer>
+    );
+  }
 
   return (
     <MobileContainer hideHeader={immersive}>
       <div className="flex-1 relative flex flex-col h-full overflow-hidden">
+        {!immersive && <NotificationBanner />}
         <AnimatePresence mode="wait">
           <Switch>
             <Route path="/"><PageWrapper><Home /></PageWrapper></Route>
             <Route path="/games"><PageWrapper><Games /></PageWrapper></Route>
-            <Route path="/games/stack"><StackGame /></Route>
-            <Route path="/games/orbit"><OrbitGame /></Route>
-            <Route path="/games/knife"><KnifeGame /></Route>
-            <Route path="/games/slice"><SliceGame /></Route>
-            <Route path="/games/color"><ColorSwitchGame /></Route>
-            <Route path="/games/zigzag"><ZigZagGame /></Route>
-            <Route path="/games/piano"><PianoGame /></Route>
-            <Route path="/games/whack"><WhackGame /></Route>
-            <Route path="/games/bubble"><BubbleGame /></Route>
-            <Route path="/games/striker"><ShooterGame /></Route>
-            <Route path="/games/breakout"><BreakoutGame /></Route>
-            <Route path="/games/hopper"><JumperGame /></Route>
-            <Route path="/games/calcblast"><CalcBlastGame /></Route>
-            <Route path="/games/numsmash"><NumSmashGame /></Route>
-            <Route path="/games/chainsum"><ChainSumGame /></Route>
-            <Route path="/games/fracsort"><FracSortGame /></Route>
-            <Route path="/games/speedmath"><SpeedMathGame /></Route>
-            <Route path="/games/gridpop"><GridPopGame /></Route>
-            <Route path="/games/neonlink"><NeonLinkGame /></Route>
-            <Route path="/games/quicksum"><QuickSumGame /></Route>
-            <Route path="/games/match3"><Match3Game /></Route>
-            <Route path="/games/pulsetap"><PulseTapGame /></Route>
-            <Route path="/games/swiperush"><SwipeRushGame /></Route>
-            <Route path="/games/bubblepop"><BubblePopGame /></Route>
-            <Route path="/games/colorrain"><ColorRainGame /></Route>
-            <Route path="/games/stackdrop"><StackDropGame /></Route>
-            <Route path="/games/orbitaim"><OrbitAimGame /></Route>
-            <Route path="/games/echotap"><EchoTapGame /></Route>
-            <Route path="/games/mergeblitz"><MergeBlitzGame /></Route>
-            <Route path="/games/numblitz"><NumBlitzGame /></Route>
-            <Route path="/games/cardflip"><CardFlipGame /></Route>
-            <Route path="/arena/detective"><DetectiveGame /></Route>
-            <Route path="/arena/cipher"><CipherRushGame /></Route>
-            <Route path="/arena/hiddenpath"><HiddenPathGame /></Route>
-            <Route path="/arena/geniusgrid"><GeniusGridGame /></Route>
-            <Route path="/arena/truthscale"><TruthScaleGame /></Route>
+            {ALL_GAMES.map((g) => {
+              const Comp = GAME_COMPONENTS[g.id];
+              if (!Comp) return null;
+              return (
+                <Route key={g.id} path={g.route}>
+                  <GameGate id={g.id}><Comp /></GameGate>
+                </Route>
+              );
+            })}
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>

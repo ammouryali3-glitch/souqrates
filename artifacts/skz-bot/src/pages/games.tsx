@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
-import { Trophy, Swords, Zap, Users, Layers, Play, ChevronRight, Orbit, Sword, Scissors, Circle, GitBranch, Music2, Cpu, Sparkles, Rocket, Grid2x2, ArrowUp, Crosshair, Hammer, Link2, Scale, BoltIcon, Target, Waves, Brain, Hash, LayoutGrid } from "lucide-react";
+import { Trophy, Swords, Zap, Users, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { ACCENTS, ARENA_GAMES, SKILL_GAMES, type GameDef } from "@/lib/games-data";
+import { useAdmin } from "@/lib/admin-store";
 
 const activeGames = [
   { id: 1, players: 42, prize: "2,100 SKZ", tier: "Gold" },
@@ -16,7 +18,88 @@ const ticketTiers = [
   { name: "Diamond", price: 1000, win: 10000, color: "from-violet-500/40 to-fuchsia-700/40", border: "border-violet-400/50", glow: "shadow-violet-500/30" },
 ];
 
+function ArenaCard({ game }: { game: GameDef }) {
+  const a = ACCENTS[game.accent];
+  const Icon = game.icon;
+  return (
+    <Link href={game.route}>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+        data-testid={`card-arena-${game.id}`}
+        className={`relative overflow-hidden rounded-3xl border ${a.border} ${a.card} p-5 shadow-lg ${a.glow} cursor-pointer group mb-3`}>
+        <div className={`absolute -right-4 -top-4 opacity-15 ${a.bigIcon}`}><Icon size={110} strokeWidth={1.2} /></div>
+        <div className="flex items-center justify-between mb-2 relative z-10">
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{game.tag}</span>
+            <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+          </div>
+          <span className={`font-display font-black ${a.text} text-sm`}>{game.prize} SKZ</span>
+        </div>
+        <div className="flex items-end justify-between relative z-10">
+          <div>
+            <h2 className="font-display font-black text-2xl text-white uppercase">{game.title}</h2>
+            <p className="text-xs text-white/50 mt-1 max-w-[200px]">{game.desc}</p>
+          </div>
+          <div className={`w-14 h-14 rounded-2xl ${a.iconWrap} flex items-center justify-center shrink-0`}><Icon size={26} className={a.iconText} /></div>
+        </div>
+        <div className={`flex items-center gap-2 mt-2 text-xs font-display font-bold ${a.text} relative z-10`}>
+          <Trophy size={12} />الدخول: {game.entry} SKZ · {game.tagline}
+          <ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
+function SkillCard({ game }: { game: GameDef }) {
+  const a = ACCENTS[game.accent];
+  const Icon = game.icon;
+  return (
+    <Link href={game.route}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+        data-testid={`card-game-${game.id}`}
+        className={`relative overflow-hidden rounded-3xl border ${a.border} ${a.card} p-5 shadow-lg ${a.glow} cursor-pointer group`}>
+        <div className={`absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity ${a.bigIcon}`}><Icon size={120} strokeWidth={1.2} /></div>
+        <div className="flex flex-col gap-3 relative z-10">
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{game.category}</span>
+            <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+          </div>
+          <div className="flex items-end justify-between">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">{game.title}</h2>
+              <p className="text-xs text-white/60 mt-1 max-w-[200px]">{game.desc}</p>
+            </div>
+            <div className={`w-14 h-14 rounded-2xl ${a.iconWrap} flex items-center justify-center shrink-0`}><Icon size={26} className={a.iconText} /></div>
+          </div>
+          <div className={`flex items-center gap-2 mt-1 text-xs font-display font-bold ${a.text} tracking-wide`}>
+            <Trophy size={13} /> {game.tagline}
+            <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
 export default function Games() {
+  const { gameOverrides, settings } = useAdmin();
+
+  const applyOverride = (g: GameDef): GameDef | null => {
+    const o = gameOverrides[g.id];
+    if (o && o.enabled === false) return null;
+    if (!o) return g;
+    return {
+      ...g,
+      title: o.title ?? g.title,
+      tagline: o.tagline ?? g.tagline,
+      prize: o.prize ?? g.prize,
+      entry: o.entry ?? g.entry,
+    };
+  };
+
+  const arena = settings.arenaEnabled ? ARENA_GAMES.map(applyOverride).filter(Boolean) as GameDef[] : [];
+  const skill = settings.skillEnabled ? SKILL_GAMES.map(applyOverride).filter(Boolean) as GameDef[] : [];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -26,943 +109,38 @@ export default function Games() {
         </div>
         <div className="bg-card/50 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
           <Zap size={14} className="text-accent" />
-          <span className="text-sm font-bold text-white">12.4k Online</span>
+          <span className="text-sm font-bold text-white">{settings.onlineCount} Online</span>
         </div>
       </div>
 
       {/* ── PRIZE POOL ARENA ── */}
-      <div>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/40 to-transparent" />
-          <span className="text-[10px] tracking-[0.4em] font-display uppercase text-yellow-400/70 flex items-center gap-1.5">
-            <Trophy size={11} className="text-yellow-400" /> Prize Pool Arena
-          </span>
-          <div className="flex-1 h-px bg-gradient-to-l from-yellow-500/40 to-transparent" />
+      {arena.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/40 to-transparent" />
+            <span className="text-[10px] tracking-[0.4em] font-display uppercase text-yellow-400/70 flex items-center gap-1.5">
+              <Trophy size={11} className="text-yellow-400" /> Prize Pool Arena
+            </span>
+            <div className="flex-1 h-px bg-gradient-to-l from-yellow-500/40 to-transparent" />
+          </div>
+          <p className="text-xs text-white/30 text-center mb-4 font-display">ادفع الدخول · حُلّ الأسرع · اربح الجائزة</p>
+          {arena.map((g) => <ArenaCard key={g.id} game={g} />)}
         </div>
-        <p className="text-xs text-white/30 text-center mb-4 font-display">Pay entry · solve fastest · win the pool</p>
+      )}
 
-        {/* Detective */}
-        <Link href="/arena/detective">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#140a00]/90 via-orange-950/20 to-background p-5 shadow-lg shadow-orange-900/20 cursor-pointer group mb-3">
-            <div className="absolute -right-4 -top-4 opacity-15 text-orange-400"><Crosshair size={110} strokeWidth={1.2} /></div>
-            <div className="flex items-center justify-between mb-2 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-orange-400/80">Weekly · Mystery</span>
-                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
-              </div>
-              <span className="font-display font-black text-orange-400 text-sm">+18K SKZ</span>
-            </div>
-            <div className="flex items-end justify-between relative z-10">
-              <div><h2 className="font-display font-black text-2xl text-white uppercase">🔍 The Detective</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Reveal clues to solve the murder. Fewest hints + fastest time takes the weekly pool.</p></div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-700 to-yellow-500 flex items-center justify-center shadow-[0_0_25px_rgba(255,159,28,0.5)] shrink-0 text-2xl">🔍</div>
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-orange-400/80 relative z-10"><Trophy size={12} />Entry: 200 SKZ · Winner takes all<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
-          </motion.div>
-        </Link>
-
-        {/* Cipher Rush */}
-        <Link href="/arena/cipher">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#00080f]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group mb-3">
-            <div className="absolute -right-4 -top-4 opacity-15 text-cyan-400"><Cpu size={110} strokeWidth={1.2} /></div>
-            <div className="flex items-center justify-between mb-2 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Daily · Code</span>
-                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
-              </div>
-              <span className="font-display font-black text-cyan-400 text-sm">+9.8K SKZ</span>
-            </div>
-            <div className="flex items-end justify-between relative z-10">
-              <div><h2 className="font-display font-black text-2xl text-white uppercase">🧩 Cipher Rush</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Decode 7 encrypted words using today's cipher key. Fastest solver wins the daily pool.</p></div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,212,255,0.5)] shrink-0 text-2xl">🧩</div>
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-cyan-400/80 relative z-10"><Trophy size={12} />Entry: 150 SKZ · Daily reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
-          </motion.div>
-        </Link>
-
-        {/* Hidden Path */}
-        <Link href="/arena/hiddenpath">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-3xl border border-green-500/40 bg-gradient-to-br from-[#01100a]/90 via-green-950/20 to-background p-5 shadow-lg shadow-green-900/20 cursor-pointer group mb-3">
-            <div className="absolute -right-4 -top-4 opacity-15 text-green-400"><GitBranch size={110} strokeWidth={1.2} /></div>
-            <div className="flex items-center justify-between mb-2 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-green-400/80">Weekly · Maze</span>
-                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
-              </div>
-              <span className="font-display font-black text-green-400 text-sm">+15K SKZ</span>
-            </div>
-            <div className="flex items-end justify-between relative z-10">
-              <div><h2 className="font-display font-black text-2xl text-white uppercase">🗺️ Hidden Path</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Find the secret route through a 7×7 grid. Wrong taps cost +5s each. Weekly winner claims all.</p></div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-700 to-emerald-400 flex items-center justify-center shadow-[0_0_25px_rgba(77,255,145,0.5)] shrink-0 text-2xl">🗺️</div>
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-green-400/80 relative z-10"><Trophy size={12} />Entry: 175 SKZ · Weekly reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
-          </motion.div>
-        </Link>
-
-        {/* Genius Grid */}
-        <Link href="/arena/geniusgrid">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-[#0a0015]/90 via-purple-950/20 to-background p-5 shadow-lg shadow-purple-900/20 cursor-pointer group mb-3">
-            <div className="absolute -right-4 -top-4 opacity-15 text-purple-400"><Sparkles size={110} strokeWidth={1.2} /></div>
-            <div className="flex items-center justify-between mb-2 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-purple-400/80">Daily · Logic</span>
-                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
-              </div>
-              <span className="font-display font-black text-purple-400 text-sm">+11.8K SKZ</span>
-            </div>
-            <div className="flex items-end justify-between relative z-10">
-              <div><h2 className="font-display font-black text-2xl text-white uppercase">🧠 Genius Grid</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">Fill a 4×4 logic grid — each row & column must have all 4 symbols. No errors + fastest time wins.</p></div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-fuchsia-400 flex items-center justify-center shadow-[0_0_25px_rgba(204,136,255,0.5)] shrink-0 text-2xl">🧠</div>
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-purple-400/80 relative z-10"><Trophy size={12} />Entry: 180 SKZ · Daily reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
-          </motion.div>
-        </Link>
-
-        {/* Truth Scale */}
-        <Link href="/arena/truthscale">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#0e0900]/90 via-yellow-950/20 to-background p-5 shadow-lg shadow-yellow-900/20 cursor-pointer group mb-3">
-            <div className="absolute -right-4 -top-4 opacity-15 text-yellow-400"><Scale size={110} strokeWidth={1.2} /></div>
-            <div className="flex items-center justify-between mb-2 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] tracking-[0.3em] font-display uppercase text-yellow-400/80">Weekly · Chain</span>
-                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
-              </div>
-              <span className="font-display font-black text-yellow-400 text-sm">+14.3K SKZ</span>
-            </div>
-            <div className="flex items-end justify-between relative z-10">
-              <div><h2 className="font-display font-black text-2xl text-white uppercase">⚖️ Truth Scale</h2><p className="text-xs text-white/50 mt-1 max-w-[200px]">8 chained logic puzzles — math, deduction, patterns. Wrong = +15s penalty. Highest score wins.</p></div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-yellow-700 to-amber-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,215,0,0.5)] shrink-0 text-2xl">⚖️</div>
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs font-display font-bold text-yellow-400/80 relative z-10"><Trophy size={12} />Entry: 200 SKZ · Weekly reset<ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" /></div>
-          </motion.div>
-        </Link>
-
-        <div className="flex items-center gap-3 mb-5 mt-2">
-          <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
-          <span className="text-[10px] tracking-[0.4em] font-display uppercase text-white/20">Skill Games</span>
-          <div className="flex-1 h-px bg-gradient-to-l from-white/10 to-transparent" />
+      {/* ── SKILL GAMES ── */}
+      {skill.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-gradient-to-r from-cyan-500/40 to-transparent" />
+            <span className="text-[10px] tracking-[0.4em] font-display uppercase text-cyan-400/70 flex items-center gap-1.5">
+              <Swords size={11} className="text-cyan-400" /> Skill Games
+            </span>
+            <div className="flex-1 h-px bg-gradient-to-l from-cyan-500/40 to-transparent" />
+          </div>
+          {skill.map((g) => <SkillCard key={g.id} game={g} />)}
         </div>
-      </div>
-
-      {/* Featured Skill Game */}
-      <Link href="/games/stack">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileTap={{ scale: 0.98 }}
-          data-testid="card-game-stack"
-          className="relative overflow-hidden rounded-3xl border border-accent/40 bg-gradient-to-br from-accent/30 via-primary/10 to-background p-5 shadow-lg shadow-accent/20 cursor-pointer group"
-        >
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity">
-            <Layers size={120} strokeWidth={1.2} />
-          </div>
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.25),transparent_60%)]" />
-
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-display tracking-[0.3em] text-accent uppercase">New · Skill</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable
-              </span>
-            </div>
-
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Stack & Match</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Drop blocks, chain perfect combos, build the tallest tower.</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-[0_0_25px_rgba(212,175,55,0.5)] shrink-0">
-                <Play size={26} className="text-black fill-black ml-0.5" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-primary tracking-wide">
-              <Trophy size={13} /> Earn up to 5 SKZ per block
-              <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Featured: Orbit Dash */}
-      <Link href="/games/orbit">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileTap={{ scale: 0.98 }}
-          data-testid="card-game-orbit"
-          className="relative overflow-hidden rounded-3xl border border-cyan-400/40 bg-gradient-to-br from-cyan-500/20 via-violet-600/10 to-background p-5 shadow-lg shadow-cyan-500/20 cursor-pointer group"
-        >
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-300">
-            <Orbit size={120} strokeWidth={1.2} />
-          </div>
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.25),transparent_60%)]" />
-
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-display tracking-[0.3em] text-cyan-300 uppercase">New · Skill</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable
-              </span>
-            </div>
-
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Orbit Dash</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Jump between orbits, grab the crystals, dodge the counter-spin.</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-400 to-violet-500 flex items-center justify-center shadow-[0_0_25px_rgba(34,211,238,0.5)] shrink-0">
-                <Play size={26} className="text-black fill-black ml-0.5" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-300 tracking-wide">
-              <Trophy size={13} /> Neon crystal hunt
-              <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Featured: Knife Master */}
-      <Link href="/games/knife">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileTap={{ scale: 0.98 }}
-          data-testid="card-game-knife"
-          className="relative overflow-hidden rounded-3xl border border-amber-800/50 bg-gradient-to-br from-amber-900/30 via-yellow-900/10 to-background p-5 shadow-lg shadow-amber-900/30 cursor-pointer group"
-        >
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-amber-600">
-            <Sword size={120} strokeWidth={1.2} />
-          </div>
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(180,100,20,0.22),transparent_60%)]" />
-
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-display tracking-[0.3em] text-amber-400 uppercase">New · Skill</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable
-              </span>
-            </div>
-
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Knife Master</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Throw knives into the spinning disc — never hit the blade.</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-700 to-yellow-500 flex items-center justify-center shadow-[0_0_25px_rgba(180,100,20,0.55)] shrink-0">
-                <Sword size={26} className="text-white" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-amber-400 tracking-wide">
-              <Trophy size={13} /> Grab apples for bonus time
-              <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Perfect Slice */}
-      <Link href="/games/slice">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileTap={{ scale: 0.98 }}
-          data-testid="card-game-slice"
-          className="relative overflow-hidden rounded-3xl border border-teal-700/50 bg-gradient-to-br from-teal-900/30 via-cyan-900/10 to-background p-5 shadow-lg shadow-teal-900/30 cursor-pointer group"
-        >
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-teal-500">
-            <Scissors size={120} strokeWidth={1.2} />
-          </div>
-
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-teal-400/80">
-                Game 4
-              </span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable
-              </span>
-            </div>
-
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Perfect Slice</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Hold to cut — release before iron barriers. Watch the decoys!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-700 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,180,160,0.55)] shrink-0">
-                <Scissors size={26} className="text-white" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-teal-400 tracking-wide">
-              <Trophy size={13} /> Decoy barriers reverse to trick you
-              <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Color Switch */}
-      <Link href="/games/color">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-color"
-          className="relative overflow-hidden rounded-3xl border border-violet-700/50 bg-gradient-to-br from-violet-900/30 via-fuchsia-900/10 to-background p-5 shadow-lg shadow-violet-900/30 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-violet-500"><Circle size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-violet-400/80">Game 5</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Color Switch</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Match your ball to the ring segment. Timing is everything!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-700 to-fuchsia-400 flex items-center justify-center shadow-[0_0_25px_rgba(160,80,255,0.55)] shrink-0"><Circle size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-violet-400 tracking-wide">
-              <Trophy size={13} /> Inner ring decoy appears at score 10+<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* ZigZag Driver */}
-      <Link href="/games/zigzag">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-zigzag"
-          className="relative overflow-hidden rounded-3xl border border-cyan-700/50 bg-gradient-to-br from-cyan-900/30 via-blue-900/10 to-background p-5 shadow-lg shadow-cyan-900/30 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-500"><GitBranch size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 6</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">ZigZag Driver</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap to flip direction. Grab coins at dangerous corners!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,180,240,0.55)] shrink-0"><GitBranch size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
-              <Trophy size={13} /> 3D isometric low-poly track<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Piano Tiles Rush */}
-      <Link href="/games/piano">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-piano"
-          className="relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-white/5 via-white/[0.03] to-background p-5 shadow-lg cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-15 group-hover:opacity-25 transition-opacity text-white"><Music2 size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-white/50">Game 7</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Piano Rush</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap black tiles as they fall. Hold long tiles — miss one and it's over!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-white/20 to-white/40 flex items-center justify-center shadow-[0_0_25px_rgba(255,255,255,0.25)] shrink-0"><Music2 size={26} className="text-black" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-white/60 tracking-wide">
-              <Trophy size={13} /> 4 lanes · hold tiles · speed surge<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Whack-A-Cyber */}
-      <Link href="/games/whack">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-whack"
-          className="relative overflow-hidden rounded-3xl border border-green-700/40 bg-gradient-to-br from-[#020d06]/80 via-green-900/10 to-background p-5 shadow-lg shadow-green-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-green-500"><Cpu size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-green-400/80 font-mono">Game 8</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-green-400 tracking-wide uppercase leading-none">Whack_Cyber</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Eliminate cyber creatures. Avoid bombs. Golden ones give ×2!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-900 to-green-500 flex items-center justify-center shadow-[0_0_25px_rgba(0,255,136,0.4)] shrink-0"><Cpu size={26} className="text-black" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-mono font-bold text-green-400 tracking-wide">
-              <Trophy size={13} /> Hacker terminal UI · freeze bonus<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Bubble Shooter */}
-      <Link href="/games/bubble">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-bubble"
-          className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-purple-900/30 via-violet-900/10 to-background p-5 shadow-lg shadow-purple-900/30 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-purple-400"><Sparkles size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-purple-400/80">Game 9</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Bubble Shooter</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Aim the glowing cannon. Match 3+ bubbles to pop chains & trigger explosive combos!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-violet-400 flex items-center justify-center shadow-[0_0_25px_rgba(155,89,182,0.6)] shrink-0"><Sparkles size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-purple-400 tracking-wide">
-              <Trophy size={13} /> Chain reactions · wall bounce · combo multiplier<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Galaxy Striker */}
-      <Link href="/games/striker">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-striker"
-          className="relative overflow-hidden rounded-3xl border border-blue-500/40 bg-gradient-to-br from-[#000510]/90 via-blue-950/30 to-background p-5 shadow-lg shadow-blue-900/30 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-blue-400"><Rocket size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-blue-400/80">Game 10</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Galaxy Striker</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Drag to pilot your ship across neon nebulae. Auto-fire destroys wave after wave of aliens!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-800 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(52,152,219,0.6)] shrink-0"><Rocket size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-blue-400 tracking-wide">
-              <Trophy size={13} /> 4 enemy types · shield · triple shot · bomb<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* HyperBreak */}
-      <Link href="/games/breakout">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-breakout"
-          className="relative overflow-hidden rounded-3xl border border-pink-600/40 bg-gradient-to-br from-[#0a0015]/90 via-purple-950/30 to-background p-5 shadow-lg shadow-purple-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-pink-400"><Grid2x2 size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-pink-400/80">Game 11</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">HyperBreak</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Classic brick-breaker evolved. Laser beams, multi-ball chaos, wide paddle & bomb bricks!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-800 to-pink-500 flex items-center justify-center shadow-[0_0_25px_rgba(180,50,255,0.5)] shrink-0"><Grid2x2 size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-pink-400 tracking-wide">
-              <Trophy size={13} /> Laser · multi-ball · bomb bricks · power-ups<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Sky Hopper */}
-      <Link href="/games/hopper">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-hopper"
-          className="relative overflow-hidden rounded-3xl border border-green-500/40 bg-gradient-to-br from-[#001408]/90 via-green-950/20 to-background p-5 shadow-lg shadow-green-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-green-400"><ArrowUp size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-green-400/80">Game 12</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Sky Hopper</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Bounce up through the galaxy! Moving, breaking & cloud platforms. Stomp enemies for bonus!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-700 to-teal-400 flex items-center justify-center shadow-[0_0_25px_rgba(46,204,113,0.5)] shrink-0"><ArrowUp size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-green-400 tracking-wide">
-              <Trophy size={13} /> 5 platform types · enemies · spring boost<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Math Games Section */}
-      <div className="flex items-center gap-3 mt-4 mb-1">
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
-        <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/60">Math Games</span>
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
-      </div>
-
-      {/* Calc Blaster */}
-      <Link href="/games/calcblast">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-calcblast"
-          className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#001520]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-400"><Crosshair size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 13 · Math</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Calc Blaster</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Equations fall from above. Tap the right answer to blast them with a laser before they hit the ground!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(0,200,255,0.5)] shrink-0"><Crosshair size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
-              <Trophy size={13} /> 4 operations · 3 HP · speed ramp<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Number Smash */}
-      <Link href="/games/numsmash">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-numsmash"
-          className="relative overflow-hidden rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#1a0800]/90 via-orange-950/20 to-background p-5 shadow-lg shadow-orange-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-orange-400"><Hammer size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-orange-400/80">Game 14 · Math</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Number Smash</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Numbers pop up in a grid. Follow the challenge: Smash Primes! Evens! Squares! Tap the wrong one = −HP.</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-700 to-red-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,100,0,0.5)] shrink-0"><Hammer size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-orange-400 tracking-wide">
-              <Trophy size={13} /> 5 challenge types · rotating rules · 3 HP<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Sum Chain */}
-      <Link href="/games/chainsum">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-chainsum"
-          className="relative overflow-hidden rounded-3xl border border-emerald-500/40 bg-gradient-to-br from-[#001a08]/90 via-emerald-950/20 to-background p-5 shadow-lg shadow-emerald-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-emerald-400"><Link2 size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-emerald-400/80">Game 15 · Math</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Sum Chain</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Draw a glowing path through adjacent numbers that add up to the target sum. Race the clock!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-700 to-teal-400 flex items-center justify-center shadow-[0_0_25px_rgba(46,204,113,0.5)] shrink-0"><Link2 size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-emerald-400 tracking-wide">
-              <Trophy size={13} /> 5×5 grid · path drawing · combo clear<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Fraction Sort */}
-      <Link href="/games/fracsort">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-fracsort"
-          className="relative overflow-hidden rounded-3xl border border-violet-500/40 bg-gradient-to-br from-[#0e0020]/90 via-violet-950/20 to-background p-5 shadow-lg shadow-violet-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-violet-400"><Scale size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-violet-400/80">Game 16 · Math</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Fraction Sort</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Is the fraction less than ½ or greater than ½? Tap the correct side before you run out of HP!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-700 to-purple-400 flex items-center justify-center shadow-[0_0_25px_rgba(155,89,182,0.5)] shrink-0"><Scale size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-violet-400 tracking-wide">
-              <Trophy size={13} /> 20 unique fractions · 3 HP · visual card<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Speed Math */}
-      <Link href="/games/speedmath">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-speedmath"
-          className="relative overflow-hidden rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#100800]/90 via-yellow-950/20 to-background p-5 shadow-lg shadow-yellow-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-yellow-400"><Zap size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-yellow-400/80">Game 17 · Math</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Speed Math</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Equation flashes for 0.9s — then 4 choices appear. Answer fast for speed bonus! Build combos for ×5 multiplier!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-yellow-700 to-amber-400 flex items-center justify-center shadow-[0_0_25px_rgba(255,200,0,0.5)] shrink-0"><Zap size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-yellow-400 tracking-wide">
-              <Trophy size={13} /> Speed bonus · ×5 combo · 4 operations<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Pulse Tap */}
-      <Link href="/games/pulsetap">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-pulsetap"
-          className="relative overflow-hidden rounded-3xl border border-green-500/40 bg-gradient-to-br from-[#001a0a]/90 via-green-950/20 to-background p-5 shadow-lg shadow-green-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-green-400"><Target size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-green-400/80">Game 22 · Rhythm</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Pulse Tap</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Neon rings expand across the screen — tap each one EXACTLY as it hits the glowing target ring for 100pts PERFECT!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-700 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(34,197,94,0.5)] shrink-0"><Target size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-green-400 tracking-wide">
-              <Trophy size={13} /> Perfect · Great · Good timing<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Swipe Rush */}
-      <Link href="/games/swiperush">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-swiperush"
-          className="relative overflow-hidden rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#120800]/90 via-yellow-950/20 to-background p-5 shadow-lg shadow-yellow-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-yellow-400"><ArrowUp size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-yellow-400/80">Game 23 · Reflex</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Swipe Rush</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">A massive glowing arrow appears — swipe in that exact direction before the countdown ring collapses! Build insane combos!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-yellow-700 to-orange-400 flex items-center justify-center shadow-[0_0_25px_rgba(234,179,8,0.5)] shrink-0"><Zap size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-yellow-400 tracking-wide">
-              <Trophy size={13} /> 4 directions · combo bonus · speed<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Bubble Pop */}
-      <Link href="/games/bubblepop">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-bubblepop"
-          className="relative overflow-hidden rounded-3xl border border-pink-500/40 bg-gradient-to-br from-[#1a0018]/90 via-pink-950/20 to-background p-5 shadow-lg shadow-pink-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-pink-400"><Waves size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-pink-400/80">Game 24 · Arcade</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Bubble Pop</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Colorful bubbles float upward — tap ONLY the color shown at the top! Pop 6 correct → color changes. Speed up as you score!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-700 to-purple-400 flex items-center justify-center shadow-[0_0_25px_rgba(236,72,153,0.5)] shrink-0"><Waves size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-pink-400 tracking-wide">
-              <Trophy size={13} /> 5 colors · changing target · combos<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Color Rain */}
-      <Link href="/games/colorrain">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-colorrain"
-          className="relative overflow-hidden rounded-3xl border border-violet-500/40 bg-gradient-to-br from-[#0c0020]/90 via-violet-950/20 to-background p-5 shadow-lg shadow-violet-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-violet-400"><Rocket size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-violet-400/80">Game 25 · Catcher</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Color Rain</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Neon diamonds fall from the sky — drag your paddle to catch ONLY the matching color! Every 5 catches → color changes. Combo shrinks the paddle!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-700 to-fuchsia-400 flex items-center justify-center shadow-[0_0_25px_rgba(139,92,246,0.5)] shrink-0"><Rocket size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-violet-400 tracking-wide">
-              <Trophy size={13} /> Drag paddle · shrinking · 5 colors<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Stack Drop */}
-      <Link href="/games/stackdrop">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-stackdrop"
-          className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#001218]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-400"><Layers size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 26 · Precision</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Stack Drop</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">A sliding neon block sweeps left and right — tap to drop it! Align perfectly for no trim. Miss = −3 seconds. Speed increases!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-blue-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.5)] shrink-0"><Layers size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
-              <Trophy size={13} /> Classic stacking · speed increases<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Orbit Aim */}
-      <Link href="/games/orbitaim">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-orbitaim"
-          className="relative overflow-hidden rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#1a0800]/90 via-orange-950/20 to-background p-5 shadow-lg shadow-orange-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-orange-400"><Orbit size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-orange-400/80">Game 27 · Aim</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Orbit Aim</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">A rotating gun sweeps around an orbit ring while targets appear at random angles. Tap to fire exactly when aligned — with increasing speed!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-700 to-red-400 flex items-center justify-center shadow-[0_0_25px_rgba(249,115,22,0.5)] shrink-0"><Orbit size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-orange-400 tracking-wide">
-              <Trophy size={13} /> Rotating gun · timing · combos<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Echo Tap */}
-      <Link href="/games/echotap">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-echotap"
-          className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-[#0a0020]/90 via-purple-950/20 to-background p-5 shadow-lg shadow-purple-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-purple-400"><Brain size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-purple-400/80">Game 28 · Memory</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Echo Tap</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Watch the sequence of glowing emoji tiles, then tap them in the EXACT same order from memory. Each success adds +1 more tile!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-violet-400 flex items-center justify-center shadow-[0_0_25px_rgba(168,85,247,0.5)] shrink-0"><Brain size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-purple-400 tracking-wide">
-              <Trophy size={13} /> 9 tiles · growing sequences · memory<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Merge Blitz */}
-      <Link href="/games/mergeblitz">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-mergeblitz"
-          className="relative overflow-hidden rounded-3xl border border-amber-500/40 bg-gradient-to-br from-[#120800]/90 via-amber-950/20 to-background p-5 shadow-lg shadow-amber-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-amber-400"><Hash size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-amber-400/80">Game 29 · Merge</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Merge Blitz</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Classic 2048 under EXTREME time pressure! Swipe to merge matching tiles and reach the score target before the clock hits zero!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-700 to-orange-400 flex items-center justify-center shadow-[0_0_25px_rgba(245,158,11,0.5)] shrink-0"><Hash size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-amber-400 tracking-wide">
-              <Trophy size={13} /> 2048 mechanics · timed · swipe<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Number Blitz */}
-      <Link href="/games/numblitz">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-numblitz"
-          className="relative overflow-hidden rounded-3xl border border-teal-500/40 bg-gradient-to-br from-[#001210]/90 via-teal-950/20 to-background p-5 shadow-lg shadow-teal-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-teal-400"><BoltIcon size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-teal-400/80">Game 30 · Speed</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Number Blitz</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Numbers are scattered all over the screen — tap them in ORDER (1, 2, 3...) as fast as possible! Each round adds 3 more numbers!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-700 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(20,184,166,0.5)] shrink-0"><BoltIcon size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-teal-400 tracking-wide">
-              <Trophy size={13} /> Sequential tap · escalating · speed<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Card Flip */}
-      <Link href="/games/cardflip">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-cardflip"
-          className="relative overflow-hidden rounded-3xl border border-emerald-500/40 bg-gradient-to-br from-[#001808]/90 via-emerald-950/20 to-background p-5 shadow-lg shadow-emerald-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-emerald-400"><LayoutGrid size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-emerald-400/80">Game 31 · Memory</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Card Flip</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Flip cards to find matching emoji pairs! Complete the full 4×4 board → reshuffles instantly. Race the clock across infinite boards!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-700 to-teal-400 flex items-center justify-center shadow-[0_0_25px_rgba(16,185,129,0.5)] shrink-0"><LayoutGrid size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-emerald-400 tracking-wide">
-              <Trophy size={13} /> 8 pairs · infinite boards · memory<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Grid Pop */}
-      <Link href="/games/gridpop">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-gridpop"
-          className="relative overflow-hidden rounded-3xl border border-pink-500/40 bg-gradient-to-br from-[#1a0018]/90 via-pink-950/20 to-background p-5 shadow-lg shadow-pink-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-pink-400"><Grid2x2 size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-pink-400/80">Game 18 · Puzzle</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Grid Pop</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap connected color blocks to explode them! Pop 8+ at once for bonus time, screen shake, and glass-shatter combos!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-700 to-purple-400 flex items-center justify-center shadow-[0_0_25px_rgba(236,72,153,0.5)] shrink-0"><Grid2x2 size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-pink-400 tracking-wide">
-              <Trophy size={13} /> Flood-fill · 6 colors · screen shake<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Neon Link */}
-      <Link href="/games/neonlink">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-neonlink"
-          className="relative overflow-hidden rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#000a18]/90 via-cyan-950/20 to-background p-5 shadow-lg shadow-cyan-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-cyan-400"><GitBranch size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-cyan-400/80">Game 19 · Puzzle</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Neon Link</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Drag fluid neon lines to connect matching symbols. But beware the ⚡ blocker — cross it and your connection snaps!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-700 to-indigo-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.5)] shrink-0"><GitBranch size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-cyan-400 tracking-wide">
-              <Trophy size={13} /> Drag lines · moving blocker · escalating pairs<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Quick Sum */}
-      <Link href="/games/quicksum">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-quicksum"
-          className="relative overflow-hidden rounded-3xl border border-blue-500/40 bg-gradient-to-br from-[#000514]/90 via-blue-950/20 to-background p-5 shadow-lg shadow-blue-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-blue-400"><Cpu size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-blue-400/80">Game 20 · Math</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Quick Sum</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Tap numbers that add up to the target. Suddenly, × mode kicks in — find two numbers whose product matches instead!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-700 to-violet-400 flex items-center justify-center shadow-[0_0_25px_rgba(59,130,246,0.5)] shrink-0"><Cpu size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-blue-400 tracking-wide">
-              <Trophy size={13} /> + and × modes · Apple-style UI · speed solving<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
-
-      {/* Match 3 Blitz */}
-      <Link href="/games/match3">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }} data-testid="card-game-match3"
-          className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-br from-[#0c0018]/90 via-purple-950/20 to-background p-5 shadow-lg shadow-purple-900/20 cursor-pointer group">
-          <div className="absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity text-purple-400"><Sparkles size={120} strokeWidth={1.2} /></div>
-          <div className="flex flex-col gap-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] font-display uppercase text-purple-400/80">Game 21 · Puzzle</span>
-              <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">Match 3 Blitz</h2>
-                <p className="text-xs text-white/60 mt-1 max-w-[200px]">Swap glowing gems to match 3 or more in a row. Match 5+ for cascade combos, bonus time, and screen-shaking explosions!</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-pink-400 flex items-center justify-center shadow-[0_0_25px_rgba(168,85,247,0.5)] shrink-0"><Sparkles size={26} className="text-white" /></div>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs font-display font-bold text-purple-400 tracking-wide">
-              <Trophy size={13} /> 7×7 grid · cascades · 5-match bonus time<ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      </Link>
+      )}
 
       {/* Currently Playing */}
       <div className="flex flex-col gap-3">
@@ -993,7 +171,6 @@ export default function Games() {
       {/* Ticket Tiers */}
       <div className="flex flex-col gap-4">
         <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase mt-2">Select Tier</h3>
-        
         {ticketTiers.map((tier, i) => (
           <motion.div
             key={tier.name}
@@ -1005,7 +182,6 @@ export default function Games() {
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <Swords size={64} />
             </div>
-            
             <div className="relative z-10 flex justify-between items-center">
               <div className="flex flex-col gap-1">
                 <h3 className="text-xl font-display font-black text-white tracking-wide uppercase">{tier.name}</h3>
@@ -1013,7 +189,6 @@ export default function Games() {
                   <span className="text-sm text-white/80">Entry: <span className="font-display font-bold text-white tracking-wider">{tier.price} SKZ</span></span>
                 </div>
               </div>
-              
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-lg border border-white/10">
                   <Trophy size={12} className="text-primary" />
