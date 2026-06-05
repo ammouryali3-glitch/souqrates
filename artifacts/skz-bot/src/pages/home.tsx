@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins, Gift } from "lucide-react";
+import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins, Gift, UserCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Card } from "@/components/ui/card";
 import { useAdmin, useBalance, admin } from "@/lib/admin-store";
 import { useLang, t } from "@/lib/i18n";
+import { useTelegramUser } from "@/lib/telegram-user";
 
 export default function Home() {
   const { settings } = useAdmin();
@@ -12,6 +13,7 @@ export default function Home() {
   const lang = useLang();
   const s = t[lang];
   const canClaim = settings.dailyBonus > 0 && admin.canClaimDailyBonus();
+  const { tgUser, inTelegram } = useTelegramUser();
 
   return (
     <div className="flex flex-col gap-6">
@@ -27,6 +29,48 @@ export default function Home() {
           <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">{settings.welcomeMessage}</p>
         )}
       </div>
+
+      {/* Player identity */}
+      {inTelegram && tgUser && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 px-1"
+        >
+          {tgUser.photo_url ? (
+            <img
+              src={tgUser.photo_url}
+              alt={tgUser.first_name}
+              className="w-10 h-10 rounded-full object-cover shrink-0"
+              style={{ border: `2px solid ${settings.accent}55` }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: `${settings.accent}22`, color: settings.accent }}
+            >
+              <UserCircle2 size={22} />
+            </div>
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold text-white truncate leading-tight">
+              {tgUser.first_name}{tgUser.last_name ? ` ${tgUser.last_name}` : ""}
+            </span>
+            {tgUser.username && (
+              <span className="text-[11px] text-muted-foreground truncate leading-tight">@{tgUser.username}</span>
+            )}
+          </div>
+          {tgUser.is_premium && (
+            <span
+              className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+              style={{ background: `${settings.accent}22`, color: settings.accent }}
+            >
+              PREMIUM
+            </span>
+          )}
+        </motion.div>
+      )}
 
       {/* Daily bonus */}
       {canClaim && (
