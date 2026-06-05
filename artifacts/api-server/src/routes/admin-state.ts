@@ -20,8 +20,9 @@ import {
   supportTicketsTable,
   shopProductsTable,
   referrersTable,
+  gameResultsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requireAdminSession } from "./admin-auth";
 import { adminAccountsTable } from "@workspace/db";
 
@@ -159,6 +160,7 @@ router.get("/state", requireAdminSession, async (req: Request, res: Response) =>
       tickets,
       products,
       referrers,
+      gameStatsRaw,
     ] = await Promise.all([
       db.select().from(adminConfigTable),
       can("content") ? db.select().from(appNotificationsTable).orderBy(appNotificationsTable.createdAt) : Promise.resolve([]),
@@ -173,6 +175,17 @@ router.get("/state", requireAdminSession, async (req: Request, res: Response) =>
       can("users")   ? db.select().from(supportTicketsTable).orderBy(supportTicketsTable.updatedAt) : Promise.resolve([]),
       can("content") ? db.select().from(shopProductsTable) : Promise.resolve([]),
       can("affiliate") ? db.select().from(referrersTable) : Promise.resolve([]),
+      can("games") ? db.execute(sql`
+        SELECT
+          game_id,
+          COUNT(*)::int AS total_plays,
+          COUNT(DISTINCT user_id)::int AS unique_players,
+          MAX(score)::int AS top_score,
+          COALESCE(SUM(fee_paid), 0)::int AS total_fees_collected
+        FROM game_results
+        GROUP BY game_id
+        ORDER BY total_plays DESC
+      `) : Promise.resolve({ rows: [] }),
     ]);
 
     const rawConfig: Record<string, unknown> = {};
@@ -180,6 +193,15 @@ router.get("/state", requireAdminSession, async (req: Request, res: Response) =>
       rawConfig[row.key] = row.value;
     }
     const configMap = filterReadableConfig(rawConfig, account);
+
+    type GameStatRow = { game_id: string; total_plays: number; unique_players: number; top_score: number; total_fees_collected: number };
+    const gameStats = (gameStatsRaw as { rows: GameStatRow[] }).rows.map((r) => ({
+      gameId: r.game_id,
+      totalPlays: Number(r.total_plays),
+      uniquePlayers: Number(r.unique_players),
+      topScore: Number(r.top_score),
+      totalFeesCollected: Number(r.total_fees_collected),
+    }));
 
     res.json({
       config: configMap,
@@ -202,6 +224,7 @@ router.get("/state", requireAdminSession, async (req: Request, res: Response) =>
       tickets: (tickets as typeof supportTicketsTable.$inferSelect[]).map((t) => t.data),
       products: (products as typeof shopProductsTable.$inferSelect[]).map((p) => p.data),
       referrers: (referrers as typeof referrersTable.$inferSelect[]).map((r) => r.data),
+      gameStats,
     });
   } catch (err) {
     req.log.error({ err }, "GET /admin/state error");

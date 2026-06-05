@@ -93,3 +93,66 @@ export function formatTime(seconds: number): string {
   const s = seconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
+
+// ── Server-side API functions ─────────────────────────────────────────────────
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${BASE}${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    ...init,
+  });
+}
+
+export interface LeaderboardResponse {
+  leaders: LeaderEntry[];
+  pool: number;
+  entries: number;
+  yourRank: number | null;
+}
+
+/**
+ * Fetch the server-side leaderboard for a game.
+ * Returns null if the network request fails (caller falls back to local data).
+ */
+export async function fetchLeaderboard(gameId: string, period: ArenaPeriod): Promise<LeaderboardResponse | null> {
+  try {
+    const res = await apiFetch(`/api/user/leaderboard/${encodeURIComponent(gameId)}?period=${period}`);
+    if (!res.ok) return null;
+    return (await res.json()) as LeaderboardResponse;
+  } catch {
+    return null;
+  }
+}
+
+export interface SubmitScoreResult {
+  ok: boolean;
+  rank: number;
+}
+
+/**
+ * Submit a game score to the server.
+ * Also updates the local leaderboard cache with the merged result.
+ * Returns null if the request fails (score is still stored locally as fallback).
+ */
+export async function submitScoreToServer(
+  gameId: string,
+  score: number,
+  timeSec: number,
+  name: string,
+  period: ArenaPeriod,
+): Promise<SubmitScoreResult | null> {
+  try {
+    const res = await apiFetch("/api/user/submit-score", {
+      method: "POST",
+      // feePaid intentionally omitted — server computes it from admin config
+      body: JSON.stringify({ gameId, score, timeSec, name, period }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as SubmitScoreResult;
+  } catch {
+    return null;
+  }
+}

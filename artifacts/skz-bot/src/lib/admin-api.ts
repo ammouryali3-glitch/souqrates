@@ -49,6 +49,14 @@ export async function fetchRuntimeConfig(): Promise<ApiRuntimeConfig | null> {
 
 // ── Full admin state (auth-required, dashboard only) ──────────────────────────
 
+export interface GameStat {
+  gameId: string;
+  totalPlays: number;
+  uniquePlayers: number;
+  topScore: number;
+  totalFeesCollected: number;
+}
+
 export interface ApiAdminState {
   config: Record<string, unknown>;
   notifications: unknown[];
@@ -63,6 +71,7 @@ export interface ApiAdminState {
   tickets: unknown[];
   products: unknown[];
   referrers: unknown[];
+  gameStats?: GameStat[];
 }
 
 /**

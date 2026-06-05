@@ -6,6 +6,7 @@ import type {
   ReferralTrigger, Referrer, SecuritySettings, SocialTask, SupportTicket,
   TicketMsg, TokenPackage, Withdrawal,
 } from "./admin-types";
+import type { GameStat } from "./admin-api";
 import {
   seedApiKeys, seedBackupSettings, seedCmsTexts,
   seedFinanceSettings, seedReferralLevels,
@@ -146,6 +147,8 @@ export interface AdminState {
   finance: FinanceSettings;
   security: SecuritySettings;
   backup: BackupSettings;
+  /** Real play statistics per game, fetched from server. Empty until admin loads state. */
+  gameStats: GameStat[];
 }
 
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -191,6 +194,7 @@ function freshSlices() {
     finance: seedFinanceSettings(),
     security: seedSecuritySettings(),
     backup: seedBackupSettings(),
+    gameStats: [] as GameStat[],
   };
 }
 
@@ -247,6 +251,7 @@ function load(): AdminState {
       finance: { ...seeded.finance, ...(parsed.finance ?? {}) },
       security: { ...seeded.security, ...(parsed.security ?? {}) },
       backup: { ...seeded.backup, ...(parsed.backup ?? {}) },
+      gameStats: seeded.gameStats,
     };
   } catch {
     return defaultState();
@@ -335,6 +340,7 @@ function applyFullAdminState(
     promoCodes: apiState.promoCodes as PromoCode[],
     broadcasts: apiState.broadcasts as Broadcast[],
     tickets: apiState.tickets as SupportTicket[],
+    gameStats: Array.isArray(apiState.gameStats) ? (apiState.gameStats as GameStat[]) : seeded.gameStats,
     // Config: always prefer server values (null/undefined means server has no entry yet)
     apiKeys: Array.isArray(cfg.api_keys) ? (cfg.api_keys as ApiKey[]) : seeded.apiKeys,
     roles: Array.isArray(cfg.roles) ? (cfg.roles as AdminRole[]) : state.roles,

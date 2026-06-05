@@ -8,7 +8,7 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { platformUsersTable, adminConfigTable } from "@workspace/db";
+import { platformUsersTable, adminConfigTable, gameResultsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 const router = Router();
@@ -520,6 +520,254 @@ router.post("/game-result", async (req: Request, res: Response) => {
     if (e.status === 400) { res.status(400).json({ error: e.message ?? "Invalid request" }); return; }
     if (e.status === 409) { res.status(409).json({ error: e.message ?? "Conflict" }); return; }
     req.log.error({ err }, "game-result error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Period helpers ─────────────────────────────────────────────────────────────
+
+/** Returns UTC midnight of the current day as a Date. */
+function todayUtc(): Date {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Returns UTC midnight of the most-recent Monday as a Date. */
+function thisWeekMondayUtc(): Date {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  const day = d.getUTCDay(); // 0=Sun
+  const diff = day === 0 ? 6 : day - 1;
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d;
+}
+
+function periodStart(period: "daily" | "weekly"): Date {
+  return period === "weekly" ? thisWeekMondayUtc() : todayUtc();
+}
+
+/**
+ * Fetch pool share (1 - platformRake/100) from admin_config.
+ * Defaults to 0.7 (30 % platform rake) if not configured.
+ */
+// Default entry fees matching games-data.ts ARENA_GAMES definitions (server-authoritative)
+const DEFAULT_ENTRY_FEES: Record<string, number> = {
+  detective: 180,
+  cipher: 150,
+  hiddenpath: 175,
+  geniusgrid: 180,
+  truthscale: 200,
+};
+
+interface GameEconomyConfig {
+  poolShare: number;
+  entryFee: number;
+}
+
+async function getGameEconomy(gameId: string): Promise<GameEconomyConfig> {
+  try {
+    const [overridesRows, settingsRows] = await Promise.all([
+      db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "game_overrides")).limit(1),
+      db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "settings")).limit(1),
+    ]);
+    const overrides = (overridesRows[0]?.value ?? {}) as Record<string, unknown>;
+    const ov = (overrides[gameId] ?? {}) as Record<string, unknown>;
+    const settings = (settingsRows[0]?.value ?? {}) as Record<string, unknown>;
+    const rake = typeof ov.rake === "number" ? ov.rake
+      : (typeof settings.platformRake === "number" ? settings.platformRake : 30);
+    const poolShare = Math.min(1, Math.max(0, 1 - rake / 100));
+    // Entry fee: admin override wins; fall back to hardcoded default; then 0
+    const entryFee = typeof ov.entry === "number" && ov.entry >= 0
+      ? Math.floor(ov.entry)
+      : (DEFAULT_ENTRY_FEES[gameId] ?? 0);
+    return { poolShare, entryFee };
+  } catch {
+    return { poolShare: 0.7, entryFee: DEFAULT_ENTRY_FEES[gameId] ?? 0 };
+  }
+}
+
+// ── POST /api/user/submit-score ────────────────────────────────────────────────
+
+/**
+ * Saves a game result to the database.
+ *
+ * Body: { gameId: string, score: number, timeSec: number, name: string,
+ *         feePaid: number, period: "daily" | "weekly" }
+ * Returns: { ok: true, rank: number }
+ *
+ * One result per user per game per period is kept (best score).
+ * Additional plays within the same period are recorded but only the best
+ * score surfaces in the leaderboard query.
+ */
+router.post("/submit-score", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const { gameId, score, timeSec, name, period } = req.body ?? {};
+
+  if (typeof gameId !== "string" || !gameId) {
+    res.status(400).json({ error: "gameId required" }); return;
+  }
+  if (typeof score !== "number" || !Number.isFinite(score) || score < 0) {
+    res.status(400).json({ error: "score must be a non-negative number" }); return;
+  }
+  if (typeof timeSec !== "number" || !Number.isFinite(timeSec) || timeSec < 0) {
+    res.status(400).json({ error: "timeSec must be a non-negative number" }); return;
+  }
+  if (typeof name !== "string") {
+    res.status(400).json({ error: "name required" }); return;
+  }
+  const validPeriods = ["daily", "weekly"];
+  const safePeriod: "daily" | "weekly" = validPeriods.includes(period) ? period : "daily";
+  const safeName = String(name).slice(0, 64) || "Player";
+
+  // Entry fee is always computed server-side — never trusted from the client.
+  // Fee is only charged on the first play per user per game per period;
+  // any additional attempts in the same period count as 0-fee replays.
+  const { entryFee: baseEntryFee } = await getGameEconomy(gameId);
+
+  try {
+    const since = periodStart(safePeriod);
+
+    // Check if this user has already paid for this game in the current period
+    const existingRows = await db.execute(sql`
+      SELECT id FROM game_results
+      WHERE user_id = ${payload.tgId}
+        AND game_id = ${gameId}
+        AND period = ${safePeriod}
+        AND created_at >= ${since}
+      LIMIT 1
+    `);
+    const alreadyPaidEntry = (existingRows.rows as Array<{ id: string }>).length > 0;
+    const safeFee = alreadyPaidEntry ? 0 : baseEntryFee;
+
+    const id = randomBytes(12).toString("hex");
+    await db.insert(gameResultsTable).values({
+      id,
+      userId: payload.tgId,
+      gameId,
+      score: Math.floor(score),
+      timeSec: Math.floor(timeSec),
+      name: safeName,
+      feePaid: safeFee,
+      period: safePeriod,
+      createdAt: new Date(),
+    });
+
+    // Compute the caller's rank in the current period leaderboard (full set, not top-20 slice)
+    const rankResult = await db.execute(sql`
+      WITH best AS (
+        SELECT DISTINCT ON (user_id) user_id, score, time_sec
+        FROM game_results
+        WHERE game_id = ${gameId}
+          AND period = ${safePeriod}
+          AND created_at >= ${since}
+        ORDER BY user_id, score DESC, time_sec ASC
+      )
+      SELECT COUNT(*)::int AS ahead
+      FROM best
+      WHERE score > ${Math.floor(score)}
+        OR (score = ${Math.floor(score)} AND time_sec < ${Math.floor(timeSec)})
+    `);
+    const rows = rankResult.rows as Array<{ ahead: number }>;
+    const rank = (Number(rows[0]?.ahead ?? 0)) + 1;
+
+    req.log.info({ tgId: payload.tgId, gameId, score, timeSec, period: safePeriod, feePaid: safeFee }, "game score submitted");
+    res.json({ ok: true, rank });
+  } catch (err) {
+    req.log.error({ err }, "submit-score error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/leaderboard/:gameId ─────────────────────────────────────────
+
+/**
+ * Returns the top-20 leaderboard for a game in the current period.
+ * Auth is optional: if a valid session cookie is present the caller's entry
+ * gets { isYou: true } and yourRank is populated.
+ *
+ * Query: ?period=daily|weekly  (defaults to "daily")
+ * Returns: { leaders: LeaderEntry[], pool: number, entries: number, yourRank: number | null }
+ */
+router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId);
+  const periodParam = req.query.period as string;
+  const period: "daily" | "weekly" = periodParam === "weekly" ? "weekly" : "daily";
+  const since = periodStart(period);
+
+  // Optionally identify the caller for isYou/yourRank
+  let myTgId: string | null = null;
+  try {
+    const token = req.cookies?.[USER_COOKIE];
+    if (token) {
+      const p = verifyUserToken(token);
+      if (p) myTgId = p.tgId;
+    }
+  } catch { /* anonymous */ }
+
+  try {
+    // Best score per user in the current period (both date AND period column must match)
+    const [rows, statsResult] = await Promise.all([
+      db.execute(sql`
+        SELECT DISTINCT ON (user_id)
+          user_id,
+          name,
+          score,
+          time_sec
+        FROM game_results
+        WHERE game_id = ${gameId}
+          AND period = ${period}
+          AND created_at >= ${since}
+        ORDER BY user_id, score DESC, time_sec ASC
+      `),
+      db.execute(sql`
+        SELECT COUNT(DISTINCT user_id)::int AS entries,
+               COALESCE(SUM(fee_paid), 0)::int AS total_fees
+        FROM game_results
+        WHERE game_id = ${gameId}
+          AND period = ${period}
+          AND created_at >= ${since}
+      `),
+    ]);
+
+    type RawRow = { user_id: string; name: string; score: number; time_sec: number };
+    // Sort ALL best-per-user results for global rank computation
+    const allSorted = (rows.rows as RawRow[])
+      .sort((a, b) => b.score - a.score || a.time_sec - b.time_sec);
+
+    // yourRank is derived from full global list (not limited to top-20)
+    const yourRank = myTgId !== null
+      ? (() => {
+          const idx = allSorted.findIndex((r) => r.user_id === myTgId);
+          return idx >= 0 ? idx + 1 : null;
+        })()
+      : null;
+
+    // Only the top-20 are sent as visible leaders
+    const top20 = allSorted.slice(0, 20);
+    const leaders = top20.map((r, i) => ({
+      rank: i + 1,
+      name: r.name,
+      score: Number(r.score),
+      time: Number(r.time_sec),
+      isYou: myTgId !== null && r.user_id === myTgId,
+    }));
+
+    // Total unique entries and pool for the period
+    const stats = (statsResult.rows as Array<{ entries: number; total_fees: number }>)[0];
+    const entries = stats?.entries ?? 0;
+    const totalFees = stats?.total_fees ?? 0;
+
+    const { poolShare } = await getGameEconomy(gameId);
+    const pool = Math.floor(totalFees * poolShare);
+
+    res.json({ leaders, pool, entries, yourRank });
+  } catch (err) {
+    req.log.error({ err }, "leaderboard error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

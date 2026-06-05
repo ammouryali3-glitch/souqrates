@@ -3,11 +3,13 @@ import { Link } from "wouter";
 import { ArrowLeft, Trophy, Users, Clock, Coins, Crown, Flame, ChevronRight, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  getPool, getEntries, addEntry, hasPlayed, markPlayed,
+  getPool, getEntries, hasPlayed, markPlayed,
   getLeaderboard, submitScore, getCountdown, formatTime,
-  getDefaultLeaders, ArenaPeriod, LeaderEntry,
+  fetchLeaderboard, submitScoreToServer,
+  ArenaPeriod, LeaderEntry,
 } from "@/lib/arena";
 import { useArenaEconomy } from "@/lib/game-economy";
+import { useTelegramUser } from "@/lib/telegram-user";
 
 const BALANCE_KEY = "skz_balance";
 
@@ -48,6 +50,7 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
 }
 
 export default function ArenaShell({ gameId, title, subtitle, icon, color, entryFee, period, description, children }: ArenaShellProps) {
+  const { dbUser } = useTelegramUser();
   const [shell, setShell] = useState<Shell>("lobby");
   const [balance, setBalance] = useState(() => parseInt(localStorage.getItem(BALANCE_KEY) || "1000"));
   const [pool, setPool] = useState(() => getPool(gameId));
@@ -58,25 +61,24 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
   const [myRank, setMyRank] = useState(0);
   const [countdown, setCountdown] = useState(() => getCountdown(period));
   const [alreadyPlayed] = useState(() => hasPlayed(gameId, period));
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { fee: effEntry, prizeFactor, winnerCut } = useArenaEconomy(gameId, entryFee);
   const winnerTake = Math.floor(pool * winnerCut * prizeFactor);
 
-  // Live prize pool simulation
+  // Fetch real leaderboard + pool from server on mount
+  useEffect(() => {
+    fetchLeaderboard(gameId, period).then((data) => {
+      if (!data) return;
+      setLeaders(data.leaders);
+      setPool(data.pool);       // always trust server value (including 0 for new periods)
+      setEntries(data.entries); // always trust server value
+    });
+  }, [gameId, period]);
+
+  // Countdown refresh (period display only — no pool simulation)
   useEffect(() => {
     if (shell !== "lobby") return;
-    intervalRef.current = setInterval(() => {
-      if (Math.random() < 0.35) {
-        const add = Math.floor(Math.random() * 170 + 30);
-        setPool(p => p + add);
-        setEntries(e => e + 1);
-      }
-    }, 3200);
     const cdInterval = setInterval(() => setCountdown(getCountdown(period)), 30000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      clearInterval(cdInterval);
-    };
+    return () => clearInterval(cdInterval);
   }, [shell, period]);
 
   const handlePay = useCallback(() => {
@@ -84,22 +86,40 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
     const nb = balance - effEntry;
     setBalance(nb);
     localStorage.setItem(BALANCE_KEY, String(nb));
-    addEntry(gameId, effEntry);
-    setPool(getPool(gameId));
-    setEntries(getEntries(gameId));
     markPlayed(gameId);
     setShell("playing");
   }, [balance, effEntry, gameId]);
 
-  const handleComplete = useCallback((score: number, timeSec: number) => {
+  const handleComplete = useCallback(async (score: number, timeSec: number) => {
     setMyScore(score);
     setMyTime(timeSec);
-    const playerName = "You";
-    const { leaders: newLeaders, rank } = submitScore(gameId, score, timeSec, playerName);
-    setLeaders(newLeaders);
-    setMyRank(rank);
+
+    // Determine display name: prefer DB user name, then fallback
+    const playerName = typeof dbUser?.name === "string" && dbUser.name
+      ? dbUser.name
+      : "You";
+
+    // Optimistic local update
+    const { leaders: localLeaders, rank: localRank } = submitScore(gameId, score, timeSec, playerName);
+    setLeaders(localLeaders);
+    setMyRank(localRank);
     setShell("result");
-  }, [gameId]);
+
+    // Submit to server (fire and forget — update leaders if server responds)
+    const serverResult = await submitScoreToServer(gameId, score, timeSec, playerName, period);
+    if (serverResult) {
+      // Refresh leaderboard from server after submission
+      const fresh = await fetchLeaderboard(gameId, period);
+      if (fresh) {
+        setLeaders(fresh.leaders);
+        setMyRank(fresh.yourRank ?? serverResult.rank);
+        setPool(fresh.pool);       // always trust server value
+        setEntries(fresh.entries); // always trust server value
+      } else {
+        setMyRank(serverResult.rank);
+      }
+    }
+  }, [gameId, period, dbUser]);
 
   const colorRGB = color;
 
@@ -319,6 +339,11 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                   </div>
                 </motion.div>
               ))}
+              {leaders.length === 0 && (
+                <div className="text-center text-white/30 text-sm font-display py-12">
+                  No entries yet — be the first!
+                </div>
+              )}
             </div>
           </motion.div>
         )}

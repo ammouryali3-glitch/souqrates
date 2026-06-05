@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Gamepad2, Trophy, Target, Coins, Zap, Star, Save, RotateCcw, Pencil,
-  Percent, type LucideIcon,
+  Percent, Users, type LucideIcon,
 } from "lucide-react";
 import { useAdmin, admin, type TicketPatch } from "../../lib/admin-store";
 import { ARENA_GAMES, SKILL_GAMES, ACCENTS, type GameDef } from "../../lib/games-data";
@@ -264,21 +264,64 @@ function GameRow({ game, defaultRake }: { game: GameDef; defaultRake: number }) 
 }
 
 export default function GamesSection() {
-  const { gameOverrides, settings } = useAdmin();
+  const { gameOverrides, settings, gameStats } = useAdmin();
   const hidden = Object.values(gameOverrides).filter((o) => o.enabled === false).length;
   const featured = Object.values(gameOverrides).filter((o) => o.featured).length;
   const total = ARENA_GAMES.length + SKILL_GAMES.length;
+
+  const totalPlays = gameStats.reduce((s, g) => s + g.totalPlays, 0);
+  const totalUniquePlayers = gameStats.reduce((s, g) => s + g.uniquePlayers, 0);
+  const totalFees = gameStats.reduce((s, g) => s + g.totalFeesCollected, 0);
 
   return (
     <div>
       <SectionHeader title="الألعاب والأرباح" subtitle="تحكّم كامل بكل لعبة — التذاكر، الجوائز، العمولة، والتمييز" icon={Gamepad2} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <StatCard label="إجمالي الألعاب" value={total} icon={Gamepad2} tone="blue" />
         <StatCard label="ألعاب نشطة" value={total - hidden} icon={Gamepad2} tone="green" />
         <StatCard label="ألعاب مخفية" value={hidden} icon={Gamepad2} tone="red" />
         <StatCard label="ألعاب مميّزة" value={featured} icon={Star} tone="gold" />
       </div>
+
+      {gameStats.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <StatCard label="إجمالي الجلسات" value={totalPlays} icon={Trophy} tone="gold" />
+          <StatCard label="لاعبون فريدون" value={totalUniquePlayers} icon={Users} tone="blue" />
+          <StatCard label="رسوم محصّلة (SKZ)" value={totalFees} icon={Coins} tone="green" />
+          <StatCard label="ألعاب بها إحصاءات" value={gameStats.length} icon={Gamepad2} tone="blue" />
+        </div>
+      )}
+
+      {gameStats.length > 0 && (
+        <Card className="mb-5" title="أكثر الألعاب نشاطاً" icon={Trophy}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs font-display">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-right text-white/40 font-normal pb-2">اللعبة</th>
+                  <th className="text-center text-white/40 font-normal pb-2">الجلسات</th>
+                  <th className="text-center text-white/40 font-normal pb-2">اللاعبون</th>
+                  <th className="text-center text-white/40 font-normal pb-2">أعلى نقطة</th>
+                  <th className="text-center text-white/40 font-normal pb-2">الرسوم</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gameStats.slice(0, 10).map((s) => (
+                  <tr key={s.gameId} className="border-b border-white/5">
+                    <td className="py-2 text-white font-bold">{s.gameId}</td>
+                    <td className="py-2 text-center text-white/70">{s.totalPlays.toLocaleString()}</td>
+                    <td className="py-2 text-center text-white/70">{s.uniquePlayers.toLocaleString()}</td>
+                    <td className="py-2 text-center text-yellow-400 font-bold">{s.topScore.toLocaleString()}</td>
+                    <td className="py-2 text-center text-green-400">{s.totalFeesCollected.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
 
       <Card className="mb-5 border-primary/25" title="عمولة المنصة العامة" icon={Percent}>
         <div className="flex items-center gap-3">
