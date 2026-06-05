@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Users, UserCheck, Ban, Flag, Search, Wallet, Calendar, Plus, Minus,
   ShieldOff, TrendingUp, TrendingDown,
@@ -24,12 +24,21 @@ function truncate(s: string, head = 6, tail = 4): string {
   return `${s.slice(0, head)}…${s.slice(-tail)}`;
 }
 
-export default function UsersSection() {
+type UserView = "all" | "top-depositor" | "top-winner";
+
+export default function UsersSection({ seed }: { seed?: { q: string; n: number } } = {}) {
   const { users } = useAdmin();
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState<"all" | UserTier>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "banned" | "flagged">("all");
+  const [view, setView] = useState<UserView>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Seed search from the dashboard global search (re-applies on each pick via nonce).
+  useEffect(() => {
+    if (seed && seed.n > 0) setQuery(seed.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed?.n]);
 
   const stats = useMemo(() => {
     const total = users.length;
@@ -41,9 +50,9 @@ export default function UsersSection() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return users.filter((u) => {
+    const rows = users.filter((u) => {
       if (q) {
-        const hay = `${u.name} ${u.username} ${u.tgId}`.toLowerCase();
+        const hay = `${u.name} ${u.username} ${u.tgId} ${u.wallet} ${u.refCode}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (tierFilter !== "all" && u.tier !== tierFilter) return false;
@@ -52,7 +61,10 @@ export default function UsersSection() {
       if (statusFilter === "flagged" && !u.flagged) return false;
       return true;
     });
-  }, [users, query, tierFilter, statusFilter]);
+    if (view === "top-depositor") return [...rows].sort((a, b) => b.totalDeposit - a.totalDeposit);
+    if (view === "top-winner") return [...rows].sort((a, b) => b.totalWins - a.totalWins);
+    return rows;
+  }, [users, query, tierFilter, statusFilter, view]);
 
   const selected = users.find((u) => u.id === selectedId) ?? null;
 
@@ -74,7 +86,7 @@ export default function UsersSection() {
 
       {/* Filters */}
       <Card className="mb-5">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="lg:col-span-2">
             <Label>بحث</Label>
             <div className="relative">
@@ -83,7 +95,7 @@ export default function UsersSection() {
                 data-testid="input-user-search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="الاسم أو المعرف أو رقم تيليجرام"
+                placeholder="الاسم، المعرف، تيليجرام، المحفظة، أو رمز الإحالة"
                 className="pr-9"
               />
             </div>
@@ -113,6 +125,18 @@ export default function UsersSection() {
               <option value="active">نشط</option>
               <option value="banned">محظور</option>
               <option value="flagged">مُعلَّم</option>
+            </Select>
+          </div>
+          <div>
+            <Label>الترتيب</Label>
+            <Select
+              data-testid="select-view-filter"
+              value={view}
+              onChange={(e) => setView(e.target.value as UserView)}
+            >
+              <option value="all">افتراضي</option>
+              <option value="top-depositor">الأكثر إيداعاً</option>
+              <option value="top-winner">الأكثر فوزاً</option>
             </Select>
           </div>
         </div>

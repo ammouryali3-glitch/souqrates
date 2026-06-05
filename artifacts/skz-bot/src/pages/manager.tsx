@@ -4,9 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard, Users, Gamepad2, Store, Share2, Wallet, ShieldAlert,
   Trophy, Megaphone, Settings2, Menu, X, ArrowRight, UserCog, AlertTriangle,
-  type LucideIcon,
+  Search, CornerDownLeft, type LucideIcon,
 } from "lucide-react";
-import { useAdmin, syncBalance } from "../lib/admin-store";
+import { useAdmin, admin, syncBalance } from "../lib/admin-store";
+import { ARENA_GAMES, SKILL_GAMES } from "../lib/games-data";
 
 import OverviewSection from "./manager/overview";
 import UsersSection from "./manager/users";
@@ -41,6 +42,7 @@ const GROUPS = ["الرئيسية", "الإدارة", "المالية", "الن�
 export default function Manager() {
   const [section, setSection] = useState<SectionId>("overview");
   const [open, setOpen] = useState(false);
+  const [userSeed, setUserSeed] = useState<{ q: string; n: number }>({ q: "", n: 0 });
   const { settings } = useAdmin();
 
   useEffect(() => {
@@ -53,6 +55,11 @@ export default function Manager() {
   function go(id: SectionId) {
     setSection(id);
     setOpen(false);
+  }
+
+  function searchToUser(q: string) {
+    setUserSeed((s) => ({ q, n: s.n + 1 }));
+    go("users");
   }
 
   return (
@@ -121,16 +128,27 @@ export default function Manager() {
           <button onClick={() => setOpen(true)} className="lg:hidden w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center">
             <Menu size={18} className="text-white/70" />
           </button>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
             <active.icon size={18} className="text-primary shrink-0" />
-            <span className="font-display font-bold text-white truncate">{active.label}</span>
+            <span className="font-display font-bold text-white truncate hidden md:block">{active.label}</span>
           </div>
-          {settings.maintenance && (
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-display font-bold">
-              <AlertTriangle size={13} /> وضع الصيانة
-            </div>
-          )}
-          <div className="flex items-center gap-2 pr-1">
+
+          <GlobalSearch onSection={go} onUser={searchToUser} />
+
+          <button
+            onClick={() => admin.setSettings({ maintenance: !settings.maintenance })}
+            data-testid="button-toggle-maintenance"
+            title="تبديل وضع الصيانة"
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-display font-bold border transition-colors shrink-0 ${
+              settings.maintenance
+                ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                : "bg-white/5 border-white/10 text-white/45 hover:text-white/70"
+            }`}
+          >
+            <AlertTriangle size={13} /> {settings.maintenance ? "الصيانة: مفعّلة" : "الصيانة: معطّلة"}
+          </button>
+
+          <div className="flex items-center gap-2 pr-1 shrink-0">
             <div className="text-right hidden sm:block">
               <div className="text-xs font-display font-bold text-white">المالك</div>
               <div className="text-[10px] text-white/35 font-display">@owner</div>
@@ -152,7 +170,7 @@ export default function Manager() {
               transition={{ duration: 0.2 }}
             >
               {section === "overview" && <OverviewSection onNavigate={go} />}
-              {section === "users" && <UsersSection />}
+              {section === "users" && <UsersSection seed={userSeed} />}
               {section === "games" && <GamesSection />}
               {section === "economy" && <EconomySection />}
               {section === "affiliate" && <AffiliateSection />}
@@ -166,6 +184,113 @@ export default function Manager() {
           <div className="h-10" />
         </main>
       </div>
+    </div>
+  );
+}
+
+function GlobalSearch({ onSection, onUser }: {
+  onSection: (id: SectionId) => void;
+  onUser: (q: string) => void;
+}) {
+  const { users } = useAdmin();
+  const [q, setQ] = useState("");
+  const [focused, setFocused] = useState(false);
+  const term = q.trim().toLowerCase();
+
+  const games = [...ARENA_GAMES, ...SKILL_GAMES];
+  const navHits = term ? NAV.filter((n) => n.label.toLowerCase().includes(term)).slice(0, 4) : [];
+  const userHits = term
+    ? users
+        .filter((u) => `${u.name} ${u.username} ${u.tgId} ${u.wallet} ${u.refCode}`.toLowerCase().includes(term))
+        .slice(0, 5)
+    : [];
+  const gameHits = term ? games.filter((g) => `${g.title} ${g.tagline}`.toLowerCase().includes(term)).slice(0, 4) : [];
+  const showDrop = focused && term.length >= 1;
+  const hasHits = navHits.length + userHits.length + gameHits.length > 0;
+
+  function reset() {
+    setQ("");
+    setFocused(false);
+  }
+
+  return (
+    <div className="relative flex-1 max-w-md mx-auto">
+      <Search size={15} className="absolute top-1/2 -translate-y-1/2 right-3 text-white/30 pointer-events-none" />
+      <input
+        data-testid="input-global-search"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && term) onUser(q.trim());
+          if (e.key === "Escape") reset();
+        }}
+        placeholder="بحث شامل — مستخدمون، ألعاب، أقسام…"
+        className="w-full h-10 rounded-xl bg-black/30 border border-white/12 pr-9 pl-3 text-sm font-display text-white placeholder:text-white/30 focus:outline-none focus:border-primary/40"
+      />
+      {showDrop && (
+        <div className="absolute z-50 top-12 right-0 left-0 rounded-2xl bg-[#0f0c1d] border border-white/12 shadow-2xl shadow-black/60 overflow-hidden max-h-[70vh] overflow-y-auto">
+          {!hasHits ? (
+            <div className="px-4 py-6 text-center text-xs font-display text-white/40">لا نتائج مطابقة</div>
+          ) : (
+            <div className="py-1.5">
+              {navHits.length > 0 && (
+                <div>
+                  <div className="px-4 pt-2 pb-1 text-[10px] font-display font-bold text-white/30">الأقسام</div>
+                  {navHits.map((n) => (
+                    <button
+                      key={n.id}
+                      data-testid={`search-section-${n.id}`}
+                      onMouseDown={(e) => { e.preventDefault(); onSection(n.id); reset(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm font-display text-white/75 hover:bg-white/6 text-right"
+                    >
+                      <n.icon size={15} className="text-primary shrink-0" /> {n.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {userHits.length > 0 && (
+                <div>
+                  <div className="px-4 pt-2 pb-1 text-[10px] font-display font-bold text-white/30">المستخدمون</div>
+                  {userHits.map((u) => (
+                    <button
+                      key={u.id}
+                      data-testid={`search-user-${u.id}`}
+                      onMouseDown={(e) => { e.preventDefault(); onUser(u.username); reset(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-white/6 text-right"
+                    >
+                      <Users size={15} className="text-accent shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-display font-bold text-white truncate">{u.name}</div>
+                        <div className="text-[10px] text-white/40 font-display truncate">{u.username} · {u.refCode}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {gameHits.length > 0 && (
+                <div>
+                  <div className="px-4 pt-2 pb-1 text-[10px] font-display font-bold text-white/30">الألعاب</div>
+                  {gameHits.map((g) => (
+                    <button
+                      key={g.id}
+                      data-testid={`search-game-${g.id}`}
+                      onMouseDown={(e) => { e.preventDefault(); onSection("games"); reset(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm font-display text-white/75 hover:bg-white/6 text-right"
+                    >
+                      <Gamepad2 size={15} className="text-cyan-300 shrink-0" /> {g.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="px-4 py-2 mt-1 border-t border-white/8 flex items-center gap-1.5 text-[10px] font-display text-white/30">
+                <CornerDownLeft size={11} /> اضغط Enter للبحث في المستخدمين
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

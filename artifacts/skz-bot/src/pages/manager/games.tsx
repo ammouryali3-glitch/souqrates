@@ -7,7 +7,8 @@ import {
 import { useAdmin, admin, type TicketPatch } from "../../lib/admin-store";
 import { ARENA_GAMES, SKILL_GAMES, ACCENTS, type GameDef } from "../../lib/games-data";
 import { getDefaultTickets, type BaseTicket } from "../../lib/tickets-data";
-import { Card, SectionHeader, StatCard, Label, Field, Area, Toggle } from "./_ui";
+import { CURRENCIES, type Currency } from "../../lib/admin-types";
+import { Card, SectionHeader, StatCard, Label, Field, Area, Select, Toggle } from "./_ui";
 
 function posNum(v: string, fallback = 1) {
   const n = parseFloat(v);
@@ -124,6 +125,9 @@ function GameRow({ game, defaultRake }: { game: GameDef; defaultRake: number }) 
   const [feat, setFeat] = useState(!!o?.featured);
   const [prizeF, setPrizeF] = useState(String(o?.prizeFactor ?? 1));
   const [rake, setRake] = useState(String(o?.rake ?? defaultRake));
+  const [entryCurrency, setEntryCurrency] = useState<Currency>(o?.entryCurrency ?? "SKZ");
+  const [mode, setMode] = useState<"pvp" | "pve">(o?.mode ?? (game.type === "arena" ? "pvp" : "pve"));
+  const [matchmaking, setMatchmaking] = useState(o?.matchmaking ?? "");
   const a = ACCENTS[game.accent];
 
   const defs = game.type === "skill" ? getDefaultTickets(game.id) : [];
@@ -142,6 +146,9 @@ function GameRow({ game, defaultRake }: { game: GameDef; defaultRake: number }) 
       tagline: tagline.trim() || game.tagline,
       desc: desc.trim() || game.desc,
       rake: posNum(rake, defaultRake),
+      entryCurrency,
+      mode,
+      matchmaking: matchmaking.trim(),
       ...(game.type === "arena"
         ? {
             prize: prize.trim() || game.prize,
@@ -158,6 +165,7 @@ function GameRow({ game, defaultRake }: { game: GameDef; defaultRake: number }) 
     setTitle(game.title); setTagline(game.tagline); setDesc(game.desc);
     setPrize(game.prize ?? ""); setEntry(String(game.entry ?? ""));
     setFeat(false); setPrizeF("1"); setRake(String(defaultRake));
+    setEntryCurrency("SKZ"); setMode(game.type === "arena" ? "pvp" : "pve"); setMatchmaking("");
     setOpen(false);
   }
 
@@ -195,6 +203,27 @@ function GameRow({ game, defaultRake }: { game: GameDef; defaultRake: number }) 
                 {game.type === "arena" && (
                   <FactorInput label="مضاعف الجائزة ×" icon={Trophy} value={prizeF} onChange={setPrizeF} testId={`input-prizef-${game.id}`} />
                 )}
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                <div>
+                  <Label><span className="inline-flex items-center gap-1"><Coins size={11} /> عملة الدخول</span></Label>
+                  <Select value={entryCurrency} data-testid={`select-currency-${game.id}`} onChange={(e) => setEntryCurrency(e.target.value as Currency)}>
+                    {CURRENCIES.map((c) => <option key={c} value={c} className="bg-[#13101f]">{c}</option>)}
+                  </Select>
+                </div>
+                <div>
+                  <Label><span className="inline-flex items-center gap-1"><Target size={11} /> نمط اللعب</span></Label>
+                  <Select value={mode} data-testid={`select-mode-${game.id}`} onChange={(e) => setMode(e.target.value as "pvp" | "pve")}>
+                    <option value="pvp" className="bg-[#13101f]">تنافسي (لاعب ضد لاعب)</option>
+                    <option value="pve" className="bg-[#13101f]">فردي (ضد التحدي)</option>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label><span className="inline-flex items-center gap-1"><Zap size={11} /> ملاحظات المطابقة (Matchmaking)</span></Label>
+                <Area rows={2} value={matchmaking} data-testid={`input-matchmaking-${game.id}`} onChange={(e) => setMatchmaking(e.target.value)} placeholder="مثال: تجميع كل ٢٠ لاعب، تقسيم حسب المستوى، انتظار أقصى ٣٠ ثانية" />
               </div>
 
               {game.type === "arena" ? (

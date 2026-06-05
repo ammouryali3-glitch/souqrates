@@ -27,6 +27,9 @@ export interface GameOverride {
   desc?: string;
   prize?: string; // arena display label
   entry?: number; // arena absolute entry fee
+  entryCurrency?: Currency; // currency charged for entry (default SKZ)
+  mode?: "pvp" | "pve"; // competitive (player-vs-player pool) or solo (player-vs-environment)
+  matchmaking?: string; // free-text matchmaking notes (pool size, bracketing, etc.)
   featured?: boolean; // pin to top of its section
   /** Economy multipliers applied to a game's ticket tiers (and arena fee). */
   priceFactor?: number; // default 1 — scales ticket prices / entry
