@@ -142,11 +142,7 @@ function Router() {
   }
 
   if (isManager) {
-    return (
-      <MobileContainer hideHeader>
-        <Manager />
-      </MobileContainer>
-    );
+    return <Manager />;
   }
 
   if (settings.maintenance) {

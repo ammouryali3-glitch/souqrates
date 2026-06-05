@@ -1,3 +1,5 @@
+import { getPoolShare } from "./admin-store";
+
 export interface LeaderEntry {
   rank: number;
   name: string;
@@ -64,7 +66,7 @@ export function getEntries(gameId: string): number {
 export function addEntry(gameId: string, fee: number): void {
   const pool = getPool(gameId);
   const entries = getEntries(gameId);
-  localStorage.setItem(`skz_pool_${gameId}`, String(pool + Math.floor(fee * 0.85)));
+  localStorage.setItem(`skz_pool_${gameId}`, String(pool + Math.floor(fee * getPoolShare(gameId))));
   localStorage.setItem(`skz_entries_${gameId}`, String(entries + 1));
 }
 

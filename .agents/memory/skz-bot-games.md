@@ -30,6 +30,10 @@ Skill games (e.g. Stack & Match) live as full-screen pages under `/games/<name>`
 **Why:** code review flagged a "tap = brief invulnerability" landing grace as exploitable — rapid taps kept refreshing it for near-permanent invuln, breaking the win/economy. But removing grace entirely made blindly switching lanes/rings an instant death (game felt unfair / instant-loss on first tap).
 **How to apply:** keep a short landing grace BUT pair it with a per-tap action cooldown that is strictly LONGER than the grace (e.g. grace 0.18s, cooldown 0.32s), and gate the action on the cooldown. That bounds max invulnerability well under 100% so spamming can't be exploited, while still letting a deliberate player slip through the obstacle they just moved onto. Also keep early-difficulty forgiving (few/slow obstacles) and make any mid-game obstacle spawns avoid the player's CURRENT position, not just the spawn-time start position.
 
+## Admin controls must reach the mini-app runtime (rake example)
+**Why:** code review failed the manager dashboard because the "platform rake / house cut" controls (global `settings.platformRake` + per-game `gameOverrides[gameId].rake`) only persisted to the store — the arena pool math hardcoded `fee * 0.85`, so the controls were no-ops in the actual game.
+**How to apply:** when a manager control is meant to "affect the mini-app", trace the value all the way into the runtime path that consumes it, not just the store write. Non-React runtime code (e.g. `arena.ts addEntry`, a plain function) can't call `useAdmin()`; expose a non-reactive getter from `admin-store.ts` that reads the module-level `state` (e.g. `getPoolShare(gameId)`) and call that. Keep manager labels aligned with the real math.
+
 ## Canvas drawing gotcha
 **Why:** `roundRect`/arcTo throws `IndexSizeError: radius is negative` when a block's width shrinks below ~0. Stacking games shrink the platform, so this WILL happen at runtime even when typecheck passes.
 **How to apply:** in any rounded-rect helper, early-return on `w<=0 || h<=0` and clamp radius with `Math.max(0, Math.min(r, w/2, h/2))`.
