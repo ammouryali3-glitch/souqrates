@@ -21,6 +21,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, sql, count } from "@workspace/db";
 import { requireAdminSession, requirePermission } from "./admin-auth";
+import { recordLedger } from "../lib/ledger";
 
 const router = Router();
 router.use(requireAdminSession);
@@ -326,22 +327,48 @@ router.patch("/withdrawals/:id", requirePermission("finance"), async (req: Reque
         const skzAmount = Number(wdData.amount ?? 0);
 
         if (userId && skzAmount > 0) {
-          const nowMs = Date.now();
-          await tx.execute(sql`
-            UPDATE platform_users
-            SET
-              data = jsonb_set(
-                jsonb_set(data,
-                  '{balances,SKZ}',
-                  to_jsonb(COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${skzAmount}::numeric)
-                ),
-                '{lastSeen}',
-                to_jsonb(${nowMs}::bigint)
-              ),
-              updated_at = NOW()
-            WHERE id = ${userId}
-          `);
-          req.log.info({ id, userId, skzAmount }, "withdrawal rejected — SKZ refunded to user");
+          const [userRow] = await tx
+            .select()
+            .from(platformUsersTable)
+            .where(eq(platformUsersTable.id, userId))
+            .for("update")
+            .limit(1);
+
+          if (userRow) {
+            const uData = userRow.data as Record<string, unknown>;
+            const balanceBefore = Math.floor(Number(
+              (uData.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+            ));
+            const balanceAfter = balanceBefore + skzAmount;
+
+            await tx
+              .update(platformUsersTable)
+              .set({
+                data: {
+                  ...uData,
+                  balances: {
+                    ...(uData.balances as Record<string, unknown> | undefined),
+                    SKZ: balanceAfter,
+                  },
+                  lastSeen: Date.now(),
+                },
+                updatedAt: new Date(),
+              })
+              .where(eq(platformUsersTable.id, userId));
+
+            await recordLedger(tx, {
+              userId,
+              type: "credit",
+              reason: "refund",
+              amount: skzAmount,
+              balanceBefore,
+              balanceAfter,
+              ref: id,
+              meta: { withdrawalId: id },
+            });
+
+            req.log.info({ id, userId, skzAmount }, "withdrawal rejected — SKZ refunded to user");
+          }
         }
       }
     });

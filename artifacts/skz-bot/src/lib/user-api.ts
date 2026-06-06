@@ -89,6 +89,45 @@ export async function buyShopProduct(
   }
 }
 
+// ── Daily check-in ────────────────────────────────────────────────────────────
+
+export interface CheckinStatus {
+  checkedInToday: boolean;
+  streak: number;
+  nextReward: number;
+}
+
+export interface CheckinResult {
+  ok: boolean;
+  reward?: number;
+  streak?: number;
+  newSkz?: number;
+  error?: string;
+  alreadyCheckedIn?: boolean;
+}
+
+export async function fetchCheckinStatus(): Promise<CheckinStatus | null> {
+  try {
+    const res = await apiFetch("/api/user/checkin/status");
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function claimCheckin(): Promise<CheckinResult> {
+  try {
+    const res = await apiFetch("/api/user/checkin", { method: "POST" });
+    const json = await res.json();
+    if (res.status === 409) return { ok: false, alreadyCheckedIn: true };
+    if (!res.ok) return { ok: false, error: json.error ?? "Check-in failed" };
+    return { ok: true, reward: json.reward, streak: json.streak, newSkz: json.newSkz };
+  } catch {
+    return { ok: false, error: "Connection error" };
+  }
+}
+
 // ── Withdraw ─────────────────────────────────────────────────────────────────
 
 export async function submitWithdrawal(

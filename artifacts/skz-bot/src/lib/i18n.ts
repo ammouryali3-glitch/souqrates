@@ -48,6 +48,10 @@ export const t = {
     noActivity: "لا يوجد نشاط بعد",
     dailyBonus: "مكافأة يومية متاحة",
     dailyBonusSub: (amt: number, bal: number) => `اضغط للحصول على ${amt} SKZ · رصيدك ${bal}`,
+    checkin: "تسجيل الحضور اليومي",
+    checkinClaim: (amt: number) => `اضغط للحصول على ${amt} SKZ`,
+    checkinDone: (streak: number) => `تحققت اليوم · سلسلة ${streak} يوم 🔥`,
+    checkinStreak: (s: number) => `سلسلة ${s} يوم`,
     // Wallet core
     availableSkz: "رصيد SKZ المتاح",
     deposit: "إيداع",
@@ -177,6 +181,10 @@ export const t = {
     noActivity: "No activity yet",
     dailyBonus: "Daily bonus available",
     dailyBonusSub: (amt: number, bal: number) => `Tap to claim ${amt} SKZ · Balance: ${bal}`,
+    checkin: "Daily Check-In",
+    checkinClaim: (amt: number) => `Tap to claim ${amt} SKZ`,
+    checkinDone: (streak: number) => `Checked in · Day ${streak} streak 🔥`,
+    checkinStreak: (s: number) => `${s}-day streak`,
     // Wallet core
     availableSkz: "Available SKZ",
     deposit: "Deposit",

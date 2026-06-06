@@ -23,6 +23,7 @@ import { db } from "@workspace/db";
 import { platformUsersTable, depositsTable, adminConfigTable } from "@workspace/db";
 import { eq, sql } from "@workspace/db";
 import { logger } from "./logger";
+import { recordLedger } from "./ledger";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,9 @@ async function creditDeposit(
   // Credit SKZ and update totalDeposit atomically
   const nowMs = Date.now();
 
+  const skzBefore = Math.floor(Number((userData.balances as Record<string, unknown> | undefined)?.SKZ ?? 0));
+  const skzAfter = skzBefore + skzCredit;
+
   await db.transaction(async (tx) => {
     // Credit SKZ balance and update totalDeposit (totalDeposit tracked in TON)
     await tx.execute(sql`
@@ -171,6 +175,17 @@ async function creditDeposit(
       .insert(depositsTable)
       .values({ id: txHash, status: "confirmed", data: depositData })
       .onConflictDoNothing();
+
+    await recordLedger(tx, {
+      userId: tgId,
+      type: "credit",
+      reason: "deposit",
+      amount: skzCredit,
+      balanceBefore: skzBefore,
+      balanceAfter: skzAfter,
+      ref: txHash,
+      meta: { tonAmount: amount, txHash },
+    });
   });
 
   logger.info(

@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount } from "./lib/seed";
+import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount, ensureIndexes } from "./lib/seed";
 import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 import { registerWebhook } from "./routes/bot";
@@ -41,6 +41,11 @@ app.listen(port, (err) => {
   // Ensure a working owner account exists (idempotent; bootstraps fresh DBs)
   ensureOwnerAccount().catch((err) => {
     logger.error({ err }, "Failed to ensure owner account");
+  });
+
+  // Ensure functional (expression) indexes that Drizzle schema DSL can't express
+  ensureIndexes().catch((err) => {
+    logger.error({ err }, "Failed to ensure indexes");
   });
 
   // Start the blockchain deposit poller (non-blocking; log errors but keep server alive)

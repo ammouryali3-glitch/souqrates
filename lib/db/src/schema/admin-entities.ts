@@ -1,4 +1,5 @@
 import { pgTable, text, jsonb, timestamp, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * Platform (mini-app) users managed in the admin dashboard.
@@ -75,6 +76,43 @@ export const referrersTable = pgTable("referrers", {
   data: jsonb("data").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Financial ledger — one immutable row for every SKZ credit or debit.
+ * Provides a full audit trail so any balance can be reconstructed from history.
+ */
+export const balanceTransactionsTable = pgTable("balance_transactions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  type: text("type", { enum: ["credit", "debit"] }).notNull(),
+  reason: text("reason").notNull(), // game_win | game_fee | deposit | withdrawal | prize | referral | checkin | purchase | refund | starting_balance | admin
+  currency: text("currency").notNull().default("SKZ"),
+  amount: integer("amount").notNull(),          // always positive; direction is in `type`
+  balanceBefore: integer("balance_before").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  ref: text("ref"),                             // external ID (depositId, gameId, …)
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("bal_tx_user_created_idx").on(t.userId, t.createdAt),
+  index("bal_tx_reason_idx").on(t.reason),
+]);
+
+/**
+ * Daily check-in records — one row per user per UTC day.
+ * Unique index on (user_id, date) prevents double check-ins.
+ */
+export const dailyCheckinsTable = pgTable("daily_checkins", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  date: text("date").notNull(),                 // "YYYY-MM-DD" UTC
+  streak: integer("streak").notNull().default(1),
+  reward: integer("reward").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("daily_checkins_user_date_idx").on(t.userId, t.date),
+  index("daily_checkins_user_idx").on(t.userId),
+]);
 
 /**
  * Individual game result records — one row per play per user.

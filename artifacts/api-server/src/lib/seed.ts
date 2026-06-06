@@ -5,7 +5,7 @@
  */
 import { db } from "@workspace/db";
 import { adminConfigTable, adminAccountsTable } from "@workspace/db";
-import { eq } from "@workspace/db";
+import { eq, sql } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import { logger } from "./logger";
 
@@ -179,6 +179,40 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
     logger.info("Database config seeded successfully");
   } catch (err) {
     logger.error({ err }, "Database seed failed");
+  }
+}
+
+/**
+ * Ensures performance indexes that cannot be expressed in the Drizzle schema DSL.
+ * Functional (expression) indexes on JSONB columns must be created via raw SQL.
+ * Safe to call on every startup — CREATE INDEX IF NOT EXISTS is a no-op when
+ * the index already exists.
+ */
+export async function ensureIndexes(): Promise<void> {
+  try {
+    // Functional indexes on deposits/withdrawals userId for O(log n) user history lookups.
+    // Without these, every wallet history query does a full table scan.
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS deposits_user_id_idx
+        ON deposits ((data->>'userId'))
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS deposits_status_idx
+        ON deposits (status)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS withdrawals_user_id_idx
+        ON withdrawals ((data->>'userId'))
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS withdrawals_status_idx
+        ON withdrawals (status)
+    `);
+    logger.info("ensureIndexes: all indexes verified");
+  } catch (err) {
+    // Non-fatal — log and continue. Indexes are a performance optimization,
+    // not a correctness requirement.
+    logger.warn({ err }, "ensureIndexes: failed to create one or more indexes");
   }
 }
 

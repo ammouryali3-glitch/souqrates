@@ -8,8 +8,9 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable } from "@workspace/db";
-import { eq, sql } from "@workspace/db";
+import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable } from "@workspace/db";
+import { eq, sql, and } from "@workspace/db";
+import { recordLedger } from "../lib/ledger";
 
 const router = Router();
 
@@ -119,6 +120,46 @@ async function getStartingBalance(): Promise<number> {
   return 1000;
 }
 
+/** Read Level-1 referral commission from admin_config. Defaults to 10 SKZ. */
+async function getReferralConfig(): Promise<{ l1Bonus: number }> {
+  try {
+    const [row] = await db
+      .select()
+      .from(adminConfigTable)
+      .where(eq(adminConfigTable.key, "referral_config"))
+      .limit(1);
+    if (row?.value) {
+      const c = row.value as Record<string, unknown>;
+      const levels = Array.isArray(c.levels) ? c.levels : [];
+      const l1 = (levels as Array<Record<string, unknown>>).find((l) => l["level"] === 1);
+      const commission = typeof l1?.["commission"] === "number" ? l1["commission"] : 10;
+      return { l1Bonus: commission };
+    }
+  } catch { /* ignore */ }
+  return { l1Bonus: 10 };
+}
+
+/** Default daily check-in reward schedule (7-day cycle, loops). */
+const DEFAULT_CHECKIN_REWARDS = [50, 75, 100, 150, 200, 300, 500];
+
+/** Read daily check-in reward schedule from admin_config. */
+async function getCheckinRewards(): Promise<number[]> {
+  try {
+    const [row] = await db
+      .select()
+      .from(adminConfigTable)
+      .where(eq(adminConfigTable.key, "daily_checkin"))
+      .limit(1);
+    if (row?.value) {
+      const v = row.value as Record<string, unknown>;
+      if (Array.isArray(v["rewards"]) && (v["rewards"] as unknown[]).length > 0) {
+        return v["rewards"] as number[];
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_CHECKIN_REWARDS;
+}
+
 // ── POST /api/user/init ────────────────────────────────────────────────────────
 
 router.post("/init", async (req: Request, res: Response) => {
@@ -140,6 +181,11 @@ router.post("/init", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Missing user id in initData" });
     return;
   }
+
+  // Parse Telegram start_param (referral code) — present when user opened via referral link
+  const startParam = (() => {
+    try { return new URLSearchParams(initData).get("start_param") ?? ""; } catch { return ""; }
+  })();
 
   try {
     const [existing] = await db
@@ -185,6 +231,99 @@ router.post("/init", async (req: Request, res: Response) => {
         .values({ id: tgId, data: userData, updatedAt: new Date() });
 
       req.log.info({ tgId, name }, "new platform user created");
+
+      // Record starting balance as first ledger entry (non-fatal)
+      if (startingBalance > 0) {
+        db.insert(balanceTransactionsTable).values({
+          id: randomBytes(8).toString("hex"),
+          userId: tgId,
+          type: "credit",
+          reason: "starting_balance",
+          currency: "SKZ",
+          amount: startingBalance,
+          balanceBefore: 0,
+          balanceAfter: startingBalance,
+          createdAt: new Date(),
+        }).catch((e: unknown) => req.log.warn({ e }, "starting balance ledger insert failed"));
+      }
+
+      // Award referral bonus to referrer (non-fatal — bonus is a perk, not a requirement)
+      if (startParam) {
+        db.transaction(async (refTx) => {
+          const result = await refTx.execute(sql`
+            SELECT id, data FROM platform_users
+            WHERE data->>'refCode' = ${startParam}
+              AND id != ${tgId}
+            LIMIT 1
+          `);
+          const referrerRows = result.rows as Array<{ id: string; data: Record<string, unknown> }>;
+          if (referrerRows.length === 0) return;
+
+          const referrerId = String(referrerRows[0]!.id);
+          const referrerData = referrerRows[0]!.data as Record<string, unknown>;
+          const { l1Bonus } = await getReferralConfig();
+          const refSkzBefore = Math.floor(Number(
+            (referrerData.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+          ));
+          const refSkzAfter = refSkzBefore + l1Bonus;
+
+          await refTx
+            .update(platformUsersTable)
+            .set({
+              data: {
+                ...referrerData,
+                balances: {
+                  ...(referrerData.balances as Record<string, unknown> | undefined),
+                  SKZ: refSkzAfter,
+                },
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(platformUsersTable.id, referrerId));
+
+          await recordLedger(refTx, {
+            userId: referrerId,
+            type: "credit",
+            reason: "referral",
+            amount: l1Bonus,
+            balanceBefore: refSkzBefore,
+            balanceAfter: refSkzAfter,
+            ref: tgId,
+            meta: { referredId: tgId, refCode: startParam },
+          });
+
+          // Upsert referrers table row for the referrer
+          const [existingRef] = await refTx
+            .select()
+            .from(referrersTable)
+            .where(eq(referrersTable.id, referrerId))
+            .limit(1);
+
+          if (existingRef) {
+            const rd = existingRef.data as Record<string, unknown>;
+            const invited: string[] = Array.isArray(rd["invited"]) ? rd["invited"] as string[] : [];
+            if (!invited.includes(tgId)) {
+              await refTx
+                .update(referrersTable)
+                .set({
+                  data: { ...rd, invited: [...invited, tgId], totalBonus: Number(rd["totalBonus"] ?? 0) + l1Bonus },
+                  updatedAt: new Date(),
+                })
+                .where(eq(referrersTable.id, referrerId));
+            }
+          } else {
+            await refTx.insert(referrersTable).values({
+              id: referrerId,
+              data: { referrerId, refCode: startParam, invited: [tgId], totalBonus: l1Bonus },
+              updatedAt: new Date(),
+            });
+          }
+        }).then(() => {
+          req.log.info({ tgId, referrerRefCode: startParam }, "referral bonus awarded");
+        }).catch((refErr: unknown) => {
+          req.log.warn({ refErr, tgId, startParam }, "referral reward failed — non-fatal");
+        });
+      }
     }
 
     const updatedData = { ...userData, lastSeen: Date.now() };
@@ -249,30 +388,57 @@ router.post("/balance-event", async (req: Request, res: Response) => {
     return;
   }
 
-  const delta = -Math.floor(amount);
+  const safeDebit = Math.floor(amount);
 
   try {
-    const nowMs = Date.now();
-    const result = await db.execute(sql`
-      UPDATE platform_users
-      SET
-        data = jsonb_set(
-          jsonb_set(data, '{balances,SKZ}',
-            to_jsonb(GREATEST(0,
-              COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${delta}::numeric
-            ))
-          ),
-          '{lastSeen}',
-          to_jsonb(${nowMs}::bigint)
-        ),
-        updated_at = NOW()
-      WHERE id = ${payload.tgId}
-      RETURNING (data #>> '{balances,SKZ}')::int AS skz
-    `);
+    let newSkzBalance = 0;
+    let notFound = false;
 
-    const rows = result.rows as Array<{ skz: number }>;
-    if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
-    res.json({ skz: rows[0].skz });
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+
+      if (!row) { notFound = true; return; }
+
+      const data = row.data as Record<string, unknown>;
+      const balanceBefore = Math.floor(Number(
+        (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      ));
+      const effectiveDebit = Math.min(safeDebit, balanceBefore);
+      const balanceAfter = balanceBefore - effectiveDebit;
+
+      await tx
+        .update(platformUsersTable)
+        .set({
+          data: {
+            ...data,
+            balances: { ...(data.balances as Record<string, unknown>), SKZ: balanceAfter },
+            lastSeen: Date.now(),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      if (effectiveDebit > 0) {
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "debit",
+          reason: "game_fee",
+          amount: effectiveDebit,
+          balanceBefore,
+          balanceAfter,
+        });
+      }
+
+      newSkzBalance = balanceAfter;
+    });
+
+    if (notFound) { res.status(404).json({ error: "User not found" }); return; }
+    res.json({ skz: newSkzBalance });
   } catch (err) {
     req.log.error({ err }, "user balance-event error");
     res.status(500).json({ error: "Internal server error" });
@@ -507,6 +673,19 @@ router.post("/game-result", async (req: Request, res: Response) => {
         .where(eq(platformUsersTable.id, payload.tgId));
 
       newSkz = newSkzValue;
+
+      if (effectiveAmount > 0) {
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "credit",
+          reason: "game_win",
+          amount: effectiveAmount,
+          balanceBefore: currentSkz,
+          balanceAfter: newSkzValue,
+          ref: session.gameId,
+        });
+      }
+
       req.log.info(
         { tgId: payload.tgId, gameId: session.gameId, claimed: claimAmount, credited: effectiveAmount, dailyTotal: dailyTotal + effectiveAmount },
         "game credit applied",
@@ -696,6 +875,16 @@ router.post("/submit-score", async (req: Request, res: Response) => {
           .update(platformUsersTable)
           .set({ data: updatedData, updatedAt: new Date() })
           .where(eq(platformUsersTable.id, payload.tgId));
+
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "debit",
+          reason: "game_fee",
+          amount: safeFee,
+          balanceBefore: currentSkz,
+          balanceAfter: newSkz,
+          ref: gameId,
+        });
       }
 
       const id = randomBytes(12).toString("hex");
@@ -866,6 +1055,15 @@ router.post("/withdraw", async (req: Request, res: Response) => {
         .set({ data: updatedData, updatedAt: new Date() })
         .where(eq(platformUsersTable.id, payload.tgId));
 
+      await recordLedger(tx, {
+        userId: payload.tgId,
+        type: "debit",
+        reason: "withdrawal",
+        amount: safeAmount,
+        balanceBefore: currentSkz,
+        balanceAfter: newSkzValue,
+      });
+
       // Create withdrawal record
       withdrawalId = randomBytes(12).toString("hex");
       const withdrawalData = {
@@ -983,6 +1181,16 @@ router.post("/shop/buy", async (req: Request, res: Response) => {
         .update(platformUsersTable)
         .set({ data: updatedData, updatedAt: new Date() })
         .where(eq(platformUsersTable.id, payload.tgId));
+
+      await recordLedger(tx, {
+        userId: payload.tgId,
+        type: "debit",
+        reason: "purchase",
+        amount: serverPrice,
+        balanceBefore: currentSkz,
+        balanceAfter: newSkz,
+        ref: String(productId),
+      });
     });
 
     req.log.info({ tgId: payload.tgId, productId, price: serverPrice }, "shop purchase");
@@ -997,6 +1205,159 @@ router.post("/shop/buy", async (req: Request, res: Response) => {
     if (e.status === 402) { res.status(402).json({ error: "Insufficient balance" }); return; }
     if (e.status === 409) { res.status(409).json({ error: "Already purchased" }); return; }
     req.log.error({ err }, "shop buy error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/checkin ────────────────────────────────────────────────────
+
+/**
+ * Daily check-in endpoint. Awards SKZ based on streak (consecutive days).
+ * Idempotent per UTC day — a second call on the same day returns 409.
+ * Streak is computed from the previous calendar day's check-in row.
+ *
+ * Reward schedule is read from admin_config key "daily_checkin".{ rewards: number[] }.
+ * Defaults to [50, 75, 100, 150, 200, 300, 500] (7-day cycle, loops).
+ *
+ * Returns: { ok: true, reward: number, streak: number, newSkz: number }
+ */
+router.post("/checkin", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD" UTC
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+  try {
+    let reward = 0;
+    let streak = 1;
+    let newSkz = 0;
+    let alreadyCheckedIn = false;
+
+    await db.transaction(async (tx) => {
+      // Check if already checked in today (unique index prevents duplicates but 409 is friendlier)
+      const [todayRow] = await tx
+        .select()
+        .from(dailyCheckinsTable)
+        .where(and(eq(dailyCheckinsTable.userId, payload.tgId), eq(dailyCheckinsTable.date, today)))
+        .limit(1);
+
+      if (todayRow) { alreadyCheckedIn = true; return; }
+
+      // Get yesterday's streak for streak continuation
+      const [yesterdayRow] = await tx
+        .select()
+        .from(dailyCheckinsTable)
+        .where(and(eq(dailyCheckinsTable.userId, payload.tgId), eq(dailyCheckinsTable.date, yesterdayStr)))
+        .limit(1);
+
+      streak = yesterdayRow ? yesterdayRow.streak + 1 : 1;
+
+      // Compute reward from admin config schedule (loops on completion)
+      const rewards = await getCheckinRewards();
+      reward = rewards[(streak - 1) % rewards.length] ?? rewards[0] ?? 50;
+
+      // Lock user row and credit balance
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+
+      if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
+
+      const data = row.data as Record<string, unknown>;
+      const balanceBefore = Math.floor(Number(
+        (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      ));
+      const balanceAfter = balanceBefore + reward;
+
+      await tx
+        .update(platformUsersTable)
+        .set({
+          data: {
+            ...data,
+            balances: { ...(data.balances as Record<string, unknown>), SKZ: balanceAfter },
+            lastSeen: Date.now(),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      await tx.insert(dailyCheckinsTable).values({
+        id: randomBytes(8).toString("hex"),
+        userId: payload.tgId,
+        date: today,
+        streak,
+        reward,
+        createdAt: new Date(),
+      });
+
+      await recordLedger(tx, {
+        userId: payload.tgId,
+        type: "credit",
+        reason: "checkin",
+        amount: reward,
+        balanceBefore,
+        balanceAfter,
+        ref: today,
+        meta: { streak },
+      });
+
+      newSkz = balanceAfter;
+    });
+
+    if (alreadyCheckedIn) {
+      res.status(409).json({ error: "Already checked in today", today });
+      return;
+    }
+
+    req.log.info({ tgId: payload.tgId, streak, reward }, "daily check-in");
+    res.json({ ok: true, reward, streak, newSkz });
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    req.log.error({ err }, "checkin error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/checkin/status ──────────────────────────────────────────────
+
+/**
+ * Returns whether the user has checked in today and what their current streak is.
+ * Used by the frontend to show the correct CTA state.
+ *
+ * Returns: { checkedInToday: boolean, streak: number, nextReward: number }
+ */
+router.get("/checkin/status", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  try {
+    const [todayRow] = await db
+      .select()
+      .from(dailyCheckinsTable)
+      .where(and(eq(dailyCheckinsTable.userId, payload.tgId), eq(dailyCheckinsTable.date, today)))
+      .limit(1);
+
+    const streak = todayRow?.streak ?? 0;
+    const rewards = await getCheckinRewards();
+    const nextStreak = streak + 1;
+    const nextReward = rewards[(nextStreak - 1) % rewards.length] ?? rewards[0] ?? 50;
+
+    res.json({ checkedInToday: !!todayRow, streak, nextReward });
+  } catch (err) {
+    req.log.error({ err }, "checkin status error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

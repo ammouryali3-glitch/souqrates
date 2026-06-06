@@ -1,19 +1,44 @@
-import { motion } from "framer-motion";
-import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins, Gift, UserCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins, CheckCircle2, UserCircle2, CalendarCheck } from "lucide-react";
 import { Link } from "wouter";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Card } from "@/components/ui/card";
 import { useAdmin, useBalance, admin } from "@/lib/admin-store";
 import { useLang, t } from "@/lib/i18n";
 import { useTelegramUser } from "@/lib/telegram-user";
+import { fetchCheckinStatus, claimCheckin, type CheckinStatus } from "@/lib/user-api";
 
 export default function Home() {
   const { settings } = useAdmin();
   const skzBalance = useBalance();
   const lang = useLang();
   const s = t[lang];
-  const canClaim = settings.dailyBonus > 0 && admin.canClaimDailyBonus();
   const { tgUser, inTelegram, loading: balanceLoading } = useTelegramUser();
+
+  const [checkin, setCheckin] = useState<CheckinStatus | null>(null);
+  const [checkinLoading, setCheckinLoading] = useState(true);
+  const [claiming, setClaiming] = useState(false);
+  const [claimed, setClaimed] = useState<{ reward: number; streak: number } | null>(null);
+
+  useEffect(() => {
+    fetchCheckinStatus().then((status) => {
+      setCheckin(status);
+      setCheckinLoading(false);
+    });
+  }, []);
+
+  const handleCheckin = async () => {
+    if (claiming || checkin?.checkedInToday) return;
+    setClaiming(true);
+    const result = await claimCheckin();
+    if (result.ok && result.reward !== undefined && result.streak !== undefined) {
+      setClaimed({ reward: result.reward, streak: result.streak });
+      setCheckin({ checkedInToday: true, streak: result.streak, nextReward: checkin?.nextReward ?? 50 });
+      if (result.newSkz !== undefined) admin.setBalance(result.newSkz);
+    }
+    setClaiming(false);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,24 +97,69 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* Daily bonus */}
-      {canClaim && (
-        <motion.button
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={() => admin.claimDailyBonus()}
-          className="flex items-center gap-3 p-3 rounded-2xl border text-right"
-          style={{ borderColor: `${settings.accent}55`, background: `linear-gradient(135deg, ${settings.accent}22, transparent)` }}
-        >
-          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${settings.accent}30`, color: settings.accent }}>
-            <Gift size={20} />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-display font-bold text-white">{s.dailyBonus}</div>
-            <div className="text-[11px] text-muted-foreground">{s.dailyBonusSub(settings.dailyBonus, skzBalance)}</div>
-          </div>
-          <ArrowRight size={16} style={{ color: settings.accent }} />
-        </motion.button>
+      {/* Daily Check-In Card */}
+      {!checkinLoading && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <AnimatePresence mode="wait">
+            {claimed ? (
+              <motion.div
+                key="claimed"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="flex items-center gap-3 p-3 rounded-2xl border"
+                style={{ borderColor: `${settings.accent}55`, background: `linear-gradient(135deg, ${settings.accent}22, transparent)` }}
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${settings.accent}30`, color: settings.accent }}>
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-display font-bold text-white">+{claimed.reward.toLocaleString()} SKZ</div>
+                  <div className="text-[11px] text-muted-foreground">{s.checkinDone(claimed.streak)}</div>
+                </div>
+              </motion.div>
+            ) : checkin?.checkedInToday ? (
+              <motion.div
+                key="done"
+                className="flex items-center gap-3 p-3 rounded-2xl border border-white/10 bg-card/30"
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-white/10 text-muted-foreground">
+                  <CalendarCheck size={20} />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-white">{s.checkin}</div>
+                  <div className="text-[11px] text-muted-foreground">{s.checkinDone(checkin.streak)}</div>
+                </div>
+                {checkin.streak > 0 && (
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${settings.accent}22`, color: settings.accent }}>
+                    {s.checkinStreak(checkin.streak)}
+                  </span>
+                )}
+              </motion.div>
+            ) : (
+              <motion.button
+                key="claim"
+                onClick={handleCheckin}
+                disabled={claiming}
+                whileTap={{ scale: 0.97 }}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl border text-right disabled:opacity-60"
+                style={{ borderColor: `${settings.accent}55`, background: `linear-gradient(135deg, ${settings.accent}22, transparent)` }}
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${settings.accent}30`, color: settings.accent }}>
+                  {claiming ? (
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CalendarCheck size={20} />
+                  )}
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-display font-bold text-white">{s.checkin}</div>
+                  <div className="text-[11px] text-muted-foreground">{s.checkinClaim(checkin?.nextReward ?? 50)}</div>
+                </div>
+                <ArrowRight size={16} style={{ color: settings.accent }} />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
       )}
 
       {/* Balance */}
@@ -143,7 +213,7 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* Stats — zeros until real data flows in */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-card/40 backdrop-blur-md border-white/5 p-4 flex flex-col gap-1">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -161,7 +231,7 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Activity Feed — empty state until backend feeds real events */}
+      {/* Activity Feed */}
       <div className="flex flex-col gap-3 mt-2">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">

@@ -17,6 +17,7 @@
  */
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
+import { recordLedger } from "./ledger";
 import {
   platformUsersTable,
   gameResultsTable as _gameResultsTable,
@@ -207,6 +208,17 @@ export async function awardPeriodWinners(
             updatedAt: new Date(),
           })
           .where(eq(platformUsersTable.id, winner.user_id));
+
+        await recordLedger(tx, {
+          userId: winner.user_id,
+          type: "credit",
+          reason: "prize",
+          amount: prize,
+          balanceBefore: currentSkz,
+          balanceAfter: newSkz,
+          ref: `${game.id}:${period}`,
+          meta: { gameTitle: game.title, score: winner.score, periodEnd: periodEnd.toISOString() },
+        });
       });
 
       if (!credited) {
