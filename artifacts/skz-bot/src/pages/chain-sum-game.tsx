@@ -241,7 +241,6 @@ export default function ChainSumGame() {
     pendingTicketRef.current = null;
     startGame(t);
   }, [phase, startGame]);
-  const refillBalance = () => { setBalance(1000); localStorage.setItem(BALANCE_KEY, "1000"); };
 
   return (
     <div className="h-screen w-full bg-[#020f08] flex flex-col overflow-hidden">
@@ -260,7 +259,6 @@ export default function ChainSumGame() {
               <div className="mt-1 flex items-center gap-2 px-4 py-2 rounded-full bg-white/8 border border-white/10">
                 <Coins size={14} className="text-emerald-400" /><span className="font-display font-bold text-white text-sm">{balance.toLocaleString()} SKZ</span>
               </div>
-              {balance < 30 && <button onClick={refillBalance} className="text-xs text-emerald-400 underline mt-1">Refill Balance (+1000 SKZ)</button>}
             </div>
             <div className="flex flex-col gap-3 px-4">
               {TICKETS.map(t => {

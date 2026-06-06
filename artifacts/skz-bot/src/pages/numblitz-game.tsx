@@ -153,7 +153,6 @@ export default function NumBlitzGame() {
                 <div className="text-right"><div className="font-display font-bold text-cyan-300 text-lg flex items-center gap-1"><Coins size={13} className="text-cyan-400"/>{tk.prize}</div><div className="text-xs text-white/40">ENTRY {tk.price}</div></div>
               </button>
             ))}</div>
-            {balance<TICKETS[0].price&&<button onClick={()=>{setBalance(1000);localStorage.setItem(BALANCE_KEY,"1000");}} className="mt-4 text-xs text-cyan-400/60 underline">Refill balance (demo)</button>}
           </motion.div>
         </motion.div>)}
         {phase==="playing"&&(<motion.div key="play" initial={{opacity:0}} animate={{opacity:1}} className="relative flex-1 flex flex-col h-full">

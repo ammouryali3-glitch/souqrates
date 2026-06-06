@@ -146,7 +146,6 @@ export default function PulseTapGame() {
             <p className="text-xs text-white/50 mb-4 max-w-[260px]">Neon rings pulse and expand — tap each ring exactly when it reaches the target size for PERFECT 100pts! Timing is everything.</p>
             <div className="flex items-center gap-2 mb-6 bg-white/5 rounded-full px-4 py-2"><Coins size={14} className="text-green-400"/><span className="font-display font-bold text-white">{balance.toLocaleString()} SKZ</span></div>
             <TicketList/>
-            {balance<TICKETS[0].price&&<button onClick={()=>{setBalance(1000);localStorage.setItem(BALANCE_KEY,"1000");}} className="mt-4 text-xs text-green-400/60 underline">Refill balance (demo)</button>}
           </motion.div>
         </motion.div>)}
 

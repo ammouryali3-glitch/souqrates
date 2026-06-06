@@ -245,7 +245,6 @@ export default function Match3Game() {
                   </button>
                 ))}
               </div>
-              {balance < TICKETS[0].price && <button onClick={() => { setBalance(1000); localStorage.setItem(BALANCE_KEY, "1000"); }} className="mt-4 text-xs text-purple-400/60 underline">Refill balance (demo)</button>}
             </motion.div>
           </motion.div>
         )}

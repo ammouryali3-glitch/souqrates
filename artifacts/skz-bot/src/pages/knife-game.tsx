@@ -892,10 +892,6 @@ export default function KnifeGame() {
     };
   }, []);
 
-  const refillBalance = useCallback(() => {
-    setBalance(START_BALANCE);
-    localStorage.setItem(BALANCE_KEY, String(START_BALANCE));
-  }, []);
 
   const toggleMute = () => {
     audioRef.current.muted = !muted;
@@ -1084,23 +1080,6 @@ export default function KnifeGame() {
                 <span data-testid="text-best">Best {best}</span>
               </div>
 
-              {balance < 30 ? (
-                <button
-                  onClick={refillBalance}
-                  data-testid="button-refill"
-                  className="mt-5 w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-display font-bold text-sm tracking-widest shadow-[0_0_24px_rgba(212,175,55,0.55)] active:scale-95 transition-transform"
-                >
-                  🎁 GET 1,000 FREE CHIPS
-                </button>
-              ) : (
-                <button
-                  onClick={refillBalance}
-                  data-testid="button-refill"
-                  className="mt-3 text-[10px] text-white/25 hover:text-white/50 transition-colors underline underline-offset-2"
-                >
-                  Low on chips? Get 1,000 free
-                </button>
-              )}
             </motion.div>
           </motion.div>
         )}

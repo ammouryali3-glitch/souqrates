@@ -531,7 +531,6 @@ export default function JumperGame() {
   }, [balance, startLoop]);
 
   useEffect(() => { const audio = audioRef.current; return () => { cancelAnimationFrame(rafRef.current); audio.dispose(); }; }, []);
-  const refillBalance = useCallback(() => { setBalance(START_BALANCE); localStorage.setItem(BALANCE_KEY, String(START_BALANCE)); }, []);
   const toggleMute = () => { audioRef.current.muted = !muted; setMuted(!muted); };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -597,41 +596,6 @@ export default function JumperGame() {
               ); })}
             </div>
             <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-green-400" /><span data-testid="text-best" className="font-mono">Best {best}</span></div>
-            {balance < 30 ? (<button onClick={refillBalance} data-testid="button-refill" className="mt-5 w-full py-3 rounded-2xl bg-gradient-to-r from-green-500 to-blue-500 text-white font-mono font-bold text-sm tracking-widest shadow-[0_0_24px_rgba(46,204,113,0.5)] active:scale-95">🎁 GET 1,000 FREE CHIPS</button>) : (<button onClick={refillBalance} data-testid="button-refill" className="mt-3 text-[10px] text-white/25 hover:text-white/50 transition-colors underline underline-offset-2 font-mono">Low on chips? Get 1,000 free</button>)}
-          </motion.div>
-        </motion.div>
-      )}</AnimatePresence>
-
-      <AnimatePresence>{phase === "won" && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex items-center justify-center px-8" style={{ background: "rgba(10,0,32,0.93)" }}>
-          <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.4 }} className="w-full max-w-[300px] flex flex-col items-center text-center">
-            <div className="text-5xl mb-3">🏆</div>
-            <span data-testid="text-result" className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-green-300">Sky Champion!</span>
-            <div className="font-display font-black text-5xl text-green-300 mb-1">+{ticket?.prize.toLocaleString()}</div>
-            <span className="text-sm text-white/50 mb-6 font-mono">SKZ prize claimed</span>
-            <div className="w-full grid grid-cols-2 gap-3 mb-7">
-              <div className="bg-green-500/8 border border-green-500/30 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Height</div><span data-testid="text-final-score" className="font-mono font-bold text-xl text-green-300">{score}</span></div>
-              <div className="bg-green-500/8 border border-green-500/30 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Balance</div><span data-testid="text-balance-final" className="font-mono font-bold text-xl text-green-300">{balance.toLocaleString()}</span></div>
-            </div>
-            <button onClick={() => setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-blue-500 text-white font-mono font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95"><RotateCcw size={18} />PLAY AGAIN</button>
-            <Link href="/games"><button data-testid="button-exit" className="text-sm text-green-300/40 hover:text-green-300 font-mono">← Back to Arena</button></Link>
-          </motion.div>
-        </motion.div>
-      )}</AnimatePresence>
-
-      <AnimatePresence>{phase === "lost" && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex items-center justify-center px-8" style={{ background: "rgba(10,0,32,0.93)" }}>
-          <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.35 }} className="w-full max-w-[300px] flex flex-col items-center text-center">
-            <div className="text-5xl mb-3">💫</div>
-            <span data-testid="text-result" className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-red-400">Fell Down!</span>
-            <div data-testid="text-loss-amount" className="font-display font-black text-5xl text-red-400 mb-1">-{ticket?.price ?? 0}</div>
-            <span className="text-sm text-white/50 mb-6 font-mono">SKZ entry lost</span>
-            <div className="w-full grid grid-cols-2 gap-3 mb-7">
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Height</div><span data-testid="text-final-score" className="font-mono font-bold text-xl text-white">{score}/{target}</span></div>
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase mb-1">Balance</div><span data-testid="text-balance-final" className="font-mono font-bold text-xl text-white">{balance.toLocaleString()}</span></div>
-            </div>
-            <button onClick={() => setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-blue-500 text-white font-mono font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95"><RotateCcw size={18} />TRY AGAIN</button>
-            <Link href="/games"><button data-testid="button-exit" className="text-sm text-green-300/40 hover:text-green-300 font-mono">← Back to Arena</button></Link>
           </motion.div>
         </motion.div>
       )}</AnimatePresence>

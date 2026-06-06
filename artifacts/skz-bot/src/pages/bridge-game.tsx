@@ -546,7 +546,6 @@ export default function BridgeGame() {
   }, [balance, startLoop]);
 
   useEffect(() => { const audio = audioRef.current; return () => { cancelAnimationFrame(rafRef.current); audio.dispose(); }; }, []);
-  const refillBalance = useCallback(() => { setBalance(START_BALANCE); localStorage.setItem(BALANCE_KEY, String(START_BALANCE)); }, []);
   const toggleMute = () => { audioRef.current.muted = !muted; setMuted(!muted); };
 
   return (
@@ -607,7 +606,6 @@ export default function BridgeGame() {
               ); })}
             </div>
             <div className="flex items-center gap-1.5 mt-5 text-[11px] text-amber-900/40"><Trophy size={11} className="text-amber-800" /><span data-testid="text-best" className="font-mono">Best {best}</span></div>
-            {balance < 30 ? (<button onClick={refillBalance} data-testid="button-refill" className="mt-5 w-full py-3 rounded-2xl bg-gradient-to-r from-amber-700 to-yellow-600 text-white font-mono font-bold text-sm tracking-widest shadow-[0_0_24px_rgba(139,69,19,0.4)] active:scale-95">🎁 GET 1,000 FREE CHIPS</button>) : (<button onClick={refillBalance} data-testid="button-refill" className="mt-3 text-[10px] text-amber-900/30 hover:text-amber-900/60 transition-colors underline underline-offset-2 font-mono">Low on chips? Get 1,000 free</button>)}
           </motion.div>
         </motion.div>
       )}</AnimatePresence>

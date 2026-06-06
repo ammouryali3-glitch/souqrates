@@ -117,6 +117,7 @@ export interface AdminSettings {
   platformRake: number; // default house cut % across games
   // legal
   tosEnabled: boolean; // show terms acceptance gate
+  botUsername: string; // Telegram bot username used to build invite links
 }
 
 export interface AdminState {
@@ -171,6 +172,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
   dailyBonus: 0,
   platformRake: 5,
   tosEnabled: false,
+  botUsername: "",
 };
 
 const DEFAULT_CHECKIN = [50, 75, 100, 150, 200, 300, 500];

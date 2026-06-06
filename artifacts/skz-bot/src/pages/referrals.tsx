@@ -4,14 +4,18 @@ import { Share2, Users, Network, TrendingUp, Copy, CheckCircle2 } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { useAdmin } from "@/lib/admin-store";
 import { useLang, t } from "@/lib/i18n";
+import { useTelegramUser } from "@/lib/telegram-user";
 
 export default function Referrals() {
   const [copied, setCopied] = useState(false);
-  const { referralLevels } = useAdmin();
+  const { referralLevels, settings } = useAdmin();
+  const { dbUser } = useTelegramUser();
   const lang = useLang();
   const s = t[lang];
 
-  const inviteLink = "t.me/skzbot?start=ref_xxx";
+  const refCode = (dbUser as Record<string, unknown> | null)?.refCode as string | undefined;
+  const botName = settings.botUsername || "skzbot";
+  const inviteLink = `https://t.me/${botName}?start=${refCode ?? ""}`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});

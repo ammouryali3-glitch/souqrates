@@ -26,7 +26,7 @@ const DEFAULT_CONFIG = {
     onlineCount: "0", appName: "SKZ Arcade", welcomeMessage: "العب، تنافس، واربح جوائز SKZ",
     accent: "#f5b301", freePlay: false, globalPriceFactor: 1, globalPrizeFactor: 1,
     globalDifficulty: 1, startingBalance: 1000, winnerCut: 0.95, dailyBonus: 0,
-    platformRake: 5, tosEnabled: false,
+    platformRake: 5, tosEnabled: false, botUsername: "",
   },
   game_overrides: {},
   ticket_overrides: {},

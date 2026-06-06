@@ -800,6 +800,10 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   if (typeof destWallet !== "string" || !destWallet.trim()) {
     res.status(400).json({ error: "destWallet required" }); return;
   }
+  const TON_ADDR_RE = /^[EU]Q[A-Za-z0-9_-]{46}$/;
+  if (!TON_ADDR_RE.test(destWallet.trim())) {
+    res.status(400).json({ error: "Invalid TON wallet address format" }); return;
+  }
   const safeCurrency = "TON" as const;
   const safeAmount = Math.floor(skzAmount);
 

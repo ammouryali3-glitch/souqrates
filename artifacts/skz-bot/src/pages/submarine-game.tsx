@@ -431,7 +431,6 @@ export default function SubmarineGame() {
   }, [balance, startLoop]);
 
   useEffect(() => { const audio = audioRef.current; return () => { cancelAnimationFrame(rafRef.current); audio.dispose(); }; }, []);
-  const refillBalance = useCallback(() => { setBalance(START_BALANCE); localStorage.setItem(BALANCE_KEY, String(START_BALANCE)); }, []);
   const toggleMute = () => { audioRef.current.muted = !muted; setMuted(!muted); };
 
   return (
@@ -485,7 +484,6 @@ export default function SubmarineGame() {
               ); })}
             </div>
             <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-cyan-400" /><span data-testid="text-best" className="font-mono">Best {best}</span></div>
-            {balance < 30 ? (<button onClick={refillBalance} data-testid="button-refill" className="mt-5 w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-400 text-black font-mono font-bold text-sm tracking-widest shadow-[0_0_24px_rgba(0,200,255,0.5)] active:scale-95 transition-transform">🎁 GET 1,000 FREE CHIPS</button>) : (<button onClick={refillBalance} data-testid="button-refill" className="mt-3 text-[10px] text-white/25 hover:text-white/50 transition-colors underline underline-offset-2 font-mono">Low on chips? Get 1,000 free</button>)}
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
