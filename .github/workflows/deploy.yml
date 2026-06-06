@@ -1,0 +1,135 @@
+name: Build & Deploy to Contabo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "10"
+
+jobs:
+  # ── 1. Typecheck + Build ──────────────────────────────────────────────────
+  build:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build API server
+        run: pnpm --filter @workspace/api-server run build
+        env:
+          NODE_ENV: production
+          PORT: 8080
+          BASE_PATH: /api
+
+      - name: Build frontend (skz-bot)
+        run: pnpm --filter @workspace/skz-bot run build
+        env:
+          NODE_ENV: production
+          PORT: 3000
+          BASE_PATH: /
+
+      # Upload built artifacts so the deploy job can use them
+      - name: Upload API build
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-dist
+          path: artifacts/api-server/dist/
+          retention-days: 1
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: skz-dist
+          path: artifacts/skz-bot/dist/
+          retention-days: 1
+
+  # ── 2. Deploy to Contabo ──────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Contabo
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download API build
+        uses: actions/download-artifact@v4
+        with:
+          name: api-dist
+          path: artifacts/api-server/dist/
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: skz-dist
+          path: artifacts/skz-bot/dist/
+
+      - name: Write SSH key
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/contabo_key
+          echo "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/contabo_key
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Sync API server to Contabo
+        run: |
+          rsync -az --delete \
+            --exclude='*.map' \
+            artifacts/api-server/dist/ \
+            ${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}:/opt/souqrates/api/dist/
+
+      - name: Sync frontend to Contabo
+        run: |
+          rsync -az --delete \
+            artifacts/skz-bot/dist/public/ \
+            ${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}:/var/www/souqrates/
+
+      - name: Sync package.json for production deps
+        run: |
+          rsync -az \
+            artifacts/api-server/package.json \
+            pnpm-workspace.yaml \
+            pnpm-lock.yaml \
+            ${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}:/opt/souqrates/api/
+
+      - name: Install production deps & reload PM2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/souqrates/api
+
+            # Install only production deps (esbuild already bundled most things)
+            export PNPM_HOME="/root/.local/share/pnpm"
+            export PATH="$PNPM_HOME:$PATH"
+            pnpm install --prod --frozen-lockfile --ignore-scripts 2>/dev/null || true
+
+            # Reload without downtime (PM2 does graceful reload)
+            pm2 reload souqrates-api --update-env
+            pm2 save
+
+            echo "✅ Deploy complete — $(date -u)"
