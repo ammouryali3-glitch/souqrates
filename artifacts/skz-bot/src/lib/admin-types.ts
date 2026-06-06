@@ -204,6 +204,24 @@ export interface CmsTexts {
   tos: string;
 }
 
+export interface ContactInfo {
+  email: string;
+  supportEmail: string;
+  phone: string;
+  address: string;
+  telegramChannel: string;
+  telegramSupport: string;
+  twitter: string;
+  instagram: string;
+  workingHours: string;
+}
+
+export interface PolicyTexts {
+  privacyPolicy: string;
+  termsOfService: string;
+  refundPolicy: string;
+}
+
 export interface FinanceSettings {
   autoWithdrawMax: number; // USDT-eq threshold for instant auto-approval
   withdrawMin: Record<Currency, number>;

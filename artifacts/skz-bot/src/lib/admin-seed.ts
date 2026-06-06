@@ -286,3 +286,27 @@ export function seedBackupSettings(): BackupSettings {
     lastBackupAt: NOW - 6 * H,
   };
 }
+
+import type { ContactInfo, PolicyTexts } from "./admin-types";
+
+export function seedContactInfo(): ContactInfo {
+  return {
+    email: "",
+    supportEmail: "",
+    phone: "",
+    address: "",
+    telegramChannel: "",
+    telegramSupport: "",
+    twitter: "",
+    instagram: "",
+    workingHours: "",
+  };
+}
+
+export function seedPolicies(): PolicyTexts {
+  return {
+    privacyPolicy: "",
+    termsOfService: "",
+    refundPolicy: "",
+  };
+}

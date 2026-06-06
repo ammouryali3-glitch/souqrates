@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard, Users, Gamepad2, Store, Share2, Wallet, ShieldAlert,
   Trophy, Megaphone, Settings2, Menu, X, ArrowRight, UserCog, AlertTriangle,
-  Search, CornerDownLeft, LogOut, ShieldOff, type LucideIcon,
+  Search, CornerDownLeft, LogOut, ShieldOff, Mail, type LucideIcon,
 } from "lucide-react";
 import { useAdmin, admin, syncBalance, refreshFromApi } from "../lib/admin-store";
 import { ARENA_GAMES, SKILL_GAMES } from "../lib/games-data";
@@ -27,22 +27,25 @@ import SecuritySection from "./manager/security";
 import GamificationSection from "./manager/gamification";
 import ContentSection from "./manager/content";
 import SystemSection from "./manager/system";
+import ContactPoliciesSection from "./manager/contact-policies";
 
 type SectionId =
   | "overview" | "users" | "games" | "economy" | "affiliate"
-  | "finance" | "security" | "gamification" | "content" | "system";
+  | "finance" | "security" | "gamification" | "content" | "system"
+  | "contact-policies";
 
 const NAV: { id: SectionId; label: string; icon: LucideIcon; group: string; perm?: Permission }[] = [
-  { id: "overview",      label: "نظرة عامة",       icon: LayoutDashboard, group: "الرئيسية" },
-  { id: "users",         label: "المستخدمون",       icon: Users,           group: "الإدارة",  perm: "users" },
-  { id: "games",         label: "الألعاب والأرباح", icon: Gamepad2,        group: "الإدارة",  perm: "games" },
-  { id: "economy",       label: "الاقتصاد والمتجر", icon: Store,           group: "الإدارة",  perm: "economy" },
-  { id: "affiliate",     label: "نظام الإحالة",     icon: Share2,          group: "الإدارة",  perm: "affiliate" },
-  { id: "finance",       label: "المالية والسحوبات", icon: Wallet,          group: "المالية",  perm: "finance" },
-  { id: "security",      label: "الأمان والتدقيق",  icon: ShieldAlert,     group: "المالية",  perm: "security" },
-  { id: "gamification",  label: "التحفيز والمكافآت", icon: Trophy,          group: "النمو",    perm: "gamification" },
-  { id: "content",       label: "المحتوى والبث",    icon: Megaphone,       group: "النمو",    perm: "content" },
-  { id: "system",        label: "النظام والإدارة",  icon: Settings2,       group: "النظام",   perm: "system" },
+  { id: "overview",          label: "نظرة عامة",          icon: LayoutDashboard, group: "الرئيسية" },
+  { id: "users",             label: "المستخدمون",          icon: Users,           group: "الإدارة",  perm: "users" },
+  { id: "games",             label: "الألعاب والأرباح",    icon: Gamepad2,        group: "الإدارة",  perm: "games" },
+  { id: "economy",           label: "الاقتصاد والمتجر",   icon: Store,           group: "الإدارة",  perm: "economy" },
+  { id: "affiliate",         label: "نظام الإحالة",        icon: Share2,          group: "الإدارة",  perm: "affiliate" },
+  { id: "finance",           label: "المالية والسحوبات",  icon: Wallet,          group: "المالية",  perm: "finance" },
+  { id: "security",          label: "الأمان والتدقيق",    icon: ShieldAlert,     group: "المالية",  perm: "security" },
+  { id: "gamification",      label: "التحفيز والمكافآت",  icon: Trophy,          group: "النمو",    perm: "gamification" },
+  { id: "content",           label: "المحتوى والبث",      icon: Megaphone,       group: "النمو",    perm: "content" },
+  { id: "contact-policies",  label: "التواصل والسياسات",  icon: Mail,            group: "النمو",    perm: "content" },
+  { id: "system",            label: "النظام والإدارة",    icon: Settings2,       group: "النظام",   perm: "system" },
 ];
 
 const GROUPS = ["الرئيسية", "الإدارة", "المالية", "النمو", "النظام"];
@@ -128,8 +131,9 @@ function Dashboard({
       case "finance":      return <FinanceSection />;
       case "security":     return <SecuritySection />;
       case "gamification": return <GamificationSection />;
-      case "content":      return <ContentSection />;
-      case "system":       return <SystemSection />;
+      case "content":           return <ContentSection />;
+      case "contact-policies":  return <ContactPoliciesSection />;
+      case "system":            return <SystemSection />;
     }
   }
 

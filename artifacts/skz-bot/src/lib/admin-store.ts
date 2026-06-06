@@ -1,14 +1,14 @@
 import { useSyncExternalStore } from "react";
 import type { Product, Category } from "./shop-products";
 import type {
-  AdminRole, ApiKey, BackupSettings, Broadcast, CmsTexts, Currency, Deposit,
-  FinanceSettings, InventoryItem, ManagedUser, PromoCode, ReferralLevel,
+  AdminRole, ApiKey, BackupSettings, Broadcast, CmsTexts, ContactInfo, Currency, Deposit,
+  FinanceSettings, InventoryItem, ManagedUser, PolicyTexts, PromoCode, ReferralLevel,
   ReferralTrigger, Referrer, SecuritySettings, SocialTask, SupportTicket,
   TicketMsg, TokenPackage, Withdrawal,
 } from "./admin-types";
 import type { GameStat } from "./admin-api";
 import {
-  seedApiKeys, seedBackupSettings, seedCmsTexts,
+  seedApiKeys, seedBackupSettings, seedCmsTexts, seedContactInfo, seedPolicies,
   seedFinanceSettings, seedReferralLevels,
   seedRoles, seedSecuritySettings,
 } from "./admin-seed";
@@ -144,6 +144,8 @@ export interface AdminState {
   roles: AdminRole[];
   apiKeys: ApiKey[];
   cms: CmsTexts;
+  contactInfo: ContactInfo;
+  policies: PolicyTexts;
   finance: FinanceSettings;
   security: SecuritySettings;
   backup: BackupSettings;
@@ -157,7 +159,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
   skillEnabled: true,
   maintenance: false,
   onlineCount: "12.4k",
-  appName: "SKZ Arcade",
+  appName: "Souqrates System",
   welcomeMessage: "العب، تنافس، واربح جوائز SKZ",
   accent: "#f5b301",
   freePlay: false,
@@ -191,6 +193,8 @@ function freshSlices() {
     roles: seedRoles(),
     apiKeys: seedApiKeys(),
     cms: seedCmsTexts(),
+    contactInfo: seedContactInfo(),
+    policies: seedPolicies(),
     finance: seedFinanceSettings(),
     security: seedSecuritySettings(),
     backup: seedBackupSettings(),
@@ -248,6 +252,8 @@ function load(): AdminState {
       })(),
       apiKeys: parsed.apiKeys ?? seeded.apiKeys,
       cms: { ...seeded.cms, ...(parsed.cms ?? {}) },
+      contactInfo: { ...seeded.contactInfo, ...(parsed.contactInfo ?? {}) },
+      policies: { ...seeded.policies, ...(parsed.policies ?? {}) },
       finance: { ...seeded.finance, ...(parsed.finance ?? {}) },
       security: { ...seeded.security, ...(parsed.security ?? {}) },
       backup: { ...seeded.backup, ...(parsed.backup ?? {}) },
@@ -875,6 +881,18 @@ export const admin = {
   setCms(patch: Partial<CmsTexts>) {
     update((s) => ({ ...s, cms: { ...s.cms, ...patch } }));
     putAdminConfig("cms", state.cms);
+  },
+
+  // ── Contact info ─────────────────────────────────────────────────────────────
+  setContactInfo(patch: Partial<ContactInfo>) {
+    update((s) => ({ ...s, contactInfo: { ...s.contactInfo, ...patch } }));
+    putAdminConfig("contact_info", state.contactInfo);
+  },
+
+  // ── Policies ─────────────────────────────────────────────────────────────────
+  setPolicies(patch: Partial<PolicyTexts>) {
+    update((s) => ({ ...s, policies: { ...s.policies, ...patch } }));
+    putAdminConfig("policies", state.policies);
   },
 
   // ── Roles ────────────────────────────────────────────────────────────────────

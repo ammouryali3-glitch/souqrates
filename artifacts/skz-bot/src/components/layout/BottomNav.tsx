@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Gamepad2, ShoppingCart, Wallet, Users } from "lucide-react";
+import { Home, Gamepad2, ShoppingCart, Wallet, Users, Mail, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLang, setLang, t } from "@/lib/i18n";
 
@@ -17,7 +17,7 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="absolute bottom-0 w-full px-4 pb-6 pt-3 bg-card/80 backdrop-blur-xl border-t border-white/10 z-50 rounded-t-3xl">
+    <div className="absolute bottom-0 w-full px-4 pb-4 pt-3 bg-card/80 backdrop-blur-xl border-t border-white/10 z-50 rounded-t-3xl">
       <div className="flex justify-between items-center max-w-sm mx-auto">
         {tabs.map((tab) => {
           const isActive = location === tab.path;
@@ -55,14 +55,29 @@ export function BottomNav() {
         })}
       </div>
 
-      {/* Language toggle — small pill below the nav tabs */}
-      <div className="flex justify-center mt-2">
+      {/* Footer row: language toggle + contact + policies */}
+      <div className="flex items-center justify-between mt-2 max-w-sm mx-auto">
         <button
           onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-          className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/6 border border-white/10 text-white/40 text-[10px] font-bold tracking-wider hover:text-white/70 hover:border-white/20 transition-all"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/6 border border-white/10 text-white/35 text-[10px] font-bold tracking-wider hover:text-white/60 transition-all"
         >
           {s.langSwitch}
         </button>
+
+        <div className="flex items-center gap-3">
+          <Link href="/contact">
+            <div className={`flex items-center gap-1 text-[10px] font-display transition-colors ${location === "/contact" ? "text-primary" : "text-white/30 hover:text-white/55"}`}>
+              <Mail size={11} />
+              {lang === "ar" ? "تواصل" : "Contact"}
+            </div>
+          </Link>
+          <Link href="/policies">
+            <div className={`flex items-center gap-1 text-[10px] font-display transition-colors ${location === "/policies" ? "text-primary" : "text-white/30 hover:text-white/55"}`}>
+              <FileText size={11} />
+              {lang === "ar" ? "السياسات" : "Policies"}
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );

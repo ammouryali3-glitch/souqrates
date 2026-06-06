@@ -55,6 +55,8 @@ import HiddenPathGame from "@/pages/hidden-path-game";
 import GeniusGridGame from "@/pages/genius-grid-game";
 import TruthScaleGame from "@/pages/truth-scale-game";
 import Manager from "@/pages/manager";
+import Contact from "@/pages/contact";
+import Policies from "@/pages/policies";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -208,6 +210,8 @@ function Router() {
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
+            <Route path="/contact"><PageWrapper><Contact /></PageWrapper></Route>
+            <Route path="/policies"><PageWrapper><Policies /></PageWrapper></Route>
             <Route><PageWrapper><NotFound /></PageWrapper></Route>
           </Switch>
         </AnimatePresence>
