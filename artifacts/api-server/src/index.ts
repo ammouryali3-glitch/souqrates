@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded } from "./lib/seed";
 import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
+import { registerWebhook } from "./routes/bot";
 
 const rawPort = process.env["PORT"];
 
@@ -49,4 +50,9 @@ app.listen(port, (err) => {
   } catch (err) {
     logger.error({ err }, "Failed to start leaderboard reset scheduler");
   }
+
+  // Register Telegram bot webhook (non-blocking)
+  registerWebhook().catch((err) => {
+    logger.error({ err }, "Failed to register Telegram webhook");
+  });
 });
