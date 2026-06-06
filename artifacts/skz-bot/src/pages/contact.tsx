@@ -12,56 +12,56 @@ export default function Contact() {
   const cards = [
     {
       icon: Mail,
-      label: lang === "ar" ? "البريد الإلكتروني" : "Email",
+      label: s.contactEmail,
       value: contactInfo.email,
-      sub: lang === "ar" ? "للاستفسارات العامة" : "General inquiries",
+      sub: s.contactEmailSub,
       href: contactInfo.email ? `mailto:${contactInfo.email}` : undefined,
     },
     {
       icon: Send,
-      label: lang === "ar" ? "بريد الدعم الفني" : "Support Email",
+      label: s.contactSupportEmail,
       value: contactInfo.supportEmail,
-      sub: lang === "ar" ? "للمشكلات التقنية" : "Technical issues",
+      sub: s.contactSupportEmailSub,
       href: contactInfo.supportEmail ? `mailto:${contactInfo.supportEmail}` : undefined,
     },
     {
       icon: Phone,
-      label: lang === "ar" ? "الهاتف" : "Phone",
+      label: s.contactPhone,
       value: contactInfo.phone,
-      sub: lang === "ar" ? "الاتصال المباشر" : "Direct call",
+      sub: s.contactPhoneSub,
       href: contactInfo.phone ? `tel:${contactInfo.phone}` : undefined,
     },
     {
       icon: MapPin,
-      label: lang === "ar" ? "العنوان البريدي" : "Address",
+      label: s.contactAddress,
       value: contactInfo.address,
       sub: "",
       href: undefined,
     },
     {
       icon: MessageCircle,
-      label: lang === "ar" ? "قناة تيليغرام" : "Telegram Channel",
+      label: s.contactTelegramChannel,
       value: contactInfo.telegramChannel,
-      sub: lang === "ar" ? "أخبار ومستجدات" : "News & updates",
+      sub: s.contactTelegramChannelSub,
       href: contactInfo.telegramChannel ? contactInfo.telegramChannel : undefined,
     },
     {
       icon: MessageCircle,
-      label: lang === "ar" ? "دعم تيليغرام" : "Telegram Support",
+      label: s.contactTelegramSupport,
       value: contactInfo.telegramSupport,
-      sub: lang === "ar" ? "تواصل مع الدعم" : "Chat with support",
+      sub: s.contactTelegramSupportSub,
       href: contactInfo.telegramSupport ? contactInfo.telegramSupport : undefined,
     },
     {
       icon: Twitter,
-      label: lang === "ar" ? "تويتر / X" : "Twitter / X",
+      label: s.contactTwitter,
       value: contactInfo.twitter,
       sub: "",
       href: contactInfo.twitter ? contactInfo.twitter : undefined,
     },
     {
       icon: Instagram,
-      label: lang === "ar" ? "إنستغرام" : "Instagram",
+      label: s.contactInstagram,
       value: contactInfo.instagram,
       sub: "",
       href: contactInfo.instagram ? contactInfo.instagram : undefined,
@@ -82,14 +82,8 @@ export default function Contact() {
         >
           <Mail size={26} style={{ color: c }} />
         </div>
-        <h1 className="font-display font-black text-2xl text-white">
-          {lang === "ar" ? "تواصل معنا" : "Contact Us"}
-        </h1>
-        <p className="text-xs text-white/45 max-w-[260px] font-display">
-          {lang === "ar"
-            ? "نحن هنا للمساعدة — اختر قناة التواصل المناسبة لك"
-            : "We're here to help — choose the right channel for you"}
-        </p>
+        <h1 className="font-display font-black text-2xl text-white">{s.contactTitle}</h1>
+        <p className="text-xs text-white/45 max-w-[260px] font-display">{s.contactDesc}</p>
       </motion.div>
 
       {/* Working hours banner */}
@@ -104,7 +98,7 @@ export default function Contact() {
           <Clock size={16} style={{ color: c }} className="shrink-0" />
           <div>
             <div className="text-[11px] text-white/40 font-display uppercase tracking-widest mb-0.5">
-              {lang === "ar" ? "ساعات العمل" : "Working Hours"}
+              {s.contactWorkingHoursLabel}
             </div>
             <div className="text-sm font-display font-bold text-white">{contactInfo.workingHours}</div>
           </div>
@@ -115,9 +109,7 @@ export default function Contact() {
       {cards.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <Mail size={32} className="text-white/20" />
-          <p className="text-sm text-white/30 font-display">
-            {lang === "ar" ? "لا توجد بيانات تواصل بعد" : "No contact info available yet"}
-          </p>
+          <p className="text-sm text-white/30 font-display">{s.contactNoInfo}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -172,7 +164,7 @@ export default function Contact() {
         transition={{ delay: 0.3 }}
         className="text-center text-[11px] text-white/20 font-display pb-2"
       >
-        Souqrates System ©{new Date().getFullYear()}
+        {s.footerCopyright(new Date().getFullYear())}
       </motion.p>
     </div>
   );

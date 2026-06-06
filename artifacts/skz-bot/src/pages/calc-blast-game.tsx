@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins, Crosshair } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -270,13 +271,13 @@ export default function CalcBlastGame() {
                 <Coins size={16} className="text-cyan-400" /><span className="font-display font-bold text-cyan-300 text-lg">+{ticket.prize} SKZ</span>
               </div>
             ) : (
-              <div className="text-white/40 text-sm">Lost {ticket.price} SKZ entry fee</div>
+              <div className="text-white/40 text-sm">{gt[getLang()].gameEntryLost(ticket.price)}</div>
             )}
             <div className="text-xs text-white/30 font-display">Balance: {balance.toLocaleString()} SKZ</div>
             {best > 0 && <div className="text-xs text-cyan-400/50 font-display flex items-center gap-1"><Trophy size={11} />Best: {best}</div>}
             <div className="flex flex-col gap-3 w-full max-w-xs">
               <button onClick={() => { setPhase("select"); }} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 font-display font-bold text-cyan-300 hover:bg-cyan-500/30">
-                <RotateCcw size={16} />Play Again
+                <RotateCcw size={16} />{gt[getLang()].gamePlayAgain}
               </button>
               <Link href="/games"><button className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 font-display text-white/60 text-sm">← All Games</button></Link>
             </div>

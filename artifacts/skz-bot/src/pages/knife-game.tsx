@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -1077,7 +1078,7 @@ export default function KnifeGame() {
 
               <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40">
                 <Trophy size={11} className="text-amber-400" />
-                <span data-testid="text-best">Best {best}</span>
+                <span data-testid="text-best">{gt[getLang()].gameBest(best)}</span>
               </div>
 
             </motion.div>
@@ -1130,11 +1131,11 @@ export default function KnifeGame() {
                 data-testid="button-replay"
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.5)] flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
               >
-                <RotateCcw size={18} /> PLAY AGAIN
+                <RotateCcw size={18} /> {gt[getLang()].gamePlayAgain}
               </button>
               <Link href="/games">
                 <button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
-                  Back to Arena
+                  {gt[getLang()].arenaBackToGames}
                 </button>
               </Link>
             </motion.div>
@@ -1158,7 +1159,7 @@ export default function KnifeGame() {
               className="w-full max-w-[300px] flex flex-col items-center text-center"
             >
               <span data-testid="text-result" className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-red-400">
-                {lostReason === "time" ? "Time Up" : "Knife Clash"}
+                {lostReason === "time" ? gt[getLang()].gameTimeUp : gt[getLang()].gameKnifeClash}
               </span>
               <div data-testid="text-loss-amount" className="font-display font-black text-5xl text-transparent bg-clip-text bg-gradient-to-br from-red-400 to-white/70 mb-1">
                 -{ticket?.price ?? 0}
@@ -1189,11 +1190,11 @@ export default function KnifeGame() {
                 data-testid="button-replay"
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.5)] flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
               >
-                <RotateCcw size={18} /> TRY AGAIN
+                <RotateCcw size={18} /> {gt[getLang()].gamePlayAgain}
               </button>
               <Link href="/games">
                 <button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
-                  Back to Arena
+                  {gt[getLang()].arenaBackToGames}
                 </button>
               </Link>
             </motion.div>

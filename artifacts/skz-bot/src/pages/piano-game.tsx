@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -483,7 +484,7 @@ export default function PianoGame() {
                 </button>
               ); })}
             </div>
-            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-white/50" /><span data-testid="text-best">Best {best}</span></div>
+            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-white/50" /><span data-testid="text-best">{gt[getLang()].gameBest(best)}</span></div>
           </motion.div>
         </motion.div>
       )}</AnimatePresence>

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -527,7 +528,7 @@ export default function WhackGame() {
                 </button>
               ); })}
             </div>
-            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-[#00ff88]" /><span data-testid="text-best" className="font-mono">Best {best}</span></div>
+            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-[#00ff88]" /><span data-testid="text-best" className="font-mono">{gt[getLang()].gameBest(best)}</span></div>
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
@@ -560,7 +561,7 @@ export default function WhackGame() {
               <div className="bg-[#0a1a0f] border border-[#00ff8840] rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase tracking-wider mb-1">Kills</div><span data-testid="text-final-score" className="font-mono font-bold text-xl text-white">{score}/{target}</span></div>
               <div className="bg-[#0a1a0f] border border-[#00ff8840] rounded-2xl p-3 flex flex-col items-center"><div className="text-white/40 text-[10px] font-mono uppercase tracking-wider mb-1">Balance</div><span data-testid="text-balance-final" className="font-mono font-bold text-xl text-white">{balance.toLocaleString()}</span></div>
             </div>
-            <button onClick={() => setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#00ff88] to-[#00cc66] text-black font-mono font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"><RotateCcw size={18} />TRY AGAIN</button>
+            <button onClick={() => setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#00ff88] to-[#00cc66] text-black font-mono font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"><RotateCcw size={18} />{gt[getLang()].gamePlayAgain}</button>
             <Link href="/games"><button data-testid="button-exit" className="text-sm text-[#00ff88]/40 hover:text-[#00ff88] transition-colors font-mono">back_to_arena()</button></Link>
           </motion.div>
         </motion.div>

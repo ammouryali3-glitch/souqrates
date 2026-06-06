@@ -132,7 +132,7 @@ export default function Home() {
               className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
               style={{ background: `${settings.accent}22`, color: settings.accent }}
             >
-              PREMIUM
+              {s.premiumBadge}
             </span>
           )}
         </motion.div>

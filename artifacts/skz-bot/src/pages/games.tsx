@@ -2,14 +2,15 @@ import { motion } from "framer-motion";
 import { Trophy, Swords, Zap, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
-import { ACCENTS, ARENA_GAMES, SKILL_GAMES, type GameDef } from "@/lib/games-data";
+import { ACCENTS, ARENA_GAMES, SKILL_GAMES, localizeGame, type GameDef } from "@/lib/games-data";
 import { useAdmin } from "@/lib/admin-store";
 import { useLang, t, type Strings } from "@/lib/i18n";
 
 
-function ArenaCard({ game, s }: { game: GameDef; s: Strings }) {
+function ArenaCard({ game, s, lang }: { game: GameDef; s: Strings; lang: "ar" | "en" }) {
   const a = ACCENTS[game.accent];
   const Icon = game.icon;
+  const loc = localizeGame(game, lang);
   return (
     <Link href={game.route}>
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
@@ -18,7 +19,7 @@ function ArenaCard({ game, s }: { game: GameDef; s: Strings }) {
         <div className={`absolute -right-4 -top-4 opacity-15 ${a.bigIcon}`}><Icon size={110} strokeWidth={1.2} /></div>
         <div className="flex items-center justify-between mb-2 relative z-10">
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{game.tag}</span>
+            <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{loc.tag}</span>
             <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> {s.livePool}</span>
           </div>
           <span className={`font-display font-black ${a.text} text-sm`}>{game.prize} SKZ</span>
@@ -26,12 +27,12 @@ function ArenaCard({ game, s }: { game: GameDef; s: Strings }) {
         <div className="flex items-end justify-between relative z-10">
           <div>
             <h2 className="font-display font-black text-2xl text-white uppercase">{game.title}</h2>
-            <p className="text-xs text-white/50 mt-1 max-w-[200px]">{game.desc}</p>
+            <p className="text-xs text-white/50 mt-1 max-w-[200px]">{loc.desc}</p>
           </div>
           <div className={`w-14 h-14 rounded-2xl ${a.iconWrap} flex items-center justify-center shrink-0`}><Icon size={26} className={a.iconText} /></div>
         </div>
         <div className={`flex items-center gap-2 mt-2 text-xs font-display font-bold ${a.text} relative z-10`}>
-          <Trophy size={12} />{s.arenaEntry}: {game.entry} SKZ · {game.tagline}
+          <Trophy size={12} />{s.arenaEntry}: {game.entry} SKZ · {loc.tagline}
           <ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" />
         </div>
       </motion.div>
@@ -39,9 +40,10 @@ function ArenaCard({ game, s }: { game: GameDef; s: Strings }) {
   );
 }
 
-function SkillCard({ game, s }: { game: GameDef; s: Strings }) {
+function SkillCard({ game, s, lang }: { game: GameDef; s: Strings; lang: "ar" | "en" }) {
   const a = ACCENTS[game.accent];
   const Icon = game.icon;
+  const loc = localizeGame(game, lang);
   return (
     <Link href={game.route}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
@@ -50,18 +52,18 @@ function SkillCard({ game, s }: { game: GameDef; s: Strings }) {
         <div className={`absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity ${a.bigIcon}`}><Icon size={120} strokeWidth={1.2} /></div>
         <div className="flex flex-col gap-3 relative z-10">
           <div className="flex items-center justify-between">
-            <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{game.category}</span>
+            <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{loc.category}</span>
             <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> {s.playable}</span>
           </div>
           <div className="flex items-end justify-between">
             <div className="flex flex-col gap-1">
               <h2 className="font-display font-black text-2xl text-white tracking-wide uppercase leading-none">{game.title}</h2>
-              <p className="text-xs text-white/60 mt-1 max-w-[200px]">{game.desc}</p>
+              <p className="text-xs text-white/60 mt-1 max-w-[200px]">{loc.desc}</p>
             </div>
             <div className={`w-14 h-14 rounded-2xl ${a.iconWrap} flex items-center justify-center shrink-0`}><Icon size={26} className={a.iconText} /></div>
           </div>
           <div className={`flex items-center gap-2 mt-1 text-xs font-display font-bold ${a.text} tracking-wide`}>
-            <Trophy size={13} /> {game.tagline}
+            <Trophy size={13} /> {loc.tagline}
             <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
@@ -89,7 +91,6 @@ export default function Games() {
     };
   };
 
-  // Featured (pinned) games float to the top of their section.
   const byFeatured = (a: GameDef, b: GameDef) =>
     (gameOverrides[b.id]?.featured ? 1 : 0) - (gameOverrides[a.id]?.featured ? 1 : 0);
 
@@ -120,7 +121,7 @@ export default function Games() {
             <div className="flex-1 h-px bg-gradient-to-l from-yellow-500/40 to-transparent" />
           </div>
           <p className="text-xs text-white/30 text-center mb-4 font-display">{s.arenaSubtitle}</p>
-          {arena.map((g) => <ArenaCard key={g.id} game={g} s={s} />)}
+          {arena.map((g) => <ArenaCard key={g.id} game={g} s={s} lang={lang} />)}
         </div>
       )}
 
@@ -134,7 +135,7 @@ export default function Games() {
             </span>
             <div className="flex-1 h-px bg-gradient-to-l from-cyan-500/40 to-transparent" />
           </div>
-          {skill.map((g) => <SkillCard key={g.id} game={g} s={s} />)}
+          {skill.map((g) => <SkillCard key={g.id} game={g} s={s} lang={lang} />)}
         </div>
       )}
 

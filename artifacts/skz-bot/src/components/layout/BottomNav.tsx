@@ -68,13 +68,13 @@ export function BottomNav() {
           <Link href="/contact">
             <div className={`flex items-center gap-1 text-[10px] font-display transition-colors ${location === "/contact" ? "text-primary" : "text-white/30 hover:text-white/55"}`}>
               <Mail size={11} />
-              {lang === "ar" ? "تواصل" : "Contact"}
+              {s.navContact}
             </div>
           </Link>
           <Link href="/policies">
             <div className={`flex items-center gap-1 text-[10px] font-display transition-colors ${location === "/policies" ? "text-primary" : "text-white/30 hover:text-white/55"}`}>
               <FileText size={11} />
-              {lang === "ar" ? "السياسات" : "Policies"}
+              {s.navPolicies}
             </div>
           </Link>
         </div>

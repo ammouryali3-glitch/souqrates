@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -161,7 +162,7 @@ export default function MergeBlitzGame() {
             onPointerDown={e=>handleDown(e.clientX,e.clientY)}
             onPointerUp={e=>handleUp(e.clientX,e.clientY)}>
             <div className="flex items-center gap-3 text-xs font-display text-white/40 uppercase tracking-widest">
-              <span>Score</span><span className="text-amber-400 font-bold text-sm">{scoreDisp.toLocaleString()}</span>
+              <span>{gt[getLang()].gameScore}</span><span className="text-amber-400 font-bold text-sm">{scoreDisp.toLocaleString()}</span>
               <span className="ml-3">Target</span><span className="text-white/60 font-bold text-sm">{ticket?.target.toLocaleString()}</span>
             </div>
             <div className="grid grid-cols-4 gap-2 w-full max-w-[320px]">
@@ -179,11 +180,11 @@ export default function MergeBlitzGame() {
         {(phase==="won"||phase==="lost")&&ticket&&(<motion.div key="res" initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} className="flex flex-col items-center justify-center h-full px-6 gap-5">
           <div className="text-7xl">{phase==="won"?"🏆":"⏱️"}</div>
           <div className="text-center"><div className={`font-display font-black text-4xl uppercase ${phase==="won"?"text-amber-400":"text-red-400"}`}>{phase==="won"?"MERGED!":"TIME'S UP!"}</div><div className="text-white/60 text-sm mt-1">Score: {scoreDisp.toLocaleString()} / {ticket.target.toLocaleString()}</div></div>
-          {phase==="won"?<div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-500/20 border border-amber-500/40"><Coins size={16} className="text-amber-400"/><span className="font-display font-bold text-amber-300 text-lg">+{ticket.prize} SKZ</span></div>:<div className="text-white/40 text-sm">Lost {ticket.price} SKZ entry fee</div>}
+          {phase==="won"?<div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-500/20 border border-amber-500/40"><Coins size={16} className="text-amber-400"/><span className="font-display font-bold text-amber-300 text-lg">+{ticket.prize} SKZ</span></div>:<div className="text-white/40 text-sm">{gt[getLang()].gameEntryLost(ticket.price)}</div>}
           <div className="text-xs text-white/30 font-display">Balance: {balance.toLocaleString()} SKZ</div>
           {best>0&&<div className="text-xs text-amber-400/50 font-display flex items-center gap-1"><Trophy size={11}/>Best: {best}</div>}
           <div className="flex flex-col gap-3 w-full max-w-xs">
-            <button onClick={()=>{finishedRef.current=false;pendingTicketRef.current=ticket;setScoreDisp(0);setTimeLeft(ticket.time);setPhase("playing");}} className="w-full py-3 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-display font-bold tracking-wide text-sm flex items-center justify-center gap-2"><RotateCcw size={16}/> TRY AGAIN</button>
+            <button onClick={()=>{finishedRef.current=false;pendingTicketRef.current=ticket;setScoreDisp(0);setTimeLeft(ticket.time);setPhase("playing");}} className="w-full py-3 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-display font-bold tracking-wide text-sm flex items-center justify-center gap-2"><RotateCcw size={16}/> {gt[getLang()].gamePlayAgain}</button>
             <Link href="/games"><button className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 font-display font-bold tracking-wide text-sm">← BACK</button></Link>
           </div>
         </motion.div>)}

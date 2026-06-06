@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -461,7 +462,7 @@ export default function ColorSwitchGame() {
                 </button>
               );})}
             </div>
-            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-violet-400"/><span data-testid="text-best">Best {best}</span></div>
+            <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40"><Trophy size={11} className="text-violet-400"/><span data-testid="text-best">{gt[getLang()].gameBest(best)}</span></div>
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
@@ -477,8 +478,8 @@ export default function ColorSwitchGame() {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1"><Trophy size={11} className="text-violet-400"/>Rings</div><span data-testid="text-final-score" className="font-display font-bold text-xl text-white">{score}</span></div>
               <div className="bg-violet-400/10 border border-violet-400/30 rounded-2xl p-3 flex flex-col items-center"><div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1"><Coins size={11} className="text-violet-300"/>Balance</div><span data-testid="text-balance-final" className="font-display font-bold text-xl text-violet-300">{balance.toLocaleString()}</span></div>
             </div>
-            <button onClick={()=>setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-400 text-black font-display font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"><RotateCcw size={18}/>PLAY AGAIN</button>
-            <Link href="/games"><button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors">Back to Arena</button></Link>
+            <button onClick={()=>setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-400 text-black font-display font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"><RotateCcw size={18}/>{gt[getLang()].gamePlayAgain}</button>
+            <Link href="/games"><button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors">{gt[getLang()].arenaBackToGames}</button></Link>
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
@@ -494,8 +495,8 @@ export default function ColorSwitchGame() {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1"><Trophy size={11} className="text-violet-400"/>Reached</div><span data-testid="text-final-score" className="font-display font-bold text-xl text-white">{score}/{target}</span></div>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center"><div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1"><Coins size={11} className="text-violet-300"/>Balance</div><span data-testid="text-balance-final" className="font-display font-bold text-xl text-white">{balance.toLocaleString()}</span></div>
             </div>
-            <button onClick={()=>setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-400 text-black font-display font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"><RotateCcw size={18}/>TRY AGAIN</button>
-            <Link href="/games"><button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors">Back to Arena</button></Link>
+            <button onClick={()=>setPhase("select")} data-testid="button-replay" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-400 text-black font-display font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"><RotateCcw size={18}/>{gt[getLang()].gamePlayAgain}</button>
+            <Link href="/games"><button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors">{gt[getLang()].arenaBackToGames}</button></Link>
           </motion.div>
         </motion.div>
       )}</AnimatePresence>

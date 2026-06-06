@@ -71,17 +71,15 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
   const { fee: effEntry, prizeFactor, winnerCut } = useArenaEconomy(gameId, entryFee);
   const winnerTake = Math.floor(pool * winnerCut * prizeFactor);
 
-  // Fetch real leaderboard + pool from server on mount
   useEffect(() => {
     fetchLeaderboard(gameId, period).then((data) => {
       if (!data) return;
       setLeaders(data.leaders);
-      setPool(data.pool);       // always trust server value (including 0 for new periods)
-      setEntries(data.entries); // always trust server value
+      setPool(data.pool);
+      setEntries(data.entries);
     });
   }, [gameId, period]);
 
-  // Fetch all-time leaderboard when tab switches to alltime
   useEffect(() => {
     if (lbTab !== "alltime") return;
     setAlltimeLoading(true);
@@ -94,7 +92,6 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
     });
   }, [lbTab, gameId]);
 
-  // Countdown refresh (period display only — no pool simulation)
   useEffect(() => {
     if (shell !== "lobby") return;
     const cdInterval = setInterval(() => setCountdown(getCountdown(period)), 30000);
@@ -114,34 +111,28 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
     setMyScore(score);
     setMyTime(timeSec);
 
-    // Determine display name: prefer DB user name, then fallback
     const playerName = typeof dbUser?.name === "string" && dbUser.name
       ? dbUser.name
-      : "You";
+      : s.arenaYouBadge;
 
-    // Optimistic local update
     const { leaders: localLeaders, rank: localRank } = submitScore(gameId, score, timeSec, playerName);
     setLeaders(localLeaders);
     setMyRank(localRank);
     setShell("result");
 
-    // Submit to server (fire and forget — update leaders if server responds)
     const serverResult = await submitScoreToServer(gameId, score, timeSec, playerName, period);
     if (serverResult) {
-      // Refresh leaderboard from server after submission
       const fresh = await fetchLeaderboard(gameId, period);
       if (fresh) {
         setLeaders(fresh.leaders);
         setMyRank(fresh.yourRank ?? serverResult.rank);
-        setPool(fresh.pool);       // always trust server value
-        setEntries(fresh.entries); // always trust server value
+        setPool(fresh.pool);
+        setEntries(fresh.entries);
       } else {
         setMyRank(serverResult.rank);
       }
     }
-  }, [gameId, period, dbUser]);
-
-  const colorRGB = color;
+  }, [gameId, period, dbUser, s.arenaYouBadge]);
 
   return (
     <div className="flex-1 relative flex flex-col h-full overflow-hidden select-none" style={{ background: "#06040f" }}>
@@ -151,7 +142,6 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
         {shell === "lobby" && (
           <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -40 }}
             className="absolute inset-0 flex flex-col overflow-y-auto">
-            {/* Hero */}
             <div className="relative overflow-hidden px-5 pt-10 pb-6 flex flex-col items-center text-center"
               style={{ background: `linear-gradient(160deg, ${color}22 0%, #06040f 100%)` }}>
               <div className="absolute inset-0 pointer-events-none"
@@ -162,7 +152,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                 </button>
               </Link>
               <div className="text-5xl mb-2 relative z-10">{icon}</div>
-              <div className="text-[10px] tracking-[0.4em] uppercase mb-1 font-display relative z-10" style={{ color: `${color}` }}>{subtitle}</div>
+              <div className="text-[10px] tracking-[0.4em] uppercase mb-1 font-display relative z-10" style={{ color }}>{subtitle}</div>
               <h1 className="font-display font-black text-3xl text-white uppercase relative z-10">{title}</h1>
               <p className="text-xs text-white/50 mt-2 max-w-[260px] relative z-10">{description}</p>
             </div>
@@ -189,7 +179,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                   animate={{ width: ["60%", "75%", "68%", "82%"] }}
                   transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} />
               </div>
-              <div className="text-[10px] text-white/25 mt-1 font-display">Prize grows with each new entry</div>
+              <div className="text-[10px] text-white/25 mt-1 font-display">{s.arenaPrizeGrows}</div>
             </div>
 
             {/* Top 3 Preview */}
@@ -208,7 +198,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                   </div>
                   <div className="flex-1 font-display text-sm text-white">{l.name}</div>
                   <div className="text-xs text-white/40 font-display">{formatTime(l.time)}</div>
-                  <div className="text-xs font-display font-bold" style={{ color }}>{l.score} pts</div>
+                  <div className="text-xs font-display font-bold" style={{ color }}>{l.score} {s.arenaPts}</div>
                 </div>
               ))}
             </div>
@@ -270,7 +260,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               style={{ borderColor: `${color}40`, background: `linear-gradient(135deg, ${color}12, #06040f)` }}>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-white/40 font-display uppercase">{s.arenaYourScore}</span>
-                <span className="font-display font-black text-2xl" style={{ color }}>{myScore} pts</span>
+                <span className="font-display font-black text-2xl" style={{ color }}>{myScore} {s.arenaPts}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-white/40 font-display uppercase">{s.arenaTimeTaken}</span>
@@ -278,7 +268,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-white/40 font-display uppercase">{s.arenaYourRank}</span>
-                <span className="font-display font-bold" style={{ color }}>#{myRank} of {entries}</span>
+                <span className="font-display font-bold" style={{ color }}>#{myRank} {s.arenaOf} {entries}</span>
               </div>
               <div className="border-t border-white/10 pt-3">
                 <div className="text-xs text-white/30 font-display uppercase mb-1">{s.arenaCurPrizePool}</div>
@@ -343,7 +333,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               </button>
             </div>
 
-            {/* Live pool banner — only for current-period tab */}
+            {/* Live pool banner */}
             {lbTab !== "alltime" && (
               <div className="mx-4 mb-3 px-4 py-3 rounded-2xl flex items-center justify-between"
                 style={{ background: `linear-gradient(135deg, ${color}20, ${color}08)`, border: `1px solid ${color}40` }}>
@@ -398,13 +388,13 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-display font-bold text-sm text-white flex items-center gap-1">
-                          {l.name}{l.isYou && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-display" style={{ background: `${color}30`, color }}>YOU</span>}
+                          {l.name}{l.isYou && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-display" style={{ background: `${color}30`, color }}>{s.arenaYouBadge}</span>}
                         </div>
                         <div className="text-xs text-white/30 font-display">{formatTime(l.time)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-display font-bold text-sm" style={{ color: i === 0 ? "#ffd700" : "rgba(255,255,255,0.8)" }}>{l.score} pts</div>
-                        {i === 0 && <div className="text-[10px] text-yellow-400 font-display flex items-center justify-end gap-0.5"><Star size={9} />{lbTab === "alltime" ? "Legend" : "Leader"}</div>}
+                        <div className="font-display font-bold text-sm" style={{ color: i === 0 ? "#ffd700" : "rgba(255,255,255,0.8)" }}>{l.score} {s.arenaPts}</div>
+                        {i === 0 && <div className="text-[10px] text-yellow-400 font-display flex items-center justify-end gap-0.5"><Star size={9} />{lbTab === "alltime" ? s.arenaLegend : s.arenaLeader}</div>}
                       </div>
                     </motion.div>
                   ));

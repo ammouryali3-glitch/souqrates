@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
+import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
 
 type Phase = "select" | "playing" | "won" | "lost";
@@ -649,7 +650,7 @@ export default function StackGame() {
         </Link>
 
         <div className="flex flex-col items-center -mt-1">
-          <span className="text-[10px] tracking-[0.3em] text-white/40 font-display uppercase">Score</span>
+          <span className="text-[10px] tracking-[0.3em] text-white/40 font-display uppercase">{gt[getLang()].gameScore}</span>
           <span data-testid="text-score" className="font-display font-black text-4xl text-white leading-none drop-shadow-[0_0_18px_rgba(212,175,55,0.4)]">
             {score}
           </span>
@@ -789,7 +790,7 @@ export default function StackGame() {
                       <div className="flex flex-col items-start">
                         <span className="font-display font-bold text-base text-white tracking-wide">{t.name}</span>
                         <span className="text-[10px] text-white/50 uppercase tracking-wider mt-0.5">
-                          Goal {t.target} · {t.time}s
+                          {gt[getLang()].gameGoalTime(t.target, t.time)}
                         </span>
                       </div>
                       <div className="flex flex-col items-end">
@@ -807,7 +808,7 @@ export default function StackGame() {
 
               <div className="flex items-center gap-1.5 mt-5 text-[11px] text-white/40">
                 <Trophy size={11} className="text-primary" />
-                <span data-testid="text-best">Best {best}</span>
+                <span data-testid="text-best">{gt[getLang()].gameBest(best)}</span>
               </div>
 
             </motion.div>
@@ -831,7 +832,7 @@ export default function StackGame() {
               className="w-full max-w-[300px] flex flex-col items-center text-center"
             >
               <span className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-primary" data-testid="text-result">
-                You Win
+                {gt[getLang()].gameYouWin}
               </span>
               <div className="font-display font-black text-5xl text-transparent bg-clip-text bg-gradient-to-br from-primary via-yellow-200 to-accent mb-1 drop-shadow-[0_0_24px_rgba(212,175,55,0.6)]">
                 +{ticket?.prize.toLocaleString() ?? 0}
@@ -841,7 +842,7 @@ export default function StackGame() {
               <div className="w-full grid grid-cols-2 gap-3 mb-7">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center">
                   <div className="flex items-center gap-1 text-white/40 text-[10px] uppercase tracking-wider mb-1">
-                    <Zap size={11} className="text-primary" /> Score
+                    <Zap size={11} className="text-primary" /> {gt[getLang()].gameScore}
                   </div>
                   <span className="font-display font-bold text-xl text-white" data-testid="text-final-score">{score}</span>
                 </div>
@@ -858,11 +859,11 @@ export default function StackGame() {
                 data-testid="button-replay"
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-primary to-accent text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
               >
-                <RotateCcw size={18} /> PLAY AGAIN
+                <RotateCcw size={18} /> {gt[getLang()].gamePlayAgain}
               </button>
               <Link href="/games">
                 <button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
-                  Back to Arena
+                  {gt[getLang()].arenaBackToGames}
                 </button>
               </Link>
             </motion.div>
@@ -889,7 +890,7 @@ export default function StackGame() {
                 data-testid="text-result"
                 className="text-xs tracking-[0.4em] font-display uppercase mb-2 text-red-400"
               >
-                {lostReason === "time" ? "Time Up" : "You Lost"}
+                {lostReason === "time" ? gt[getLang()].gameTimeUp : gt[getLang()].gameYouLost}
               </span>
               <div className="font-display font-black text-5xl text-transparent bg-clip-text bg-gradient-to-br from-red-400 to-white/70 mb-1" data-testid="text-loss-amount">
                 -{ticket?.price ?? 0}
@@ -916,11 +917,11 @@ export default function StackGame() {
                 data-testid="button-replay"
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-primary to-accent text-black font-display font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform"
               >
-                <RotateCcw size={18} /> TRY AGAIN
+                <RotateCcw size={18} /> {gt[getLang()].gamePlayAgain}
               </button>
               <Link href="/games">
                 <button data-testid="button-exit" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
-                  Back to Arena
+                  {gt[getLang()].arenaBackToGames}
                 </button>
               </Link>
             </motion.div>
