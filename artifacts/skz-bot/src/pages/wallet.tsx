@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBalance, writeBalance } from "@/lib/admin-store";
-import { useLang, t } from "@/lib/i18n";
+import { useLang, t, type Strings } from "@/lib/i18n";
 import { fetchUserWallet, submitWithdrawal, type WalletData } from "@/lib/user-api";
 import { useTelegramUser } from "@/lib/telegram-user";
 
@@ -37,24 +37,24 @@ interface WithdrawalRecord {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function timeAgo(ms: number): string {
+function timeAgo(ms: number, s: Strings): string {
   const diff = Date.now() - ms;
-  if (diff < 60_000) return "الآن";
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} دقيقة`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3600_000)} ساعة`;
-  return `${Math.floor(diff / 86_400_000)} يوم`;
+  if (diff < 60_000) return s.timeAgoNow;
+  if (diff < 3600_000) return s.timeAgoMinutes(Math.floor(diff / 60_000));
+  if (diff < 86_400_000) return s.timeAgoHours(Math.floor(diff / 3600_000));
+  return s.timeAgoDays(Math.floor(diff / 86_400_000));
 }
 
-function depStatusLabel(status: DepositRecord["status"]): string {
-  return status === "confirmed" ? "مؤكد" : "قيد المعالجة";
+function depStatusLabel(status: DepositRecord["status"], s: Strings): string {
+  return status === "confirmed" ? s.depStatusConfirmed : s.depStatusPending;
 }
 
-function wdStatusLabel(status: WithdrawalRecord["status"]): string {
+function wdStatusLabel(status: WithdrawalRecord["status"], s: Strings): string {
   switch (status) {
-    case "pending": return "قيد الانتظار";
-    case "approved": return "موافق عليه";
-    case "rejected": return "مرفوض";
-    case "completed": return "مكتمل";
+    case "pending": return s.wdStatusPending;
+    case "approved": return s.wdStatusApproved;
+    case "rejected": return s.wdStatusRejected;
+    case "completed": return s.wdStatusCompleted;
   }
 }
 
@@ -109,21 +109,21 @@ export default function Wallet() {
   };
 
   const depositAddress = walletData?.tonDepositWallet ?? "";
-  const depositNote = "أرسل TON إلى هذا العنوان مع ذكر معرّفك كـ تعليق على العملية. الحد الأدنى: 0.5 TON.";
+  const depositNote = s.depositNoteText;
   const hasDepositWallet = !!depositAddress;
 
   async function handleWithdraw() {
     const amount = parseFloat(wdAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      setWdError("أدخل مبلغاً صحيحاً");
+      setWdError(s.errInvalidAmount);
       return;
     }
     if (!wdAddress.trim()) {
-      setWdError("أدخل عنوان المحفظة المستلِمة");
+      setWdError(s.errNoAddress);
       return;
     }
     if (amount > skzBalance) {
-      setWdError("رصيد SKZ غير كافٍ");
+      setWdError(s.errInsufficientBalance);
       return;
     }
 
@@ -141,10 +141,10 @@ export default function Wallet() {
           loadWallet();
         }, 3000);
       } else {
-        setWdError(result.error ?? "فشل طلب السحب");
+        setWdError(result.error ?? s.errWithdrawFail);
       }
     } catch {
-      setWdError("خطأ في الاتصال — حاول مجدداً");
+      setWdError(s.errConnection);
     } finally {
       setWdLoading(false);
     }
@@ -154,16 +154,16 @@ export default function Wallet() {
     ...(walletData?.deposits ?? []).map((d: DepositRecord) => ({
       type: "deposit" as const,
       at: d.at,
-      label: `إيداع ${d.currency}`,
+      label: `${s.depositTypeLabel} ${d.currency}`,
       amount: `+${d.skzCredited ?? 0} SKZ`,
-      status: depStatusLabel(d.status),
+      status: depStatusLabel(d.status, s),
     })),
     ...(walletData?.withdrawals ?? []).map((w: WithdrawalRecord) => ({
       type: "withdraw" as const,
       at: w.at,
-      label: `سحب ${w.currency}`,
+      label: `${s.withdrawTypeLabel} ${w.currency}`,
       amount: `-${w.amount} SKZ`,
-      status: wdStatusLabel(w.status),
+      status: wdStatusLabel(w.status, s),
     })),
   ].sort((a, b) => b.at - a.at).slice(0, 20);
 
@@ -268,7 +268,7 @@ export default function Wallet() {
             {!hasDepositWallet && !loadingWallet && (
               <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-xl">
                 <p className="text-[11px] text-yellow-200/80 leading-relaxed">
-                  عناوين الإيداع غير مُفعّلة حالياً. تواصل مع الإدارة.
+                  {s.walletNotActive}
                 </p>
               </div>
             )}
@@ -384,7 +384,7 @@ export default function Wallet() {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-white truncate">{tx.label}</div>
                   <div className={`text-[10px] mt-0.5 ${statusColor(tx.status.toLowerCase())}`}>
-                    {tx.status} · {timeAgo(tx.at)}
+                    {tx.status} · {timeAgo(tx.at, s)}
                   </div>
                 </div>
                 <span className={`text-sm font-bold font-mono ${

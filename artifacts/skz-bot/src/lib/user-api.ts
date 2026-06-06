@@ -63,6 +63,35 @@ export interface WithdrawResult {
   error?: string;
 }
 
+// ── Shop ──────────────────────────────────────────────────────────────────────
+
+export interface BuyProductResult {
+  ok: boolean;
+  newSkz?: number;
+  error?: string;
+}
+
+export async function buyShopProduct(
+  productId: number,
+  price: number,
+): Promise<BuyProductResult> {
+  try {
+    const res = await apiFetch("/api/user/shop/buy", {
+      method: "POST",
+      body: JSON.stringify({ productId, price }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { ok: false, error: json.error ?? "Purchase failed" };
+    }
+    return { ok: true, newSkz: json.newSkz };
+  } catch {
+    return { ok: false, error: "Connection error" };
+  }
+}
+
+// ── Withdraw ─────────────────────────────────────────────────────────────────
+
 export async function submitWithdrawal(
   skzAmount: number,
   destWallet: string,

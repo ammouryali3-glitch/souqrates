@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ShoppingCart, Star, Download, FileText, X,
   Coins, ChevronDown, BookOpen,
-  CheckCircle, Package,
+  CheckCircle, Package, Loader2, AlertCircle,
 } from "lucide-react";
 import { CATEGORIES, type Category, type Product } from "@/lib/shop-products";
-import { useAdmin, useBalance } from "@/lib/admin-store";
+import { useAdmin, useBalance, writeBalance } from "@/lib/admin-store";
 import { useTelegramUser } from "@/lib/telegram-user";
+import { buyShopProduct } from "@/lib/user-api";
 
 // ── Content generator per category ───────────────────────────────────────────
 
@@ -574,17 +575,32 @@ function ProductModal({ product, owned: initOwned, balance: initBalance, balance
 }) {
   const [bought, setBought] = useState(initOwned);
   const [bal, setBal] = useState(initBalance);
+  const [buyLoading, setBuyLoading] = useState(false);
+  const [buyError, setBuyError] = useState("");
   const ac = accent(product.category);
   const canAfford = !balanceLoading && bal >= product.price;
 
-  function handleBuy() {
-    if (bought || !canAfford) return;
-    const nb = bal - product.price;
-    setBal(nb);
-    localStorage.setItem(BALANCE_KEY, String(nb));
-    addToLibrary(product.id);
-    setBought(true);
-    onBuy(product);
+  async function handleBuy() {
+    if (bought || !canAfford || buyLoading) return;
+    setBuyLoading(true);
+    setBuyError("");
+    try {
+      const result = await buyShopProduct(product.id, product.price);
+      if (!result.ok) {
+        setBuyError(result.error ?? "فشل الشراء");
+        return;
+      }
+      const newBal = result.newSkz ?? bal - product.price;
+      writeBalance(newBal);
+      setBal(newBal);
+      addToLibrary(product.id);
+      setBought(true);
+      onBuy(product);
+    } catch {
+      setBuyError("خطأ في الاتصال — حاول مجدداً");
+    } finally {
+      setBuyLoading(false);
+    }
   }
 
   const modal = (
@@ -694,14 +710,21 @@ function ProductModal({ product, owned: initOwned, balance: initBalance, balance
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={handleBuy}
-                  disabled={!canAfford}
+                  disabled={!canAfford || buyLoading}
                   className="w-full py-3.5 rounded-2xl font-display font-black text-sm tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-35"
                   style={{ background: `linear-gradient(135deg, ${ac}, ${ac}99)`, color: "#000", boxShadow: canAfford ? `0 0 24px ${ac}44` : "none" }}
                 >
-                  <ShoppingCart size={16} />
-                  شراء مقابل {product.price} SKZ
+                  {buyLoading
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <><ShoppingCart size={16} />شراء مقابل {product.price} SKZ</>
+                  }
                 </motion.button>
-                {!canAfford && (
+                {buyError && (
+                  <div className="flex items-center gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl">
+                    <AlertCircle size={13} />{buyError}
+                  </div>
+                )}
+                {!canAfford && !buyError && (
                   <div className="text-center text-[11px] text-red-400/70 font-display">
                     تحتاج {product.price - bal} SKZ إضافية للشراء
                   </div>

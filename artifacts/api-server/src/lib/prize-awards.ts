@@ -22,6 +22,7 @@ import {
   gameResultsTable as _gameResultsTable,
   adminConfigTable,
   appNotificationsTable,
+  prizePaidOutsTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
@@ -72,44 +73,6 @@ async function getPoolShare(gameId: string): Promise<number> {
   } catch {
     return 0.7;
   }
-}
-
-/**
- * Credit SKZ to a user's balance inside a locked transaction.
- * Returns the new SKZ balance.
- */
-async function creditPrize(userId: string, prize: number): Promise<number> {
-  let newSkz = 0;
-  await db.transaction(async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(platformUsersTable)
-      .where(eq(platformUsersTable.id, userId))
-      .for("update")
-      .limit(1);
-
-    if (!row) throw new Error(`User ${userId} not found`);
-
-    const data = row.data as Record<string, unknown>;
-    const currentSkz = Number(
-      (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
-    );
-    newSkz = currentSkz + prize;
-
-    const updatedData: Record<string, unknown> = {
-      ...data,
-      balances: {
-        ...(data.balances as Record<string, unknown> | undefined),
-        SKZ: newSkz,
-      },
-    };
-
-    await tx
-      .update(platformUsersTable)
-      .set({ data: updatedData, updatedAt: new Date() })
-      .where(eq(platformUsersTable.id, userId));
-  });
-  return newSkz;
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
@@ -189,9 +152,70 @@ export async function awardPeriodWinners(
         continue;
       }
 
-      // ── 2. Credit the winner's SKZ balance ───────────────────────────────
+      // ── 2. Claim payout slot + credit winner inside one atomic transaction ──
+      // The unique index on (game_id, period_end) ensures a duplicate scheduler
+      // run cannot credit the winner twice — onConflictDoNothing returns 0 rows.
 
-      const newSkz = await creditPrize(winner.user_id, prize);
+      const payoutId = randomBytes(12).toString("hex");
+      let credited = false;
+      let newSkz = 0;
+
+      await db.transaction(async (tx) => {
+        const inserted = await tx
+          .insert(prizePaidOutsTable)
+          .values({
+            id: payoutId,
+            gameId: game.id,
+            period,
+            periodEnd,
+            winnerId: winner.user_id,
+            prize,
+            createdAt: new Date(),
+          })
+          .onConflictDoNothing()
+          .returning({ id: prizePaidOutsTable.id });
+
+        if (inserted.length === 0) return; // already paid
+
+        credited = true;
+
+        const [row] = await tx
+          .select()
+          .from(platformUsersTable)
+          .where(eq(platformUsersTable.id, winner.user_id))
+          .for("update")
+          .limit(1);
+
+        if (!row) throw new Error(`User ${winner.user_id} not found`);
+
+        const data = row.data as Record<string, unknown>;
+        const currentSkz = Number(
+          (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+        );
+        newSkz = currentSkz + prize;
+
+        await tx
+          .update(platformUsersTable)
+          .set({
+            data: {
+              ...data,
+              balances: {
+                ...(data.balances as Record<string, unknown> | undefined),
+                SKZ: newSkz,
+              },
+            },
+            updatedAt: new Date(),
+          })
+          .where(eq(platformUsersTable.id, winner.user_id));
+      });
+
+      if (!credited) {
+        logger.info(
+          { gameId: game.id, period, periodEnd },
+          "prize-award: duplicate run detected — payout already recorded, skipping",
+        );
+        continue;
+      }
 
       logger.info(
         {

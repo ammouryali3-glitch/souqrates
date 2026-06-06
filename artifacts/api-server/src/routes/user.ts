@@ -8,7 +8,7 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable } from "@workspace/db";
+import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 const router = Router();
@@ -625,45 +625,83 @@ router.post("/submit-score", async (req: Request, res: Response) => {
   const safeName = String(name).slice(0, 64) || "Player";
 
   // Entry fee is always computed server-side — never trusted from the client.
-  // Fee is only charged on the first play per user per game per period;
-  // any additional attempts in the same period count as 0-fee replays.
   const { entryFee: baseEntryFee } = await getGameEconomy(gameId);
 
   try {
     const since = periodStart(safePeriod);
+    let newSkz: number | null = null;
+    let safeFee = 0;
 
-    // Check if this user has already paid for this game in the current period
-    const existingRows = await db.execute(sql`
-      SELECT id FROM game_results
-      WHERE user_id = ${payload.tgId}
-        AND game_id = ${gameId}
-        AND period = ${safePeriod}
-        AND created_at >= ${since}
-      LIMIT 1
-    `);
-    const alreadyPaidEntry = (existingRows.rows as Array<{ id: string }>).length > 0;
-    const safeFee = alreadyPaidEntry ? 0 : baseEntryFee;
+    // Atomically: check existing entry, deduct fee if first play, insert result.
+    // Locking the user row prevents double-charge races if two requests arrive simultaneously.
+    await db.transaction(async (tx) => {
+      const [userRow] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+      if (!userRow) throw Object.assign(new Error("user_not_found"), { status: 404 });
 
-    const id = randomBytes(12).toString("hex");
-    await db.insert(gameResultsTable).values({
-      id,
-      userId: payload.tgId,
-      gameId,
-      score: Math.floor(score),
-      timeSec: Math.floor(timeSec),
-      name: safeName,
-      feePaid: safeFee,
-      period: safePeriod,
-      createdAt: new Date(),
+      // First play this period = pay the fee; subsequent plays = free replays
+      const existingRows = await tx.execute(sql`
+        SELECT id FROM game_results
+        WHERE user_id = ${payload.tgId}
+          AND game_id  = ${gameId}
+          AND period   = ${safePeriod}
+          AND created_at >= ${since}
+        LIMIT 1
+      `);
+      const alreadyPaid = (existingRows.rows as Array<{ id: string }>).length > 0;
+      safeFee = alreadyPaid ? 0 : baseEntryFee;
+
+      if (safeFee > 0) {
+        const data = userRow.data as Record<string, unknown>;
+        const currentSkz = Number(
+          (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+        );
+        if (currentSkz < safeFee) {
+          throw Object.assign(
+            new Error(`Insufficient balance: need ${safeFee} SKZ, have ${currentSkz}`),
+            { status: 402 },
+          );
+        }
+        newSkz = currentSkz - safeFee;
+        const updatedData: Record<string, unknown> = {
+          ...data,
+          balances: {
+            ...(data.balances as Record<string, unknown> | undefined),
+            SKZ: newSkz,
+          },
+          lastSeen: Date.now(),
+        };
+        await tx
+          .update(platformUsersTable)
+          .set({ data: updatedData, updatedAt: new Date() })
+          .where(eq(platformUsersTable.id, payload.tgId));
+      }
+
+      const id = randomBytes(12).toString("hex");
+      await tx.insert(gameResultsTable).values({
+        id,
+        userId: payload.tgId,
+        gameId,
+        score: Math.floor(score),
+        timeSec: Math.floor(timeSec),
+        name: safeName,
+        feePaid: safeFee,
+        period: safePeriod,
+        createdAt: new Date(),
+      });
     });
 
-    // Compute the caller's rank in the current period leaderboard (full set, not top-20 slice)
+    // Compute rank outside the transaction (read-only, no lock needed)
     const rankResult = await db.execute(sql`
       WITH best AS (
         SELECT DISTINCT ON (user_id) user_id, score, time_sec
         FROM game_results
         WHERE game_id = ${gameId}
-          AND period = ${safePeriod}
+          AND period  = ${safePeriod}
           AND created_at >= ${since}
         ORDER BY user_id, score DESC, time_sec ASC
       )
@@ -673,11 +711,17 @@ router.post("/submit-score", async (req: Request, res: Response) => {
         OR (score = ${Math.floor(score)} AND time_sec < ${Math.floor(timeSec)})
     `);
     const rows = rankResult.rows as Array<{ ahead: number }>;
-    const rank = (Number(rows[0]?.ahead ?? 0)) + 1;
+    const rank = Number(rows[0]?.ahead ?? 0) + 1;
 
-    req.log.info({ tgId: payload.tgId, gameId, score, timeSec, period: safePeriod, feePaid: safeFee }, "game score submitted");
-    res.json({ ok: true, rank });
+    req.log.info(
+      { tgId: payload.tgId, gameId, score, timeSec, period: safePeriod, feePaid: safeFee },
+      "game score submitted",
+    );
+    res.json({ ok: true, rank, ...(newSkz !== null ? { newSkz } : {}) });
   } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 402) { res.status(402).json({ error: e.message ?? "Insufficient balance" }); return; }
     req.log.error({ err }, "submit-score error");
     res.status(500).json({ error: "Internal server error" });
   }
@@ -834,6 +878,88 @@ router.post("/withdraw", async (req: Request, res: Response) => {
     if (e.status === 400) { res.status(400).json({ error: e.message ?? "Invalid request" }); return; }
     if (e.status === 403) { res.status(403).json({ error: e.message ?? "Forbidden" }); return; }
     req.log.error({ err }, "withdraw error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/shop/buy ───────────────────────────────────────────────────
+
+/**
+ * Purchase a shop product. Atomically validates balance, deducts the price,
+ * and records the product ID in user.data.purchases[].
+ *
+ * Body: { productId: number, price: number }
+ *
+ * NOTE: price is currently accepted from the client and validated as a positive
+ * integer. When a server-side product catalog is fully seeded into shopProductsTable
+ * the price should be looked up from there and the client value ignored.
+ */
+router.post("/shop/buy", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const { productId, price } = req.body ?? {};
+  if (typeof productId !== "number" || !Number.isInteger(productId) || productId <= 0) {
+    res.status(400).json({ error: "productId must be a positive integer" }); return;
+  }
+  if (typeof price !== "number" || !Number.isFinite(price) || price <= 0 || !Number.isInteger(price)) {
+    res.status(400).json({ error: "price must be a positive integer" }); return;
+  }
+
+  try {
+    let newSkz = 0;
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+      if (!row) throw Object.assign(new Error("user_not_found"), { status: 404 });
+
+      const data = row.data as Record<string, unknown>;
+      const purchases: number[] = Array.isArray(data.purchases)
+        ? (data.purchases as number[])
+        : [];
+
+      if (purchases.includes(productId)) {
+        throw Object.assign(new Error("Already purchased"), { status: 409 });
+      }
+
+      const currentSkz = Number(
+        (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      );
+      if (currentSkz < price) {
+        throw Object.assign(new Error("Insufficient balance"), { status: 402 });
+      }
+
+      newSkz = currentSkz - price;
+      const updatedData: Record<string, unknown> = {
+        ...data,
+        balances: {
+          ...(data.balances as Record<string, unknown> | undefined),
+          SKZ: newSkz,
+        },
+        purchases: [...purchases, productId],
+        lastSeen: Date.now(),
+      };
+
+      await tx
+        .update(platformUsersTable)
+        .set({ data: updatedData, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+    });
+
+    req.log.info({ tgId: payload.tgId, productId, price }, "shop purchase");
+    res.json({ ok: true, newSkz });
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 402) { res.status(402).json({ error: "Insufficient balance" }); return; }
+    if (e.status === 409) { res.status(409).json({ error: "Already purchased" }); return; }
+    req.log.error({ err }, "shop buy error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

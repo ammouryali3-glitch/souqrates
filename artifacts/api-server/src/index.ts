@@ -36,9 +36,17 @@ app.listen(port, (err) => {
     logger.error({ err }, "Failed to migrate roles config");
   });
 
-  // Start the blockchain deposit poller (TON + USDT TRC20)
-  startDepositPoller();
+  // Start the blockchain deposit poller (non-blocking; log errors but keep server alive)
+  try {
+    startDepositPoller();
+  } catch (err) {
+    logger.error({ err }, "Failed to start deposit poller");
+  }
 
   // Purge stale leaderboard rows and schedule recurring resets at UTC midnight
-  startLeaderboardResetScheduler();
+  try {
+    startLeaderboardResetScheduler();
+  } catch (err) {
+    logger.error({ err }, "Failed to start leaderboard reset scheduler");
+  }
 });

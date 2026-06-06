@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, jsonb, timestamp, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 /**
  * Platform (mini-app) users managed in the admin dashboard.
@@ -94,4 +94,21 @@ export const gameResultsTable = pgTable("game_results", {
 }, (t) => [
   index("game_results_game_period_idx").on(t.gameId, t.period, t.createdAt),
   index("game_results_user_game_idx").on(t.userId, t.gameId),
+]);
+
+/**
+ * Idempotency guard for prize payouts.
+ * One row per (game_id, period_end) — if the row already exists the scheduler
+ * skips crediting the winner a second time, making payouts safe to retry.
+ */
+export const prizePaidOutsTable = pgTable("prize_payouts", {
+  id: text("id").primaryKey(),
+  gameId: text("game_id").notNull(),
+  period: text("period", { enum: ["daily", "weekly"] }).notNull(),
+  periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+  winnerId: text("winner_id").notNull(),
+  prize: integer("prize").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("prize_payouts_game_period_end_idx").on(t.gameId, t.periodEnd),
 ]);

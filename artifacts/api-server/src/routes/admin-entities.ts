@@ -110,6 +110,12 @@ router.post("/users", requirePermission("users"), async (req: Request, res: Resp
   }
 });
 
+// Allow-list: only these top-level fields can be patched by admins.
+// Balances, purchases, game state, and identity fields are intentionally excluded.
+const ALLOWED_USER_PATCH_FIELDS = new Set([
+  "status", "restrictions", "note", "tags", "displayName",
+]);
+
 router.patch("/users/:id", requirePermission("users"), async (req: Request, res: Response) => {
   const id = String(req.params.id);
   try {
@@ -118,7 +124,13 @@ router.patch("/users/:id", requirePermission("users"), async (req: Request, res:
       res.status(404).json({ error: "User not found" });
       return;
     }
-    const merged = { ...(existing.data as object), ...req.body, id };
+    const patch: Record<string, unknown> = {};
+    for (const key of ALLOWED_USER_PATCH_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        patch[key] = (req.body as Record<string, unknown>)[key];
+      }
+    }
+    const merged = { ...(existing.data as object), ...patch, id };
     await db
       .update(platformUsersTable)
       .set({ data: merged, updatedAt: new Date() })

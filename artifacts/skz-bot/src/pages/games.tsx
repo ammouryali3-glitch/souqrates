@@ -4,9 +4,10 @@ import { Link } from "wouter";
 
 import { ACCENTS, ARENA_GAMES, SKILL_GAMES, type GameDef } from "@/lib/games-data";
 import { useAdmin } from "@/lib/admin-store";
+import { useLang, t, type Strings } from "@/lib/i18n";
 
 
-function ArenaCard({ game }: { game: GameDef }) {
+function ArenaCard({ game, s }: { game: GameDef; s: Strings }) {
   const a = ACCENTS[game.accent];
   const Icon = game.icon;
   return (
@@ -18,7 +19,7 @@ function ArenaCard({ game }: { game: GameDef }) {
         <div className="flex items-center justify-between mb-2 relative z-10">
           <div className="flex items-center gap-2">
             <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{game.tag}</span>
-            <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Live Pool</span>
+            <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> {s.livePool}</span>
           </div>
           <span className={`font-display font-black ${a.text} text-sm`}>{game.prize} SKZ</span>
         </div>
@@ -30,7 +31,7 @@ function ArenaCard({ game }: { game: GameDef }) {
           <div className={`w-14 h-14 rounded-2xl ${a.iconWrap} flex items-center justify-center shrink-0`}><Icon size={26} className={a.iconText} /></div>
         </div>
         <div className={`flex items-center gap-2 mt-2 text-xs font-display font-bold ${a.text} relative z-10`}>
-          <Trophy size={12} />الدخول: {game.entry} SKZ · {game.tagline}
+          <Trophy size={12} />{s.arenaEntry}: {game.entry} SKZ · {game.tagline}
           <ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" />
         </div>
       </motion.div>
@@ -38,7 +39,7 @@ function ArenaCard({ game }: { game: GameDef }) {
   );
 }
 
-function SkillCard({ game }: { game: GameDef }) {
+function SkillCard({ game, s }: { game: GameDef; s: Strings }) {
   const a = ACCENTS[game.accent];
   const Icon = game.icon;
   return (
@@ -50,7 +51,7 @@ function SkillCard({ game }: { game: GameDef }) {
         <div className="flex flex-col gap-3 relative z-10">
           <div className="flex items-center justify-between">
             <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{game.category}</span>
-            <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Playable</span>
+            <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> {s.playable}</span>
           </div>
           <div className="flex items-end justify-between">
             <div className="flex flex-col gap-1">
@@ -71,6 +72,8 @@ function SkillCard({ game }: { game: GameDef }) {
 
 export default function Games() {
   const { gameOverrides, settings } = useAdmin();
+  const lang = useLang();
+  const s = t[lang];
 
   const applyOverride = (g: GameDef): GameDef | null => {
     const o = gameOverrides[g.id];
@@ -97,12 +100,12 @@ export default function Games() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-white tracking-wider uppercase">Arena</h1>
-          <p className="text-sm text-muted-foreground mt-1">High stakes skill matches</p>
+          <h1 className="text-2xl font-display font-bold text-white tracking-wider uppercase">{s.arenaTitle}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{s.arenaTagline}</p>
         </div>
         <div className="bg-card/50 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
           <Zap size={14} className="text-accent" />
-          <span className="text-sm font-bold text-white">{settings.onlineCount} Online</span>
+          <span className="text-sm font-bold text-white">{s.onlineCount(Number(settings.onlineCount) || 0)}</span>
         </div>
       </div>
 
@@ -112,12 +115,12 @@ export default function Games() {
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/40 to-transparent" />
             <span className="text-[10px] tracking-[0.4em] font-display uppercase text-yellow-400/70 flex items-center gap-1.5">
-              <Trophy size={11} className="text-yellow-400" /> Prize Pool Arena
+              <Trophy size={11} className="text-yellow-400" /> {s.prizePoolArena}
             </span>
             <div className="flex-1 h-px bg-gradient-to-l from-yellow-500/40 to-transparent" />
           </div>
-          <p className="text-xs text-white/30 text-center mb-4 font-display">ادفع الدخول · حُلّ الأسرع · اربح الجائزة</p>
-          {arena.map((g) => <ArenaCard key={g.id} game={g} />)}
+          <p className="text-xs text-white/30 text-center mb-4 font-display">{s.arenaSubtitle}</p>
+          {arena.map((g) => <ArenaCard key={g.id} game={g} s={s} />)}
         </div>
       )}
 
@@ -127,11 +130,11 @@ export default function Games() {
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-gradient-to-r from-cyan-500/40 to-transparent" />
             <span className="text-[10px] tracking-[0.4em] font-display uppercase text-cyan-400/70 flex items-center gap-1.5">
-              <Swords size={11} className="text-cyan-400" /> Skill Games
+              <Swords size={11} className="text-cyan-400" /> {s.skillGamesTitle}
             </span>
             <div className="flex-1 h-px bg-gradient-to-l from-cyan-500/40 to-transparent" />
           </div>
-          {skill.map((g) => <SkillCard key={g.id} game={g} />)}
+          {skill.map((g) => <SkillCard key={g.id} game={g} s={s} />)}
         </div>
       )}
 

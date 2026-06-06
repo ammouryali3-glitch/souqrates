@@ -33,11 +33,13 @@ document.documentElement.lang = lang;
 
 export const t = {
   ar: {
+    // Navigation
     home: "الرئيسية",
     games: "الألعاب",
     shop: "المتجر",
     wallet: "المحفظة",
     referrals: "الإحالات",
+    // Home
     totalBalance: "الرصيد الكلي",
     totalWon: "إجمالي المكاسب",
     network: "شبكتك",
@@ -46,17 +48,42 @@ export const t = {
     noActivity: "لا يوجد نشاط بعد",
     dailyBonus: "مكافأة يومية متاحة",
     dailyBonusSub: (amt: number, bal: number) => `اضغط للحصول على ${amt} SKZ · رصيدك ${bal}`,
+    // Wallet core
     availableSkz: "رصيد SKZ المتاح",
     deposit: "إيداع",
     withdraw: "سحب",
     recentTxs: "آخر المعاملات",
     noTxs: "لا توجد معاملات بعد",
     depositAddress: "عنوان الإيداع",
-    depositNote: "أرسل USDT عبر شبكة TRON (TRC20) فقط. الأصول الأخرى ستُفقد. الحد الأدنى: 10 USDT.",
+    depositNote: "أرسل TON إلى هذا العنوان.",
+    depositNoteText: "أرسل TON إلى هذا العنوان مع ذكر معرّفك كـ تعليق على العملية. الحد الأدنى: 0.5 TON.",
+    walletNotActive: "عناوين الإيداع غير مُفعّلة حالياً. تواصل مع الإدارة.",
     amount: "المبلغ (SKZ)",
     maxBtn: "الحد الأقصى",
-    destWallet: "المحفظة المستلِمة (USDT TRC20)",
+    destWallet: "المحفظة المستلِمة (TON)",
     confirmWithdraw: "تأكيد السحب",
+    withdrawSuccess: "تم إرسال طلب السحب بنجاح — سيراجعه الفريق قريباً.",
+    depositTypeLabel: "إيداع",
+    withdrawTypeLabel: "سحب",
+    // Time ago
+    timeAgoNow: "الآن",
+    timeAgoMinutes: (n: number) => `منذ ${n} دق`,
+    timeAgoHours: (n: number) => `منذ ${n} سا`,
+    timeAgoDays: (n: number) => `منذ ${n} يوم`,
+    // Deposit/Withdrawal status labels
+    depStatusConfirmed: "مؤكد",
+    depStatusPending: "قيد المعالجة",
+    wdStatusPending: "قيد الانتظار",
+    wdStatusApproved: "موافق عليه",
+    wdStatusRejected: "مرفوض",
+    wdStatusCompleted: "مكتمل",
+    // Wallet error messages
+    errInvalidAmount: "أدخل مبلغاً صحيحاً",
+    errNoAddress: "أدخل عنوان المحفظة المستلِمة",
+    errInsufficientBalance: "رصيد SKZ غير كافٍ",
+    errWithdrawFail: "فشل طلب السحب",
+    errConnection: "خطأ في الاتصال — حاول مجدداً",
+    // Referrals
     syndicateTitle: "الشبكة",
     syndicateDesc: "شبكة عمولات متعددة المستويات",
     totalEarned: "إجمالي الأرباح",
@@ -69,6 +96,7 @@ export const t = {
     commission: "عمولة",
     active: "نشط",
     generatedRevenue: "الأرباح المحققة",
+    // Shop
     shopTitle: "المتجر",
     shopEmpty: "لا توجد منتجات حالياً — تابعنا لمعرفة آخر العروض",
     searchPlaceholder: "بحث...",
@@ -76,20 +104,35 @@ export const t = {
     buy: "شراء",
     purchased: "مكتسب",
     pages: "صفحة",
+    insufficientBalanceShop: "رصيد غير كافٍ",
+    buyError: "فشل الشراء — حاول مجدداً",
+    // Games page
+    arenaTitle: "الساحة",
+    arenaTagline: "مباريات مهارة عالية المخاطر",
+    onlineCount: (n: number) => `${n} متصل`,
+    prizePoolArena: "ساحة الجائزة",
+    arenaSubtitle: "ادفع الدخول · حُل الأسرع · اربح الجائزة",
+    skillGamesTitle: "ألعاب المهارة",
+    livePool: "جائزة حية",
+    playable: "متاح",
+    arenaEntry: "الدخول",
+    loading: "جارٍ التحميل...",
+    // Misc
     langSwitch: "EN",
     play: "العب",
     vaultTitle: "الخزنة",
     refs: "إحالات",
     depositMemoLabel: "معرّفك (أضفه كتعليق على التحويل)",
     depositMemoNote: "يجب إدراج هذا الرقم كـ تعليق/مذكرة في عملية التحويل لتحديد هويتك وإضافة الرصيد تلقائياً.",
-    withdrawSuccess: "تم إرسال طلب السحب بنجاح — سيراجعه الفريق قريباً.",
   },
   en: {
+    // Navigation
     home: "Home",
     games: "Games",
     shop: "Shop",
     wallet: "Wallet",
     referrals: "Referrals",
+    // Home
     totalBalance: "Total Balance",
     totalWon: "Total Won",
     network: "Network",
@@ -98,17 +141,42 @@ export const t = {
     noActivity: "No activity yet",
     dailyBonus: "Daily bonus available",
     dailyBonusSub: (amt: number, bal: number) => `Tap to claim ${amt} SKZ · Balance: ${bal}`,
+    // Wallet core
     availableSkz: "Available SKZ",
     deposit: "Deposit",
     withdraw: "Withdraw",
     recentTxs: "Recent Transactions",
     noTxs: "No transactions yet",
     depositAddress: "Deposit Address",
-    depositNote: "Send only USDT over TRON (TRC20) network. Other assets will be lost. Minimum: 10 USDT.",
+    depositNote: "Send TON to this address.",
+    depositNoteText: "Send TON to this address with your ID as the transaction comment. Minimum: 0.5 TON.",
+    walletNotActive: "Deposit addresses not activated yet. Contact support.",
     amount: "Amount (SKZ)",
     maxBtn: "Max",
-    destWallet: "Destination Wallet (USDT TRC20)",
+    destWallet: "Destination Wallet (TON)",
     confirmWithdraw: "Confirm Withdrawal",
+    withdrawSuccess: "Withdrawal submitted — the team will process it shortly.",
+    depositTypeLabel: "Deposit",
+    withdrawTypeLabel: "Withdrawal",
+    // Time ago
+    timeAgoNow: "Just now",
+    timeAgoMinutes: (n: number) => `${n}m ago`,
+    timeAgoHours: (n: number) => `${n}h ago`,
+    timeAgoDays: (n: number) => `${n}d ago`,
+    // Deposit/Withdrawal status labels
+    depStatusConfirmed: "Confirmed",
+    depStatusPending: "Processing",
+    wdStatusPending: "Pending",
+    wdStatusApproved: "Approved",
+    wdStatusRejected: "Rejected",
+    wdStatusCompleted: "Completed",
+    // Wallet error messages
+    errInvalidAmount: "Enter a valid amount",
+    errNoAddress: "Enter destination wallet address",
+    errInsufficientBalance: "Insufficient SKZ balance",
+    errWithdrawFail: "Withdrawal request failed",
+    errConnection: "Connection error — try again",
+    // Referrals
     syndicateTitle: "Syndicate",
     syndicateDesc: "Multi-tier commission network",
     totalEarned: "Total Earned",
@@ -121,6 +189,7 @@ export const t = {
     commission: "Commission",
     active: "active",
     generatedRevenue: "Generated Revenue",
+    // Shop
     shopTitle: "Shop",
     shopEmpty: "No products available yet — stay tuned",
     searchPlaceholder: "Search...",
@@ -128,14 +197,33 @@ export const t = {
     buy: "Buy",
     purchased: "Owned",
     pages: "pages",
+    insufficientBalanceShop: "Insufficient balance",
+    buyError: "Purchase failed — try again",
+    // Games page
+    arenaTitle: "Arena",
+    arenaTagline: "High stakes skill matches",
+    onlineCount: (n: number) => `${n} Online`,
+    prizePoolArena: "Prize Pool Arena",
+    arenaSubtitle: "Pay entry · Solve fastest · Win the prize",
+    skillGamesTitle: "Skill Games",
+    livePool: "Live Pool",
+    playable: "Playable",
+    arenaEntry: "Entry",
+    loading: "Loading...",
+    // Misc
     langSwitch: "ع",
     play: "Play",
     vaultTitle: "Vault",
     refs: "Refs",
     depositMemoLabel: "Your ID (add as transaction comment/memo)",
     depositMemoNote: "Include this number as the comment/memo in your transfer so the system can identify you and credit your balance automatically.",
-    withdrawSuccess: "Withdrawal submitted — the team will process it shortly.",
   },
 } as const;
 
-export type Strings = typeof t.ar;
+// Structural type that both t.ar and t.en satisfy.
+// Mapping literal string values → string avoids incompatibility between the two locales.
+export type Strings = {
+  [K in keyof typeof t.ar]: typeof t.ar[K] extends (...args: infer A) => unknown
+    ? (...args: A) => string
+    : string;
+};
