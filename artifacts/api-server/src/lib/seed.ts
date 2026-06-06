@@ -4,8 +4,9 @@
  * Called once during server init if the DB is found to be empty.
  */
 import { db } from "@workspace/db";
-import { adminConfigTable } from "@workspace/db";
+import { adminConfigTable, adminAccountsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { logger } from "./logger";
 
 const NOW = Date.now();
@@ -84,6 +85,76 @@ const DEFAULT_CONFIG = {
     },
   ],
 };
+
+/**
+ * Bootstrap the default owner account if no owner exists yet.
+ *
+ * Safe to call on every startup — it's a no-op once any owner account is
+ * present. This guarantees that a freshly deployed (production) database always
+ * has a working admin login, since admin_accounts is never populated by config
+ * seeding.
+ *
+ * Default credentials (changeable from the System section after first login):
+ *   handle:   @admin
+ *   password: Souqrates@2025
+ *
+ * Override via env: BOOTSTRAP_OWNER_HANDLE / BOOTSTRAP_OWNER_PASSWORD.
+ */
+export async function ensureOwnerAccount(): Promise<void> {
+  try {
+    const [existingOwner] = await db
+      .select({ id: adminAccountsTable.id })
+      .from(adminAccountsTable)
+      .where(eq(adminAccountsTable.role, "owner"))
+      .limit(1);
+
+    if (existingOwner) {
+      logger.info("Owner account already present, skipping bootstrap");
+      return;
+    }
+
+    // Match the login route's normalization exactly: strip leading @, lowercase,
+    // then re-prepend @. A mismatch here makes login silently fail.
+    const rawHandle = (process.env.BOOTSTRAP_OWNER_HANDLE ?? "@admin").trim();
+    const handle = `@${rawHandle.toLowerCase().replace(/^@+/, "")}`;
+    const password = process.env.BOOTSTRAP_OWNER_PASSWORD ?? "Souqrates@2025";
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await db
+      .insert(adminAccountsTable)
+      .values({
+        id: "admin_owner",
+        name: "المالك",
+        handle,
+        role: "owner",
+        passwordHash,
+        permissions: [],
+        active: true,
+        mustChangePassword: false,
+      })
+      .onConflictDoNothing();
+
+    // Verify an owner actually exists now (the fixed id could collide with a
+    // pre-existing non-owner row, in which case the insert is a no-op).
+    const [confirmed] = await db
+      .select({ id: adminAccountsTable.id })
+      .from(adminAccountsTable)
+      .where(eq(adminAccountsTable.role, "owner"))
+      .limit(1);
+
+    if (confirmed) {
+      logger.info({ handle }, "Bootstrapped default owner account");
+    } else {
+      logger.error(
+        { handle },
+        "Owner bootstrap insert was a no-op (id collision?); no owner account exists",
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, "ensureOwnerAccount failed");
+  }
+}
 
 export async function seedDatabaseIfEmpty(): Promise<void> {
   try {

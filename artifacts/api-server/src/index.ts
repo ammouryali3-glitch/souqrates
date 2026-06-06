@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded } from "./lib/seed";
+import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount } from "./lib/seed";
 import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 import { registerWebhook } from "./routes/bot";
@@ -35,6 +35,11 @@ app.listen(port, (err) => {
   // Fix roles config shape from old object-permissions format to AdminRole[]
   migrateRolesConfigIfNeeded().catch((err) => {
     logger.error({ err }, "Failed to migrate roles config");
+  });
+
+  // Ensure a working owner account exists (idempotent; bootstraps fresh DBs)
+  ensureOwnerAccount().catch((err) => {
+    logger.error({ err }, "Failed to ensure owner account");
   });
 
   // Start the blockchain deposit poller (non-blocking; log errors but keep server alive)
