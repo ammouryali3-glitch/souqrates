@@ -25,7 +25,10 @@ existed only in the dev DB while they tested the deployed app.
   `handle.trim().toLowerCase().replace(/^@+/, "")` then queries `@${normalised}` — so a
   bootstrapped/created handle MUST be stored lowercase with a single leading `@`, or
   login silently 401s even with the right password.
-- Default bootstrap creds: `@admin` / `Souqrates@2025`, overridable via
-  `BOOTSTRAP_OWNER_HANDLE` / `BOOTSTRAP_OWNER_PASSWORD`.
+- Default bootstrap handle/password live in the `ensureOwnerAccount` doc-comment in
+  `artifacts/api-server/src/lib/seed.ts` (source of truth). Both are overridable via the
+  `BOOTSTRAP_OWNER_HANDLE` / `BOOTSTRAP_OWNER_PASSWORD` env vars. For production, set a
+  strong `BOOTSTRAP_OWNER_PASSWORD` secret and change it after first login — never rely
+  on the built-in default. (Credentials are intentionally not duplicated here.)
 - bcryptjs is NOT importable in the code_execution sandbox (ERR_MODULE_NOT_FOUND); hash
   via `node -e` in bash from inside `artifacts/api-server` instead.

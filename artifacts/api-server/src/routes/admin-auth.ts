@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
 import { adminAccountsTable } from "@workspace/db";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne } from "@workspace/db";
 
 const router = Router();
 

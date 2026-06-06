@@ -1,4 +1,6 @@
 - [SKZ Bot canvas games](skz-bot-games.md) — full-screen /games/<name> routes; must stop rAF on game-over and close AudioContext on unmount.
+- [drizzle-orm peer-fork](drizzle-upstash-peer-fork.md) — adding @upstash/redis forks drizzle into a 2nd type-brand; fix = re-export operators from @workspace/db, import from there not "drizzle-orm".
+- [Sentry Node + esbuild](sentry-node-esbuild.md) — @sentry/node v8+ crashes at runtime under esbuild (missing OTel dynamic deps); stay on v7.
 - [Admin owner bootstrap](admin-account-bootstrap.md) — admin_accounts isn't config-seeded; dev/prod DBs differ; idempotent ensureOwnerAccount on startup; store handles lowercase to match login normalization.
 - [SKZ Bot i18n + mock removal](skz-bot-i18n.md) — lib/i18n.ts lang system; freshSlices() entities are empty arrays (real data from DB); arena base values are 0.
 - [SKZ Bot economy layer](skz-bot-economy.md) — game-economy.ts is the chokepoint; a manager control is only real if traced through there; balance is a separate localStorage key.

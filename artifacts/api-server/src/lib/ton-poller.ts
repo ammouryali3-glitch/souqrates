@@ -21,7 +21,7 @@
  */
 import { db } from "@workspace/db";
 import { platformUsersTable, depositsTable, adminConfigTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql } from "@workspace/db";
 import { logger } from "./logger";
 
 // ── Constants ─────────────────────────────────────────────────────────────────

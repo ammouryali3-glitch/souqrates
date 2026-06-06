@@ -36,10 +36,6 @@ export function captureException(err: unknown): void {
   }
 }
 
-export function getSentryErrorHandler() {
-  return Sentry.expressErrorHandler();
-}
-
 export async function testSentryConnection(dsn: string): Promise<{ ok: boolean; error?: string }> {
   if (!dsn) return { ok: false, error: "No DSN provided" };
   try {

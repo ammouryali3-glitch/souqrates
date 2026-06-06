@@ -5,7 +5,7 @@
  */
 import { db } from "@workspace/db";
 import { adminConfigTable, adminAccountsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import { logger } from "./logger";
 

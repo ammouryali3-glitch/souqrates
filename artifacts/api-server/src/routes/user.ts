@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
 import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql } from "@workspace/db";
 
 const router = Router();
 

@@ -22,7 +22,7 @@ import {
   referrersTable,
   gameResultsTable,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql } from "@workspace/db";
 import { requireAdminSession } from "./admin-auth";
 import { adminAccountsTable } from "@workspace/db";
 

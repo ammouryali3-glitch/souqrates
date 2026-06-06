@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { adminConfigTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq } from "@workspace/db";
 import { logger } from "../logger";
 import { initRedis, destroyRedis } from "./redis";
 import { initR2, destroyR2 } from "./r2";
@@ -125,7 +125,12 @@ export function getMaskedConfig(): IntegrationConfig {
       secretAccessKey: c.r2.secretAccessKey ? "••••••••" : "",
       apiToken: "",
     } as IntegrationConfig["r2"],
-    sentry: { ...c.sentry },
+    sentry: {
+      ...c.sentry,
+      // backendDsn is a server-side secret; frontendDsn is intentionally public
+      // (it ships in the client bundle), so it stays unmasked for the UI to use.
+      backendDsn: c.sentry.backendDsn ? "••••••••" : "",
+    },
     cloudflare: {
       ...c.cloudflare,
       apiToken: c.cloudflare.apiToken ? "••••••••" : "",
@@ -146,7 +151,10 @@ export function mergeWithSecrets(incoming: IntegrationConfig): IntegrationConfig
       accessKeyId: incoming.r2.accessKeyId === "••••••••" ? cur.r2.accessKeyId : incoming.r2.accessKeyId,
       secretAccessKey: incoming.r2.secretAccessKey === "••••••••" ? cur.r2.secretAccessKey : incoming.r2.secretAccessKey,
     },
-    sentry: { ...incoming.sentry },
+    sentry: {
+      ...incoming.sentry,
+      backendDsn: incoming.sentry.backendDsn === "••••••••" ? cur.sentry.backendDsn : incoming.sentry.backendDsn,
+    },
     cloudflare: {
       ...incoming.cloudflare,
       apiToken: incoming.cloudflare.apiToken === "••••••••" ? cur.cloudflare.apiToken : incoming.cloudflare.apiToken,

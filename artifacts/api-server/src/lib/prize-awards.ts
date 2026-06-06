@@ -24,7 +24,7 @@ import {
   appNotificationsTable,
   prizePaidOutsTable,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql } from "@workspace/db";
 import { logger } from "./logger";
 
 // ── Arena game catalogue (server-authoritative, mirrors games-data.ts tags) ───

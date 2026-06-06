@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAdminSession, requirePermission } from "./admin-auth";
 import {
   getMaskedConfig,
+  getCurrentIntegrationConfig,
   updateIntegrations,
   mergeWithSecrets,
   type IntegrationConfig,
@@ -60,13 +61,13 @@ router.post("/integrations/:name/test", requireAdminSession, requirePermission("
       return;
     }
     case "sentry": {
-      const cfg = getMaskedConfig();
+      const cfg = getCurrentIntegrationConfig();
       const result = await testSentryConnection(cfg.sentry.backendDsn);
       res.json(result);
       return;
     }
     case "cloudflare": {
-      const cfg = getMaskedConfig();
+      const cfg = getCurrentIntegrationConfig();
       if (!cfg.cloudflare.workerUrl) {
         res.json({ ok: false, error: "No Worker URL configured" });
         return;
@@ -86,7 +87,7 @@ router.post("/integrations/:name/test", requireAdminSession, requirePermission("
 
 // ── POST /admin/integrations/r2/upload ────────────────────────────────────────
 // Upload a file (base64 body) to R2 and get back the public URL
-router.post("/integrations/r2/upload", requireAdminSession, async (req, res) => {
+router.post("/integrations/r2/upload", requireAdminSession, requirePermission("system"), async (req, res) => {
   const { key, base64, contentType } = req.body as {
     key?: string;
     base64?: string;

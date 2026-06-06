@@ -19,7 +19,7 @@ import {
   shopProductsTable,
   referrersTable,
 } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "@workspace/db";
 import { requireAdminSession, requirePermission } from "./admin-auth";
 
 const router = Router();
