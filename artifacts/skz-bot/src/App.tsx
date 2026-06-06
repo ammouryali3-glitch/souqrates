@@ -6,75 +6,62 @@ import { MobileContainer } from "@/components/layout/MobileContainer";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { NotificationBanner } from "@/components/NotificationBanner";
 import { AnimatePresence, motion } from "framer-motion";
-import { Ban, Wrench } from "lucide-react";
+import { Ban, Wrench, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/lib/admin-store";
 import { ALL_GAMES, getGameById } from "@/lib/games-data";
 import { setCurrentGameContext, useTelegramUser } from "@/lib/telegram-user";
-import { useEffect, useRef } from "react";
+import { Component, Suspense, lazy, useEffect, useRef } from "react";
+import type { ReactNode, ErrorInfo } from "react";
 
-// Pages
+// Non-game pages — loaded eagerly (they're small)
 import Home from "@/pages/home";
 import Games from "@/pages/games";
 import Shop from "@/pages/shop";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
-import StackGame from "@/pages/stack-game";
-import OrbitGame from "@/pages/orbit-game";
-import KnifeGame from "@/pages/knife-game";
-import SliceGame from "@/pages/slice-game";
-import ColorSwitchGame from "@/pages/color-switch-game";
-import ZigZagGame from "@/pages/zigzag-game";
-import PianoGame from "@/pages/piano-game";
-import WhackGame from "@/pages/whack-game";
-import BubbleGame from "@/pages/bubble-game";
-import ShooterGame from "@/pages/shooter-game";
-import BreakoutGame from "@/pages/breakout-game";
-import JumperGame from "@/pages/jumper-game";
-import CalcBlastGame from "@/pages/calc-blast-game";
-import NumSmashGame from "@/pages/num-smash-game";
-import ChainSumGame from "@/pages/chain-sum-game";
-import FracSortGame from "@/pages/frac-sort-game";
-import SpeedMathGame from "@/pages/speed-math-game";
-import GridPopGame from "@/pages/gridpop-game";
-import NeonLinkGame from "@/pages/neonlink-game";
-import QuickSumGame from "@/pages/quicksum-game";
-import Match3Game from "@/pages/match3-game";
-import PulseTapGame from "@/pages/pulsetap-game";
-import SwipeRushGame from "@/pages/swiperush-game";
-import BubblePopGame from "@/pages/bubblepop-game";
-import ColorRainGame from "@/pages/colorrain-game";
-import StackDropGame from "@/pages/stackdrop-game";
-import OrbitAimGame from "@/pages/orbitaim-game";
-import EchoTapGame from "@/pages/echotap-game";
-import MergeBlitzGame from "@/pages/mergeblitz-game";
-import NumBlitzGame from "@/pages/numblitz-game";
-import CardFlipGame from "@/pages/cardflip-game";
-import DetectiveGame from "@/pages/detective-game";
-import CipherRushGame from "@/pages/cipher-rush-game";
-import HiddenPathGame from "@/pages/hidden-path-game";
-import GeniusGridGame from "@/pages/genius-grid-game";
-import TruthScaleGame from "@/pages/truth-scale-game";
 import Manager from "@/pages/manager";
 import Contact from "@/pages/contact";
 import Policies from "@/pages/policies";
 import NotFound from "@/pages/not-found";
 
-const queryClient = new QueryClient();
-
-// Page transition wrapper
-function PageWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="flex-1 overflow-y-auto pb-28 pt-6 px-4"
-    >
-      {children}
-    </motion.div>
-  );
-}
+// Games — lazy-loaded so they don't bloat the initial bundle.
+// Each game chunk is only fetched when the user actually navigates to that route.
+const StackGame      = lazy(() => import("@/pages/stack-game"));
+const OrbitGame      = lazy(() => import("@/pages/orbit-game"));
+const KnifeGame      = lazy(() => import("@/pages/knife-game"));
+const SliceGame      = lazy(() => import("@/pages/slice-game"));
+const ColorSwitchGame = lazy(() => import("@/pages/color-switch-game"));
+const ZigZagGame     = lazy(() => import("@/pages/zigzag-game"));
+const PianoGame      = lazy(() => import("@/pages/piano-game"));
+const WhackGame      = lazy(() => import("@/pages/whack-game"));
+const BubbleGame     = lazy(() => import("@/pages/bubble-game"));
+const ShooterGame    = lazy(() => import("@/pages/shooter-game"));
+const BreakoutGame   = lazy(() => import("@/pages/breakout-game"));
+const JumperGame     = lazy(() => import("@/pages/jumper-game"));
+const CalcBlastGame  = lazy(() => import("@/pages/calc-blast-game"));
+const NumSmashGame   = lazy(() => import("@/pages/num-smash-game"));
+const ChainSumGame   = lazy(() => import("@/pages/chain-sum-game"));
+const FracSortGame   = lazy(() => import("@/pages/frac-sort-game"));
+const SpeedMathGame  = lazy(() => import("@/pages/speed-math-game"));
+const GridPopGame    = lazy(() => import("@/pages/gridpop-game"));
+const NeonLinkGame   = lazy(() => import("@/pages/neonlink-game"));
+const QuickSumGame   = lazy(() => import("@/pages/quicksum-game"));
+const Match3Game     = lazy(() => import("@/pages/match3-game"));
+const PulseTapGame   = lazy(() => import("@/pages/pulsetap-game"));
+const SwipeRushGame  = lazy(() => import("@/pages/swiperush-game"));
+const BubblePopGame  = lazy(() => import("@/pages/bubblepop-game"));
+const ColorRainGame  = lazy(() => import("@/pages/colorrain-game"));
+const StackDropGame  = lazy(() => import("@/pages/stackdrop-game"));
+const OrbitAimGame   = lazy(() => import("@/pages/orbitaim-game"));
+const EchoTapGame    = lazy(() => import("@/pages/echotap-game"));
+const MergeBlitzGame = lazy(() => import("@/pages/mergeblitz-game"));
+const NumBlitzGame   = lazy(() => import("@/pages/numblitz-game"));
+const CardFlipGame   = lazy(() => import("@/pages/cardflip-game"));
+const DetectiveGame  = lazy(() => import("@/pages/detective-game"));
+const CipherRushGame = lazy(() => import("@/pages/cipher-rush-game"));
+const HiddenPathGame = lazy(() => import("@/pages/hidden-path-game"));
+const GeniusGridGame = lazy(() => import("@/pages/genius-grid-game"));
+const TruthScaleGame = lazy(() => import("@/pages/truth-scale-game"));
 
 const GAME_COMPONENTS: Record<string, React.ComponentType> = {
   stack: StackGame, orbit: OrbitGame, knife: KnifeGame, slice: SliceGame,
@@ -89,9 +76,85 @@ const GAME_COMPONENTS: Record<string, React.ComponentType> = {
   geniusgrid: GeniusGridGame, truthscale: TruthScaleGame,
 };
 
-// Gate a game route: redirect to /games if the game is disabled or its section is off.
-// Also shows a loading overlay while the server balance is being confirmed, so the
-// ticket-selection screen cannot be interacted with before the authoritative balance arrives.
+const queryClient = new QueryClient();
+
+// ── Error Boundary ────────────────────────────────────────────────────────────
+// Catches crashes in individual game components so the rest of the app stays alive.
+
+interface EBState { hasError: boolean; error?: Error }
+
+class GameErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): EBState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[GameErrorBoundary]", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center"
+          dir="rtl"
+        >
+          <AlertTriangle size={44} className="text-amber-400" />
+          <h2 className="text-lg font-display font-bold text-white">
+            حدث خطأ في تحميل اللعبة
+          </h2>
+          <p className="text-sm text-white/50">
+            {this.state.error?.message ?? "Unknown error"}
+          </p>
+          <button
+            className="mt-2 px-5 py-2 rounded-full text-sm font-semibold text-black"
+            style={{ background: "var(--color-primary, #f5b301)" }}
+            onClick={() => this.setState({ hasError: false, error: undefined })}
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Loading fallback shown while a lazy game chunk is being fetched ───────────
+function GameLoader() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <span className="text-xs text-white/50 font-display">جارٍ تحميل اللعبة…</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Page transition wrapper ───────────────────────────────────────────────────
+function PageWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="flex-1 overflow-y-auto pb-28 pt-6 px-4"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ── Game route guard ──────────────────────────────────────────────────────────
+// Redirects if game/section is disabled. Shows a loading overlay while the
+// authoritative balance is still being confirmed from the server.
 function GameGate({ id, children }: { id: string; children: React.ReactNode }) {
   const { gameOverrides, settings } = useAdmin();
   const { loading: balanceLoading } = useTelegramUser();
@@ -153,9 +216,6 @@ function Router() {
   const isManager = location === "/manager";
 
   // Pre-fetch a game-session nonce on every game or arena route entry.
-  // This is an optimization — reduces latency for the first credit after
-  // entering a play context.  For repeated plays or arena credits, the sync
-  // layer automatically requests fresh nonces inline (see telegram-user.ts).
   const lastContextRoute = useRef<string | null>(null);
   useEffect(() => {
     const gameMatch = location.match(/^\/games\/(\w+)/);
@@ -168,6 +228,7 @@ function Router() {
       lastContextRoute.current = null;
     }
   }, [location]);
+
   const immersive = isManager || (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
 
   if (banned && !isManager) {
@@ -203,7 +264,13 @@ function Router() {
               if (!Comp) return null;
               return (
                 <Route key={g.id} path={g.route}>
-                  <GameGate id={g.id}><Comp /></GameGate>
+                  <GameGate id={g.id}>
+                    <GameErrorBoundary>
+                      <Suspense fallback={<GameLoader />}>
+                        <Comp />
+                      </Suspense>
+                    </GameErrorBoundary>
+                  </GameGate>
                 </Route>
               );
             })}

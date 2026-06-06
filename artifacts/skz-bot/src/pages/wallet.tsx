@@ -135,7 +135,10 @@ export default function Wallet() {
         setWdSuccess(true);
         setWdAmount("");
         setWdAddress("");
-        writeBalance(result.newSkz ?? skzBalance - amount);
+        // Only update local balance from the server-confirmed value.
+        // Never compute a client-side fallback — if server didn't return newSkz,
+        // the next balance sync will reconcile it.
+        if (result.newSkz != null) writeBalance(result.newSkz);
         setTimeout(() => {
           setWdSuccess(false);
           loadWallet();

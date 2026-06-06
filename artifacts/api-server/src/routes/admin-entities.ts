@@ -19,11 +19,24 @@ import {
   shopProductsTable,
   referrersTable,
 } from "@workspace/db";
-import { eq, desc, sql } from "@workspace/db";
+import { eq, desc, sql, count } from "@workspace/db";
 import { requireAdminSession, requirePermission } from "./admin-auth";
 
 const router = Router();
 router.use(requireAdminSession);
+
+// ── Pagination helper ─────────────────────────────────────────────────────────
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 500;
+
+function parsePagination(req: Request): { limit: number; offset: number } {
+  const limit = Math.min(
+    Math.max(1, Number(req.query.limit) || DEFAULT_PAGE_LIMIT),
+    MAX_PAGE_LIMIT,
+  );
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  return { limit, offset };
+}
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 
@@ -79,8 +92,12 @@ router.delete("/notifications/:id", requirePermission("content"), async (req: Re
 
 router.get("/users", requirePermission("users"), async (req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(platformUsersTable);
-    res.json(rows.map((u) => u.data));
+    const { limit, offset } = parsePagination(req);
+    const [rows, [{ total }]] = await Promise.all([
+      db.select().from(platformUsersTable).limit(limit).offset(offset).orderBy(desc(platformUsersTable.updatedAt)),
+      db.select({ total: count() }).from(platformUsersTable),
+    ]);
+    res.json({ data: rows.map((u) => u.data), total: Number(total), limit, offset });
   } catch (err) {
     req.log.error({ err }, "list users error");
     res.status(500).json({ error: "Internal server error" });
@@ -155,8 +172,12 @@ router.patch("/users/:id", requirePermission("users"), async (req: Request, res:
 
 router.get("/deposits", requirePermission("finance"), async (req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(depositsTable).orderBy(desc(depositsTable.createdAt));
-    res.json(rows.map((d) => d.data));
+    const { limit, offset } = parsePagination(req);
+    const [rows, [{ total }]] = await Promise.all([
+      db.select().from(depositsTable).orderBy(desc(depositsTable.createdAt)).limit(limit).offset(offset),
+      db.select({ total: count() }).from(depositsTable),
+    ]);
+    res.json({ data: rows.map((d) => d.data), total: Number(total), limit, offset });
   } catch (err) {
     req.log.error({ err }, "list deposits error");
     res.status(500).json({ error: "Internal server error" });
@@ -187,23 +208,44 @@ router.post("/deposits", requirePermission("finance"), async (req: Request, res:
   }
 });
 
+// Allow-list: only these fields can be patched by admins on a deposit.
+// Prevents mass-assignment of sensitive financial fields like userId or amount.
+const ALLOWED_DEPOSIT_PATCH_FIELDS = new Set(["status", "note", "confirmedAt", "txHash"]);
+
 router.patch("/deposits/:id", requirePermission("finance"), async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { status } = req.body ?? {};
   try {
-    const [existing] = await db.select().from(depositsTable).where(eq(depositsTable.id, id)).limit(1);
-    if (!existing) {
-      res.status(404).json({ error: "Deposit not found" });
-      return;
+    const patch: Record<string, unknown> = {};
+    for (const key of ALLOWED_DEPOSIT_PATCH_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        patch[key] = (req.body as Record<string, unknown>)[key];
+      }
     }
-    const merged = { ...(existing.data as object), ...req.body, id };
-    const newStatus: "pending" | "confirmed" = status ?? existing.status;
-    await db
-      .update(depositsTable)
-      .set({ status: newStatus, data: merged })
-      .where(eq(depositsTable.id, id));
+    const { status } = patch;
+
+    let merged: object = {};
+    await db.transaction(async (tx) => {
+      // FOR UPDATE prevents a concurrent credit from being lost when two
+      // admin requests update the same deposit simultaneously.
+      const [existing] = await tx
+        .select()
+        .from(depositsTable)
+        .where(eq(depositsTable.id, id))
+        .for("update")
+        .limit(1);
+      if (!existing) throw Object.assign(new Error("not_found"), { status: 404 });
+
+      merged = { ...(existing.data as object), ...patch, id };
+      const newStatus: "pending" | "confirmed" = (status as "pending" | "confirmed") ?? existing.status;
+      await tx
+        .update(depositsTable)
+        .set({ status: newStatus, data: merged })
+        .where(eq(depositsTable.id, id));
+    });
     res.json(merged);
   } catch (err) {
+    const e = err as { status?: number };
+    if (e.status === 404) { res.status(404).json({ error: "Deposit not found" }); return; }
     req.log.error({ err }, "patch deposit error");
     res.status(500).json({ error: "Internal server error" });
   }
@@ -213,8 +255,12 @@ router.patch("/deposits/:id", requirePermission("finance"), async (req: Request,
 
 router.get("/withdrawals", requirePermission("finance"), async (req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(withdrawalsTable).orderBy(desc(withdrawalsTable.createdAt));
-    res.json(rows.map((w) => w.data));
+    const { limit, offset } = parsePagination(req);
+    const [rows, [{ total }]] = await Promise.all([
+      db.select().from(withdrawalsTable).orderBy(desc(withdrawalsTable.createdAt)).limit(limit).offset(offset),
+      db.select({ total: count() }).from(withdrawalsTable),
+    ]);
+    res.json({ data: rows.map((w) => w.data), total: Number(total), limit, offset });
   } catch (err) {
     req.log.error({ err }, "list withdrawals error");
     res.status(500).json({ error: "Internal server error" });
@@ -245,17 +291,27 @@ router.post("/withdrawals", requirePermission("finance"), async (req: Request, r
   }
 });
 
+// Allow-list: only these fields can be patched by admins on a withdrawal.
+const ALLOWED_WITHDRAWAL_PATCH_FIELDS = new Set(["status", "note", "txHash", "completedAt", "rejectedAt"]);
+
 router.patch("/withdrawals/:id", requirePermission("finance"), async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { status } = req.body ?? {};
   try {
+    const patch: Record<string, unknown> = {};
+    for (const key of ALLOWED_WITHDRAWAL_PATCH_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        patch[key] = (req.body as Record<string, unknown>)[key];
+      }
+    }
+    const patchedStatus = patch.status as "pending" | "approved" | "rejected" | "completed" | undefined;
+
     const [existing] = await db.select().from(withdrawalsTable).where(eq(withdrawalsTable.id, id)).limit(1);
     if (!existing) {
       res.status(404).json({ error: "Withdrawal not found" });
       return;
     }
-    const merged = { ...(existing.data as object), ...req.body, id };
-    const newStatus: "pending" | "approved" | "rejected" | "completed" = status ?? existing.status;
+    const merged = { ...(existing.data as object), ...patch, id };
+    const newStatus: "pending" | "approved" | "rejected" | "completed" = patchedStatus ?? existing.status;
 
     await db.transaction(async (tx) => {
       await tx

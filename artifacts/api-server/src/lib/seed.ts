@@ -131,7 +131,10 @@ export async function ensureOwnerAccount(): Promise<void> {
         passwordHash,
         permissions: [],
         active: true,
-        mustChangePassword: false,
+        // Force password change on first login if the default password is in use.
+        // If the operator set BOOTSTRAP_OWNER_PASSWORD, they chose a custom password
+        // and we trust they know it — no forced change needed.
+        mustChangePassword: !process.env.BOOTSTRAP_OWNER_PASSWORD,
       })
       .onConflictDoNothing();
 

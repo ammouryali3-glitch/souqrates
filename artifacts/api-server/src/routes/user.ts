@@ -617,6 +617,23 @@ router.post("/submit-score", async (req: Request, res: Response) => {
   if (typeof timeSec !== "number" || !Number.isFinite(timeSec) || timeSec < 0) {
     res.status(400).json({ error: "timeSec must be a non-negative number" }); return;
   }
+  // Anti-cheat: sanity-check score plausibility.
+  // These caps are intentionally generous — they catch blatant scripted cheating
+  // without rejecting legitimate high-skill plays.
+  if (score > 10_000_000) {
+    res.status(400).json({ error: "score exceeds maximum allowed value" }); return;
+  }
+  if (timeSec > 3_600) {
+    res.status(400).json({ error: "timeSec exceeds maximum session duration" }); return;
+  }
+  // A non-zero score in zero time is physically impossible.
+  if (score > 0 && timeSec < 0.5) {
+    res.status(400).json({ error: "Invalid score/time combination" }); return;
+  }
+  // Rate cap: no legitimate game awards more than 50,000 points per second.
+  if (timeSec > 0 && score / timeSec > 50_000) {
+    res.status(400).json({ error: "Score rate exceeds allowed limit" }); return;
+  }
   if (typeof name !== "string") {
     res.status(400).json({ error: "name required" }); return;
   }
