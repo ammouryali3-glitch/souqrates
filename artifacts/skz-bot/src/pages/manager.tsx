@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard, Users, Gamepad2, Store, Share2, Wallet, ShieldAlert,
   Trophy, Megaphone, Settings2, Menu, X, ArrowRight, UserCog, AlertTriangle,
-  Search, CornerDownLeft, LogOut, ShieldOff, Mail, type LucideIcon,
+  Search, CornerDownLeft, LogOut, ShieldOff, Mail, Globe, type LucideIcon,
 } from "lucide-react";
 import { useAdmin, admin, syncBalance, refreshFromApi } from "../lib/admin-store";
 import { ARENA_GAMES, SKILL_GAMES } from "../lib/games-data";
@@ -28,11 +28,12 @@ import GamificationSection from "./manager/gamification";
 import ContentSection from "./manager/content";
 import SystemSection from "./manager/system";
 import ContactPoliciesSection from "./manager/contact-policies";
+import IntegrationsSection from "./manager/integrations";
 
 type SectionId =
   | "overview" | "users" | "games" | "economy" | "affiliate"
   | "finance" | "security" | "gamification" | "content" | "system"
-  | "contact-policies";
+  | "contact-policies" | "integrations";
 
 const NAV: { id: SectionId; label: string; icon: LucideIcon; group: string; perm?: Permission }[] = [
   { id: "overview",          label: "نظرة عامة",          icon: LayoutDashboard, group: "الرئيسية" },
@@ -46,6 +47,7 @@ const NAV: { id: SectionId; label: string; icon: LucideIcon; group: string; perm
   { id: "content",           label: "المحتوى والبث",      icon: Megaphone,       group: "النمو",    perm: "content" },
   { id: "contact-policies",  label: "التواصل والسياسات",  icon: Mail,            group: "النمو",    perm: "content" },
   { id: "system",            label: "النظام والإدارة",    icon: Settings2,       group: "النظام",   perm: "system" },
+  { id: "integrations",      label: "البنية التحتية",      icon: Globe,           group: "النظام" },
 ];
 
 const GROUPS = ["الرئيسية", "الإدارة", "المالية", "النمو", "النظام"];
@@ -134,6 +136,7 @@ function Dashboard({
       case "content":           return <ContentSection />;
       case "contact-policies":  return <ContactPoliciesSection />;
       case "system":            return <SystemSection />;
+      case "integrations":      return <IntegrationsSection />;
     }
   }
 

@@ -4,6 +4,7 @@ import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount } f
 import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 import { registerWebhook } from "./routes/bot";
+import { loadAndApplyIntegrations } from "./lib/integrations";
 
 const rawPort = process.env["PORT"];
 
@@ -59,5 +60,10 @@ app.listen(port, (err) => {
   // Register Telegram bot webhook (non-blocking)
   registerWebhook().catch((err) => {
     logger.error({ err }, "Failed to register Telegram webhook");
+  });
+
+  // Load and apply external integrations config from DB (Redis, R2, Sentry, Cloudflare)
+  loadAndApplyIntegrations().catch((err) => {
+    logger.error({ err }, "Failed to load integrations config");
   });
 });

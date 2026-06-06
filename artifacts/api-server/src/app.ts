@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { captureException, isSentryReady } from "./lib/integrations/sentry-node";
 
 const app: Express = express();
 
@@ -55,7 +56,7 @@ app.use(
   }),
 );
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
@@ -88,10 +89,11 @@ app.use("/api/user/balance-event", rateLimit({
 
 app.use("/api", router);
 
-// Global error handler — must be the last middleware registered
+// Global error handler — captures to Sentry when active, then returns 500
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error({ err }, "Unhandled error");
+  if (isSentryReady()) captureException(err);
   res.status(500).json({ error: "Internal server error" });
 });
 
