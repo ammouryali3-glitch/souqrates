@@ -119,24 +119,33 @@ const ALLOWED_USER_PATCH_FIELDS = new Set([
 router.patch("/users/:id", requirePermission("users"), async (req: Request, res: Response) => {
   const id = String(req.params.id);
   try {
-    const [existing] = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, id)).limit(1);
-    if (!existing) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
     const patch: Record<string, unknown> = {};
     for (const key of ALLOWED_USER_PATCH_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(req.body, key)) {
         patch[key] = (req.body as Record<string, unknown>)[key];
       }
     }
-    const merged = { ...(existing.data as object), ...patch, id };
-    await db
-      .update(platformUsersTable)
-      .set({ data: merged, updatedAt: new Date() })
-      .where(eq(platformUsersTable.id, id));
+    // FOR UPDATE lock prevents a concurrent deposit/game-win from being
+    // silently overwritten by the read-modify-write cycle here.
+    let merged: object = {};
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, id))
+        .for("update")
+        .limit(1);
+      if (!existing) throw Object.assign(new Error("not_found"), { status: 404 });
+      merged = { ...(existing.data as object), ...patch, id };
+      await tx
+        .update(platformUsersTable)
+        .set({ data: merged, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, id));
+    });
     res.json(merged);
   } catch (err) {
+    const e = err as { status?: number };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
     req.log.error({ err }, "patch user error");
     res.status(500).json({ error: "Internal server error" });
   }

@@ -885,14 +885,12 @@ router.post("/withdraw", async (req: Request, res: Response) => {
 // ── POST /api/user/shop/buy ───────────────────────────────────────────────────
 
 /**
- * Purchase a shop product. Atomically validates balance, deducts the price,
- * and records the product ID in user.data.purchases[].
+ * Purchase a shop product. Looks up the server-authoritative price from
+ * shopProductsTable — the client-supplied price is NEVER trusted.
+ * Atomically validates balance, deducts, and records the product ID in
+ * user.data.purchases[].
  *
- * Body: { productId: number, price: number }
- *
- * NOTE: price is currently accepted from the client and validated as a positive
- * integer. When a server-side product catalog is fully seeded into shopProductsTable
- * the price should be looked up from there and the client value ignored.
+ * Body: { productId: number }
  */
 router.post("/shop/buy", async (req: Request, res: Response) => {
   const token = req.cookies?.[USER_COOKIE];
@@ -900,17 +898,31 @@ router.post("/shop/buy", async (req: Request, res: Response) => {
   const payload = verifyUserToken(token);
   if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
 
-  const { productId, price } = req.body ?? {};
+  const { productId } = req.body ?? {};
   if (typeof productId !== "number" || !Number.isInteger(productId) || productId <= 0) {
     res.status(400).json({ error: "productId must be a positive integer" }); return;
-  }
-  if (typeof price !== "number" || !Number.isFinite(price) || price <= 0 || !Number.isInteger(price)) {
-    res.status(400).json({ error: "price must be a positive integer" }); return;
   }
 
   try {
     let newSkz = 0;
+    let serverPrice = 0;
     await db.transaction(async (tx) => {
+      // ── 1. Fetch server-authoritative price ────────────────────────────────
+      const [product] = await tx
+        .select()
+        .from(shopProductsTable)
+        .where(eq(shopProductsTable.id, productId))
+        .limit(1);
+      if (!product) throw Object.assign(new Error("product_not_found"), { status: 404 });
+
+      const productData = product.data as Record<string, unknown>;
+      const rawPrice = Number(productData.price ?? 0);
+      if (!Number.isInteger(rawPrice) || rawPrice <= 0) {
+        throw Object.assign(new Error("product_price_invalid"), { status: 400 });
+      }
+      serverPrice = rawPrice;
+
+      // ── 2. Lock user row and validate balance ──────────────────────────────
       const [row] = await tx
         .select()
         .from(platformUsersTable)
@@ -925,17 +937,17 @@ router.post("/shop/buy", async (req: Request, res: Response) => {
         : [];
 
       if (purchases.includes(productId)) {
-        throw Object.assign(new Error("Already purchased"), { status: 409 });
+        throw Object.assign(new Error("already_purchased"), { status: 409 });
       }
 
       const currentSkz = Number(
         (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
       );
-      if (currentSkz < price) {
-        throw Object.assign(new Error("Insufficient balance"), { status: 402 });
+      if (currentSkz < serverPrice) {
+        throw Object.assign(new Error("insufficient_balance"), { status: 402 });
       }
 
-      newSkz = currentSkz - price;
+      newSkz = currentSkz - serverPrice;
       const updatedData: Record<string, unknown> = {
         ...data,
         balances: {
@@ -952,10 +964,14 @@ router.post("/shop/buy", async (req: Request, res: Response) => {
         .where(eq(platformUsersTable.id, payload.tgId));
     });
 
-    req.log.info({ tgId: payload.tgId, productId, price }, "shop purchase");
+    req.log.info({ tgId: payload.tgId, productId, price: serverPrice }, "shop purchase");
     res.json({ ok: true, newSkz });
   } catch (err) {
     const e = err as { status?: number; message?: string };
+    if (e.status === 404 && e.message === "product_not_found") {
+      res.status(404).json({ error: "Product not found" }); return;
+    }
+    if (e.status === 400) { res.status(400).json({ error: "Product price not configured" }); return; }
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
     if (e.status === 402) { res.status(402).json({ error: "Insufficient balance" }); return; }
     if (e.status === 409) { res.status(409).json({ error: "Already purchased" }); return; }

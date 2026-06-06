@@ -160,7 +160,6 @@ export async function initTelegramUser(): Promise<number | null> {
     });
 
     if (!res.ok) {
-      console.warn("[telegram-user] /api/user/init failed:", res.status);
       setTgState({ loading: false, ready: true });
       return null;
     }
@@ -174,8 +173,7 @@ export async function initTelegramUser(): Promise<number | null> {
 
     setTgState({ loading: false, dbUser, ready: true });
     return skz;
-  } catch (err) {
-    console.warn("[telegram-user] /api/user/init error:", err);
+  } catch {
     setTgState({ loading: false, ready: true });
     return null;
   }

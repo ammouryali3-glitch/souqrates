@@ -10,6 +10,7 @@ import {
 } from "@/lib/arena";
 import { useArenaEconomy } from "@/lib/game-economy";
 import { useTelegramUser } from "@/lib/telegram-user";
+import { useLang, t } from "@/lib/i18n";
 
 const BALANCE_KEY = "skz_balance";
 
@@ -50,6 +51,8 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
 }
 
 export default function ArenaShell({ gameId, title, subtitle, icon, color, entryFee, period, description, children }: ArenaShellProps) {
+  const lang = useLang();
+  const s = t[lang];
   const { dbUser } = useTelegramUser();
   const [shell, setShell] = useState<Shell>("lobby");
   const [balance, setBalance] = useState(() => parseInt(localStorage.getItem(BALANCE_KEY) || "1000"));
@@ -169,17 +172,17 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               style={{ borderColor: `${color}50`, background: `linear-gradient(135deg, ${color}15, #06040f)` }}>
               <div className="absolute top-2 right-3 flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-[10px] text-green-400 font-display font-bold tracking-widest uppercase">Live</span>
+                <span className="text-[10px] text-green-400 font-display font-bold tracking-widest uppercase">{s.arenaLive}</span>
               </div>
-              <div className="text-xs text-white/40 font-display uppercase tracking-widest mb-1">Prize Pool</div>
+              <div className="text-xs text-white/40 font-display uppercase tracking-widest mb-1">{s.arenaPrizePool}</div>
               <div className="font-display font-black text-4xl flex items-end gap-2" style={{ color }}>
                 <Coins size={28} className="mb-1 shrink-0" />
                 <AnimatedNumber value={pool} />
                 <span className="text-lg text-white/50 mb-0.5">SKZ</span>
               </div>
               <div className="flex items-center gap-4 mt-3 text-xs text-white/40 font-display">
-                <span className="flex items-center gap-1"><Users size={12} /><AnimatedNumber value={entries} suffix=" players" /></span>
-                <span className="flex items-center gap-1"><Clock size={12} />Resets in {countdown}</span>
+                <span className="flex items-center gap-1"><Users size={12} /><AnimatedNumber value={entries} suffix={" " + s.arenaPlayersLabel} /></span>
+                <span className="flex items-center gap-1"><Clock size={12} />{s.arenaResetsIn(countdown)}</span>
               </div>
               <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
                 <motion.div className="h-full rounded-full" style={{ background: color }}
@@ -192,9 +195,9 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
             {/* Top 3 Preview */}
             <div className="mx-4 mt-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-white/30 font-display uppercase tracking-widest">Top Challengers</span>
+                <span className="text-xs text-white/30 font-display uppercase tracking-widest">{s.arenaTopChallengers}</span>
                 <button onClick={() => setShell("leaderboard")} className="text-xs font-display flex items-center gap-1" style={{ color }}>
-                  Full Board <ChevronRight size={12} />
+                  {s.arenaFullBoard} <ChevronRight size={12} />
                 </button>
               </div>
               {leaders.slice(0, 3).map((l, i) => (
@@ -214,15 +217,17 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
             <div className="mx-4 mt-4 mb-6">
               {alreadyPlayed ? (
                 <div className="rounded-2xl border border-white/10 bg-white/5 py-4 text-center">
-                  <div className="text-white/50 text-sm font-display">✓ Already submitted this {period === "weekly" ? "week" : "day"}</div>
-                  <button onClick={() => setShell("leaderboard")} className="mt-2 text-xs font-display" style={{ color }}>View Leaderboard →</button>
+                  <div className="text-white/50 text-sm font-display">
+                    {period === "weekly" ? s.arenaAlreadyPlayedWeek : s.arenaAlreadyPlayedDay}
+                  </div>
+                  <button onClick={() => setShell("leaderboard")} className="mt-2 text-xs font-display" style={{ color }}>{s.arenaViewLb}</button>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white/5 border border-white/10 mb-3">
-                    <span className="text-sm text-white/50 font-display">Entry Fee</span>
+                    <span className="text-sm text-white/50 font-display">{s.arenaEntryFee}</span>
                     <span className="font-display font-bold flex items-center gap-1" style={{ color }}>
-                      <Coins size={14} />{effEntry === 0 ? "FREE" : `${effEntry} SKZ`}
+                      <Coins size={14} />{effEntry === 0 ? s.arenaFree : `${effEntry} SKZ`}
                     </span>
                   </div>
                   <motion.button
@@ -231,12 +236,9 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                     onClick={handlePay}
                     className="w-full py-4 rounded-2xl font-display font-black text-base tracking-widest uppercase flex items-center justify-center gap-2 disabled:opacity-30"
                     style={{ background: `linear-gradient(135deg, ${color}, ${color}99)`, color: "#000", boxShadow: `0 0 30px ${color}55` }}>
-                    <Flame size={18} /> {effEntry === 0 ? "Play Free" : `Pay ${effEntry} SKZ & Play`}
+                    <Flame size={18} /> {effEntry === 0 ? s.arenaPlayFree : s.arenaPayAndPlay(effEntry)}
                   </motion.button>
-                  {balance < effEntry && (
-                    <button onClick={() => { setBalance(2000); localStorage.setItem(BALANCE_KEY, "2000"); }} className="mt-2 w-full text-xs text-white/30 underline text-center">Refill balance (demo)</button>
-                  )}
-                  <div className="text-center text-xs text-white/25 mt-2 font-display">Your entry adds to the prize pool</div>
+                  <div className="text-center text-xs text-white/25 mt-2 font-display">{s.arenaEntryAddsToPool}</div>
                 </>
               )}
             </div>
@@ -258,32 +260,32 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
             <div className="text-7xl">{myRank === 1 ? "👑" : myRank <= 3 ? "🏆" : myRank <= 10 ? "⭐" : "🎮"}</div>
             <div className="text-center">
               <div className="font-display font-black text-3xl text-white uppercase">
-                {myRank === 1 ? "YOU'RE #1!" : `RANK #${myRank}`}
+                {myRank === 1 ? s.arenaResult1st : s.arenaResultRank(myRank)}
               </div>
-              <div className="text-white/50 text-sm mt-1">Score submitted to leaderboard</div>
+              <div className="text-white/50 text-sm mt-1">{s.arenaScoreSubmitted}</div>
             </div>
 
             {/* Score card */}
             <div className="w-full max-w-[320px] rounded-3xl border p-5 flex flex-col gap-3"
               style={{ borderColor: `${color}40`, background: `linear-gradient(135deg, ${color}12, #06040f)` }}>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/40 font-display uppercase">Your Score</span>
+                <span className="text-xs text-white/40 font-display uppercase">{s.arenaYourScore}</span>
                 <span className="font-display font-black text-2xl" style={{ color }}>{myScore} pts</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/40 font-display uppercase">Time Taken</span>
+                <span className="text-xs text-white/40 font-display uppercase">{s.arenaTimeTaken}</span>
                 <span className="font-display font-bold text-white">{formatTime(myTime)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/40 font-display uppercase">Your Rank</span>
+                <span className="text-xs text-white/40 font-display uppercase">{s.arenaYourRank}</span>
                 <span className="font-display font-bold" style={{ color }}>#{myRank} of {entries}</span>
               </div>
               <div className="border-t border-white/10 pt-3">
-                <div className="text-xs text-white/30 font-display uppercase mb-1">Current Prize Pool</div>
+                <div className="text-xs text-white/30 font-display uppercase mb-1">{s.arenaCurPrizePool}</div>
                 <div className="font-display font-black text-xl flex items-center gap-2" style={{ color }}>
                   <Coins size={18} /><AnimatedNumber value={pool} suffix=" SKZ" />
                 </div>
-                {myRank === 1 && <div className="text-xs text-yellow-400 mt-1 font-display animate-pulse">👑 You lead — hold your position until reset!</div>}
+                {myRank === 1 && <div className="text-xs text-yellow-400 mt-1 font-display animate-pulse">{s.arenaLeadNote}</div>}
               </div>
             </div>
 
@@ -291,11 +293,11 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               <button onClick={() => setShell("leaderboard")}
                 className="w-full py-3.5 rounded-2xl font-display font-bold tracking-wide flex items-center justify-center gap-2"
                 style={{ background: `${color}22`, border: `1px solid ${color}50`, color }}>
-                <Trophy size={16} /> View Leaderboard
+                <Trophy size={16} /> {s.arenaViewLeaderboard}
               </button>
               <Link href="/games">
                 <button className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/50 font-display font-bold tracking-wide text-sm">
-                  ← Back to Games
+                  {s.arenaBackToGames}
                 </button>
               </Link>
             </div>
@@ -315,8 +317,8 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                 <div className="font-display font-black text-lg text-white uppercase">{title}</div>
                 <div className="text-xs text-white/30 font-display">
                   {lbTab === "alltime"
-                    ? `${alltimeEntries} all-time players`
-                    : `${entries} players · Resets in ${countdown}`}
+                    ? s.arenaAlltimePlayers(alltimeEntries)
+                    : s.arenaPlayersResets(entries, countdown)}
                 </div>
               </div>
             </div>
@@ -329,7 +331,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                 style={lbTab !== "alltime"
                   ? { background: color, color: "#000" }
                   : { color: "rgba(255,255,255,0.4)" }}>
-                {period === "weekly" ? "This Week" : "Today"}
+                {period === "weekly" ? s.arenaTabThisWeek : s.arenaTabToday}
               </button>
               <button
                 onClick={() => setLbTab("alltime")}
@@ -337,7 +339,7 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                 style={lbTab === "alltime"
                   ? { background: color, color: "#000" }
                   : { color: "rgba(255,255,255,0.4)" }}>
-                <Trophy size={12} /> All Time
+                <Trophy size={12} /> {s.arenaTabAllTime}
               </button>
             </div>
 
@@ -346,13 +348,13 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
               <div className="mx-4 mb-3 px-4 py-3 rounded-2xl flex items-center justify-between"
                 style={{ background: `linear-gradient(135deg, ${color}20, ${color}08)`, border: `1px solid ${color}40` }}>
                 <div>
-                  <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">🔥 Live Prize Pool</div>
+                  <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">{s.arenaLivePrizePool}</div>
                   <div className="font-display font-black text-xl flex items-center gap-1.5" style={{ color }}>
                     <Coins size={16} /><AnimatedNumber value={pool} suffix=" SKZ" />
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">Winner Takes</div>
+                  <div className="text-[10px] text-white/30 font-display uppercase tracking-widest mb-0.5">{s.arenaWinnerTakes}</div>
                   <div className="font-display font-black text-xl text-yellow-400">
                     <AnimatedNumber value={winnerTake} suffix=" SKZ" />
                   </div>
@@ -366,8 +368,8 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                 style={{ background: `linear-gradient(135deg, ${color}15, ${color}05)`, border: `1px solid ${color}30` }}>
                 <Trophy size={18} style={{ color }} className="shrink-0" />
                 <div>
-                  <div className="font-display font-bold text-sm text-white">Hall of Fame</div>
-                  <div className="text-[11px] text-white/40 font-display">Best score ever achieved by each player</div>
+                  <div className="font-display font-bold text-sm text-white">{s.arenaHallOfFame}</div>
+                  <div className="text-[11px] text-white/40 font-display">{s.arenaHallOfFameSub}</div>
                 </div>
               </div>
             )}
@@ -375,14 +377,14 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
             {/* Leaderboard list */}
             <div className="px-4 flex flex-col gap-0 pb-8">
               {alltimeLoading && lbTab === "alltime" ? (
-                <div className="text-center text-white/30 text-sm font-display py-12">Loading…</div>
+                <div className="text-center text-white/30 text-sm font-display py-12">{s.loading}</div>
               ) : (
                 (() => {
                   const list = lbTab === "alltime" ? alltimeLeaders : leaders;
                   if (list.length === 0) {
                     return (
                       <div className="text-center text-white/30 text-sm font-display py-12">
-                        {lbTab === "alltime" ? "No records yet — be the first legend!" : "No entries yet — be the first!"}
+                        {lbTab === "alltime" ? s.arenaNoRecords : s.arenaNoEntries}
                       </div>
                     );
                   }

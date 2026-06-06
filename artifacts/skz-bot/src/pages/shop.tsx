@@ -585,7 +585,7 @@ function ProductModal({ product, owned: initOwned, balance: initBalance, balance
     setBuyLoading(true);
     setBuyError("");
     try {
-      const result = await buyShopProduct(product.id, product.price);
+      const result = await buyShopProduct(product.id);
       if (!result.ok) {
         setBuyError(result.error ?? "فشل الشراء");
         return;

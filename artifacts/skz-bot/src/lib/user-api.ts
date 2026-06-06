@@ -73,12 +73,11 @@ export interface BuyProductResult {
 
 export async function buyShopProduct(
   productId: number,
-  price: number,
 ): Promise<BuyProductResult> {
   try {
     const res = await apiFetch("/api/user/shop/buy", {
       method: "POST",
-      body: JSON.stringify({ productId, price }),
+      body: JSON.stringify({ productId }),
     });
     const json = await res.json();
     if (!res.ok) {
