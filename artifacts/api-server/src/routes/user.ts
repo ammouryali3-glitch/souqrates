@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
 import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable } from "@workspace/db";
-import { eq, sql, and } from "@workspace/db";
+import { eq, sql, and, desc } from "@workspace/db";
 import { recordLedger } from "../lib/ledger";
 
 const router = Router();
@@ -1013,6 +1013,26 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   const safeCurrency = "TON" as const;
   const safeAmount = Math.floor(skzAmount);
 
+  // Read withdrawal config for min/max/rate enforcement
+  const [wdConfigRow] = await db
+    .select()
+    .from(adminConfigTable)
+    .where(eq(adminConfigTable.key, "withdrawal_config"))
+    .limit(1);
+  const wdConfig = (wdConfigRow?.value ?? {}) as Record<string, unknown>;
+  const minSkz = Number(Number.isFinite(Number(wdConfig.minSkz)) ? wdConfig.minSkz : 100);
+  const maxSkz = Number(Number.isFinite(Number(wdConfig.maxSkz)) ? wdConfig.maxSkz : 50000);
+  const skzPerTon = Number(Number.isFinite(Number(wdConfig.skzPerTon)) && Number(wdConfig.skzPerTon) > 0 ? wdConfig.skzPerTon : 100);
+
+  if (safeAmount < minSkz) {
+    res.status(400).json({ error: `Minimum withdrawal is ${minSkz.toLocaleString()} SKZ` }); return;
+  }
+  if (safeAmount > maxSkz) {
+    res.status(400).json({ error: `Maximum withdrawal is ${maxSkz.toLocaleString()} SKZ` }); return;
+  }
+
+  const tonAmount = +(safeAmount / skzPerTon).toFixed(4);
+
   try {
     let newSkz = 0;
     let withdrawalId = "";
@@ -1072,11 +1092,13 @@ router.post("/withdraw", async (req: Request, res: Response) => {
         userName: String(data.name ?? ""),
         currency: safeCurrency,
         amount: safeAmount,
+        tonAmount,
+        skzPerTon,
         fee: 0,
         at: nowMs,
         status: "pending",
         wallet: destWallet.trim(),
-        auto: safeAmount <= 1000, // auto-approve small amounts
+        auto: safeAmount <= 1000,
       };
 
       await tx
@@ -1087,10 +1109,10 @@ router.post("/withdraw", async (req: Request, res: Response) => {
     });
 
     req.log.info(
-      { tgId: payload.tgId, withdrawalId, skzAmount: safeAmount, currency: safeCurrency },
+      { tgId: payload.tgId, withdrawalId, skzAmount: safeAmount, tonAmount, currency: safeCurrency },
       "withdrawal submitted",
     );
-    res.json({ ok: true, withdrawalId, newSkz });
+    res.json({ ok: true, withdrawalId, newSkz, tonAmount, skzPerTon });
   } catch (err) {
     const e = err as { status?: number; message?: string };
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
@@ -1469,6 +1491,117 @@ router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
     res.json({ leaders, pool, entries, yourRank });
   } catch (err) {
     req.log.error({ err }, "leaderboard error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/withdrawal-config ──────────────────────────────────────────
+/**
+ * Returns current withdrawal config for display in the wallet UI.
+ * Public for authenticated users; never exposes sensitive data.
+ */
+router.get("/withdrawal-config", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  if (!verifyUserToken(token)) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [row] = await db
+      .select()
+      .from(adminConfigTable)
+      .where(eq(adminConfigTable.key, "withdrawal_config"))
+      .limit(1);
+    const cfg = (row?.value ?? {}) as Record<string, unknown>;
+    res.json({
+      minSkz: Number(Number.isFinite(Number(cfg.minSkz)) ? cfg.minSkz : 100),
+      maxSkz: Number(Number.isFinite(Number(cfg.maxSkz)) ? cfg.maxSkz : 50000),
+      skzPerTon: Number(Number.isFinite(Number(cfg.skzPerTon)) && Number(cfg.skzPerTon) > 0 ? cfg.skzPerTon : 100),
+    });
+  } catch (err) {
+    req.log.error({ err }, "withdrawal-config error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/stats ───────────────────────────────────────────────────────
+/**
+ * Returns aggregated stats for the authenticated user:
+ *   totalWon        — sum of all game_win and prize credits
+ *   refCount        — number of L1 referral bonuses received (= direct invites who signed up)
+ *   refEarnedAll    — total SKZ earned from referrals (all time)
+ *   refEarnedMonth  — referral SKZ earned this calendar month
+ */
+router.get("/stats", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(amount) FILTER (WHERE type = 'credit' AND reason IN ('game_win', 'prize')), 0)::int   AS total_won,
+        COUNT(*)             FILTER (WHERE type = 'credit' AND reason = 'referral')::int                   AS ref_count,
+        COALESCE(SUM(amount) FILTER (WHERE type = 'credit' AND reason = 'referral'), 0)::int               AS ref_earned_all,
+        COALESCE(SUM(amount) FILTER (
+          WHERE type = 'credit' AND reason = 'referral'
+            AND created_at >= date_trunc('month', now())
+        ), 0)::int                                                                                          AS ref_earned_month
+      FROM balance_transactions
+      WHERE user_id = ${payload.tgId}
+    `);
+    const row = (result.rows as Array<{
+      total_won: number;
+      ref_count: number;
+      ref_earned_all: number;
+      ref_earned_month: number;
+    }>)[0];
+
+    res.json({
+      totalWon: Number(row?.total_won ?? 0),
+      refCount: Number(row?.ref_count ?? 0),
+      refEarnedAll: Number(row?.ref_earned_all ?? 0),
+      refEarnedMonth: Number(row?.ref_earned_month ?? 0),
+    });
+  } catch (err) {
+    req.log.error({ err }, "stats error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/activity ────────────────────────────────────────────────────
+/**
+ * Returns the last 15 balance transactions for the authenticated user.
+ * Used for the "live activity" feed on the home page.
+ */
+router.get("/activity", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const rows = await db
+      .select()
+      .from(balanceTransactionsTable)
+      .where(eq(balanceTransactionsTable.userId, payload.tgId))
+      .orderBy(desc(balanceTransactionsTable.createdAt))
+      .limit(15);
+
+    res.json({
+      items: rows.map((r) => ({
+        id: r.id,
+        type: r.type,
+        reason: r.reason,
+        amount: r.amount,
+        currency: r.currency,
+        balanceBefore: r.balanceBefore,
+        balanceAfter: r.balanceAfter,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "activity error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

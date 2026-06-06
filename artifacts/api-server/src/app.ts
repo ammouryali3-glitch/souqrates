@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
@@ -19,6 +20,13 @@ function buildAllowedOrigins(): string[] {
 }
 
 app.set("trust proxy", 1);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 app.use(
   pinoHttp({
@@ -82,6 +90,51 @@ app.use("/api/user/init", rateLimit({
 app.use("/api/user/balance-event", rateLimit({
   windowMs: 60 * 1000,
   max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down" },
+}));
+
+// Game result (win credit): max 60 per minute per IP
+app.use("/api/user/game-result", rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down" },
+}));
+
+// Submit score (arena): max 60 per minute per IP
+app.use("/api/user/submit-score", rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down" },
+}));
+
+// Withdraw: max 3 per 15 minutes per IP (brute-force / drain protection)
+app.use("/api/user/withdraw", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many withdrawal requests — try again later" },
+}));
+
+// Shop purchases: max 20 per minute per IP
+app.use("/api/user/shop/buy", rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down" },
+}));
+
+// Check-in: max 5 per minute per IP
+app.use("/api/user/checkin", rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — slow down" },

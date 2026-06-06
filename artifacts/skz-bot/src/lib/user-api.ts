@@ -130,6 +130,69 @@ export async function claimCheckin(): Promise<CheckinResult> {
 
 // ── Withdraw ─────────────────────────────────────────────────────────────────
 
+// ── User Stats ────────────────────────────────────────────────────────────────
+
+export interface UserStats {
+  totalWon: number;
+  refCount: number;
+  refEarnedAll: number;
+  refEarnedMonth: number;
+}
+
+export async function fetchUserStats(): Promise<UserStats | null> {
+  try {
+    const res = await apiFetch("/api/user/stats");
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Activity feed ─────────────────────────────────────────────────────────────
+
+export interface ActivityItem {
+  id: string;
+  type: "credit" | "debit";
+  reason: string;
+  amount: number;
+  currency: string;
+  balanceBefore: number;
+  balanceAfter: number;
+  createdAt: string;
+}
+
+export async function fetchUserActivity(): Promise<ActivityItem[]> {
+  try {
+    const res = await apiFetch("/api/user/activity");
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Withdrawal config ─────────────────────────────────────────────────────────
+
+export interface WithdrawalConfig {
+  minSkz: number;
+  maxSkz: number;
+  skzPerTon: number;
+}
+
+export async function fetchWithdrawalConfig(): Promise<WithdrawalConfig> {
+  try {
+    const res = await apiFetch("/api/user/withdrawal-config");
+    if (!res.ok) return { minSkz: 100, maxSkz: 50000, skzPerTon: 100 };
+    return res.json();
+  } catch {
+    return { minSkz: 100, maxSkz: 50000, skzPerTon: 100 };
+  }
+}
+
+// ── Withdraw ─────────────────────────────────────────────────────────────────
+
 export async function submitWithdrawal(
   skzAmount: number,
   destWallet: string,

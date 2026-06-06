@@ -42,6 +42,7 @@ const VALID_CONFIG_KEYS = new Set([
   "api_keys",
   "roles",
   "deposit_config",
+  "withdrawal_config",
 ]);
 
 /**
@@ -58,6 +59,7 @@ const KEY_PERMISSION: Record<string, string> = {
   cms: "content",
   finance: "finance",
   deposit_config: "finance",
+  withdrawal_config: "finance",
   referral_config: "affiliate",
   daily_checkin: "content",
 };

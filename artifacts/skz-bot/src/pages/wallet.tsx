@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBalance, writeBalance } from "@/lib/admin-store";
 import { useLang, t, type Strings } from "@/lib/i18n";
-import { fetchUserWallet, submitWithdrawal, type WalletData } from "@/lib/user-api";
+import { fetchUserWallet, submitWithdrawal, fetchWithdrawalConfig, type WalletData, type WithdrawalConfig } from "@/lib/user-api";
 import { useTelegramUser } from "@/lib/telegram-user";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -80,6 +80,9 @@ export default function Wallet() {
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [loadingWallet, setLoadingWallet] = useState(false);
 
+  // Withdrawal config
+  const [wdConfig, setWdConfig] = useState<WithdrawalConfig>({ minSkz: 100, maxSkz: 50000, skzPerTon: 100 });
+
   // Withdrawal form
   const [wdAmount, setWdAmount] = useState("");
   const [wdAddress, setWdAddress] = useState("");
@@ -99,6 +102,7 @@ export default function Wallet() {
 
   useEffect(() => {
     loadWallet();
+    fetchWithdrawalConfig().then(setWdConfig);
   }, [loadWallet]);
 
   const copyText = (text: string, key: "address" | "memo") => {
@@ -289,24 +293,38 @@ export default function Wallet() {
               </span>
             </div>
 
+            {/* Exchange rate info */}
+            <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+              <span className="bg-white/5 px-2 py-1 rounded-lg">{s.withdrawRate(wdConfig.skzPerTon)}</span>
+              <span className="bg-white/5 px-2 py-1 rounded-lg">{s.withdrawMin(wdConfig.minSkz)}</span>
+              <span className="bg-white/5 px-2 py-1 rounded-lg">{s.withdrawMax(wdConfig.maxSkz)}</span>
+            </div>
+
             {/* SKZ Amount */}
             <div className="flex flex-col gap-2">
               <div className="flex justify-between">
                 <Label className="text-xs text-muted-foreground">{s.amount}</Label>
                 <button
                   className="text-xs text-primary font-medium"
-                  onClick={() => setWdAmount(String(skzBalance))}
+                  onClick={() => setWdAmount(String(Math.min(skzBalance, wdConfig.maxSkz)))}
                 >
                   {s.maxBtn}
                 </button>
               </div>
-              <Input
-                type="number"
-                placeholder="0"
-                value={wdAmount}
-                onChange={(e) => setWdAmount(e.target.value)}
-                className="bg-black/40 border-white/10 text-lg rounded-xl h-12"
-              />
+              <div className="relative">
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={wdAmount}
+                  onChange={(e) => setWdAmount(e.target.value)}
+                  className="bg-black/40 border-white/10 text-lg rounded-xl h-12 pr-24"
+                />
+                {wdAmount && Number(wdAmount) > 0 && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
+                    {s.withdrawTonEstimate(+(Number(wdAmount) / wdConfig.skzPerTon).toFixed(4))}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Destination wallet */}

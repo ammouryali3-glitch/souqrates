@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Share2, Users, Network, TrendingUp, Copy, CheckCircle2 } from "lucide-react";
+import { Share2, Users, Network, TrendingUp, Copy, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAdmin } from "@/lib/admin-store";
 import { useLang, t } from "@/lib/i18n";
 import { useTelegramUser } from "@/lib/telegram-user";
+import { fetchUserStats, type UserStats } from "@/lib/user-api";
 
 export default function Referrals() {
   const [copied, setCopied] = useState(false);
@@ -12,6 +13,16 @@ export default function Referrals() {
   const { dbUser } = useTelegramUser();
   const lang = useLang();
   const s = t[lang];
+
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    fetchUserStats().then((data) => {
+      setStats(data);
+      setLoadingStats(false);
+    });
+  }, []);
 
   const refCode = (dbUser as Record<string, unknown> | null)?.refCode as string | undefined;
   const botName = settings.botUsername || "skzbot";
@@ -30,11 +41,15 @@ export default function Referrals() {
         <p className="text-sm text-muted-foreground mt-1">{s.syndicateDesc}</p>
       </div>
 
-      {/* Hero Stats — zeroed until real backend */}
+      {/* Real Stats from API */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">{s.totalEarned}</span>
-          <span className="text-2xl font-bold text-primary">0</span>
+          {loadingStats ? (
+            <div className="h-8 w-20 rounded bg-white/10 animate-pulse mt-1" />
+          ) : (
+            <span className="text-2xl font-bold text-primary">{(stats?.refEarnedAll ?? 0).toLocaleString()}</span>
+          )}
           <span className="text-[10px] text-white/50">{s.allTime}</span>
         </div>
         <div className="bg-card/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-1 relative overflow-hidden">
@@ -42,7 +57,11 @@ export default function Referrals() {
             <TrendingUp size={64} />
           </div>
           <span className="text-xs font-medium text-muted-foreground">{s.thisMonth}</span>
-          <span className="text-2xl font-bold text-white">0</span>
+          {loadingStats ? (
+            <div className="h-8 w-16 rounded bg-white/10 animate-pulse mt-1" />
+          ) : (
+            <span className="text-2xl font-bold text-white">{(stats?.refEarnedMonth ?? 0).toLocaleString()}</span>
+          )}
           <span className="text-[10px] text-muted-foreground">SKZ</span>
         </div>
       </div>
@@ -69,7 +88,7 @@ export default function Referrals() {
         </div>
       </div>
 
-      {/* Network Tiers — from admin config, real commissions */}
+      {/* Network Tiers */}
       <div className="flex flex-col gap-3 mt-2">
         <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
           <Network size={16} className="text-muted-foreground" />
@@ -101,15 +120,31 @@ export default function Referrals() {
                 </div>
 
                 <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded-md flex items-center gap-1">
-                    <Users size={10} /> 0 {s.active}
-                  </span>
+                  {level.level === 1 ? (
+                    loadingStats ? (
+                      <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                    ) : (
+                      <span className="text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Users size={10} /> {stats?.refCount ?? 0} {s.active}
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Users size={10} /> — {s.active}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="flex justify-between items-center pt-3 border-t border-white/5 mt-1 z-10">
                 <span className="text-xs text-muted-foreground">{s.generatedRevenue}</span>
-                <span className="text-sm font-bold text-primary">0 {level.currency}</span>
+                <span className="text-sm font-bold text-primary">
+                  {level.level === 1
+                    ? loadingStats
+                      ? "—"
+                      : `${(stats?.refEarnedAll ?? 0).toLocaleString()} ${level.currency}`
+                    : `— ${level.currency}`}
+                </span>
               </div>
             </motion.div>
           ))}

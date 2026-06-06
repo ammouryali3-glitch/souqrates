@@ -1,13 +1,47 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Trophy, Users, ShoppingBag, ArrowUpRight, Flame, Gamepad2, Coins, CheckCircle2, UserCircle2, CalendarCheck } from "lucide-react";
+import {
+  ArrowRight, Trophy, Users, ShoppingBag, Coins,
+  ArrowUpRight, ArrowDownLeft, Flame, Gamepad2,
+  CheckCircle2, UserCircle2, CalendarCheck,
+} from "lucide-react";
 import { Link } from "wouter";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Card } from "@/components/ui/card";
 import { useAdmin, useBalance, admin } from "@/lib/admin-store";
-import { useLang, t } from "@/lib/i18n";
+import { useLang, t, type Strings } from "@/lib/i18n";
 import { useTelegramUser } from "@/lib/telegram-user";
-import { fetchCheckinStatus, claimCheckin, type CheckinStatus } from "@/lib/user-api";
+import {
+  fetchCheckinStatus, claimCheckin, fetchUserStats, fetchUserActivity,
+  type CheckinStatus, type ActivityItem, type UserStats,
+} from "@/lib/user-api";
+
+// ── Activity reason → i18n label ─────────────────────────────────────────────
+function reasonLabel(reason: string, s: Strings): string {
+  const map: Record<string, string> = {
+    game_win: s.activityReasonGameWin,
+    game_fee: s.activityReasonGameFee,
+    withdrawal: s.activityReasonWithdrawal,
+    purchase: s.activityReasonPurchase,
+    daily_checkin: s.activityReasonCheckin,
+    referral: s.activityReasonReferral,
+    deposit: s.activityReasonDeposit,
+    prize: s.activityReasonPrize,
+    starting_balance: s.activityReasonStarting,
+    refund: s.activityReasonRefund,
+  };
+  return map[reason] ?? reason;
+}
+
+function timeAgo(dateStr: string, s: Strings): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60_000) return s.timeAgoNow;
+  if (diff < 3_600_000) return s.timeAgoMinutes(Math.floor(diff / 60_000));
+  if (diff < 86_400_000) return s.timeAgoHours(Math.floor(diff / 3_600_000));
+  return s.timeAgoDays(Math.floor(diff / 86_400_000));
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const { settings } = useAdmin();
@@ -21,11 +55,16 @@ export default function Home() {
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState<{ reward: number; streak: number } | null>(null);
 
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+
   useEffect(() => {
     fetchCheckinStatus().then((status) => {
       setCheckin(status);
       setCheckinLoading(false);
     });
+    fetchUserStats().then((s) => { if (s) setStats(s); });
+    fetchUserActivity().then(setActivity);
   }, []);
 
   const handleCheckin = async () => {
@@ -36,6 +75,8 @@ export default function Home() {
       setClaimed({ reward: result.reward, streak: result.streak });
       setCheckin({ checkedInToday: true, streak: result.streak, nextReward: checkin?.nextReward ?? 50 });
       if (result.newSkz !== undefined) admin.setBalance(result.newSkz);
+      // Refresh activity after checkin
+      fetchUserActivity().then(setActivity);
     }
     setClaiming(false);
   };
@@ -220,14 +261,26 @@ export default function Home() {
             <Trophy size={14} className="text-primary" />
             <span className="text-xs font-medium">{s.totalWon}</span>
           </div>
-          <span className="text-lg font-display font-bold text-white">— SKZ</span>
+          {stats ? (
+            <span className="text-lg font-display font-bold text-white">
+              {stats.totalWon.toLocaleString()} SKZ
+            </span>
+          ) : (
+            <div className="h-6 w-20 rounded bg-white/10 animate-pulse" />
+          )}
         </Card>
         <Card className="bg-card/40 backdrop-blur-md border-white/5 p-4 flex flex-col gap-1">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <Users size={14} className="text-accent" />
             <span className="text-xs font-medium">{s.network}</span>
           </div>
-          <span className="text-lg font-display font-bold text-white">0 {s.refs}</span>
+          {stats ? (
+            <span className="text-lg font-display font-bold text-white">
+              {stats.refCount} {s.refs}
+            </span>
+          ) : (
+            <div className="h-6 w-16 rounded bg-white/10 animate-pulse" />
+          )}
         </Card>
       </div>
 
@@ -243,10 +296,40 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/50 gap-2">
-          <ArrowUpRight size={28} className="opacity-30" />
-          <span className="text-xs">{s.noActivity}</span>
-        </div>
+        {activity.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/50 gap-2">
+            <ArrowUpRight size={28} className="opacity-30" />
+            <span className="text-xs">{s.noActivity}</span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {activity.slice(0, 5).map((item, i) => {
+              const isCredit = item.type === "credit";
+              return (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex items-center gap-3 bg-card/30 border border-white/5 rounded-xl p-3"
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isCredit ? "bg-green-500/15" : "bg-red-500/15"}`}>
+                    {isCredit
+                      ? <ArrowDownLeft size={14} className="text-green-400" />
+                      : <ArrowUpRight size={14} className="text-red-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-white truncate">{reasonLabel(item.reason, s)}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(item.createdAt, s)}</div>
+                  </div>
+                  <span className={`text-sm font-bold font-mono ${isCredit ? "text-green-400" : "text-red-400"}`}>
+                    {isCredit ? "+" : "-"}{item.amount.toLocaleString()} SKZ
+                  </span>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
