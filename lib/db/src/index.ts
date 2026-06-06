@@ -10,7 +10,20 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Supabase (and most managed PostgreSQL providers) require SSL in production.
+// In development the Replit-provisioned DB doesn't enforce SSL, so we skip it.
+const isProduction = process.env.NODE_ENV === "production";
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  // Allow up to 20 simultaneous connections per PM2 worker.
+  // With Supabase session pooler this is well within the free-tier limits.
+  max: isProduction ? 20 : 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

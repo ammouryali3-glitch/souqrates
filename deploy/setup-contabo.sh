@@ -15,7 +15,12 @@
 set -euo pipefail
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
+# Supabase "Session Pooler" URL  → for the running app  (port 5432, pooler host)
+# Example: postgresql://postgres.xxxxx:PASSWORD@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
 DATABASE_URL="${DATABASE_URL:-}"
+# Supabase "Direct" URL          → for drizzle-kit schema push  (port 5432, db.xxx.supabase.co)
+# Example: postgresql://postgres:PASSWORD@db.xxxxx.supabase.co:5432/postgres
+DATABASE_DIRECT_URL="${DATABASE_DIRECT_URL:-$DATABASE_URL}"
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -hex 32)}"
 DOMAIN="${DOMAIN:-_}"           # set to your actual domain or server IP
@@ -70,7 +75,12 @@ log "Writing .env file..."
 cat > "$APP_DIR/.env" <<EOF
 NODE_ENV=production
 PORT=$API_PORT
+
+# Supabase — Session Pooler (for the app)
 DATABASE_URL=$DATABASE_URL
+# Supabase — Direct connection (for drizzle-kit schema push)
+DATABASE_DIRECT_URL=$DATABASE_DIRECT_URL
+
 TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
 SESSION_SECRET=$SESSION_SECRET
 EOF
