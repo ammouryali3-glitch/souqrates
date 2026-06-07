@@ -8,6 +8,13 @@ export function MobileContainer({ children, hideHeader = false }: { children: Re
     document.documentElement.classList.add("dark");
   }, []);
 
+  // Re-call expand() after React mounts — catches cases where the initial
+  // call in main.tsx fired before Telegram's viewport was fully ready.
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg && !tg.isExpanded) tg.expand();
+  }, []);
+
   return (
     <div className="min-h-screen bg-black w-full flex justify-center overflow-hidden font-sans">
       <div className="w-full max-w-[430px] bg-background relative flex flex-col h-[100dvh] shadow-2xl border-x border-white/5 overflow-hidden">
