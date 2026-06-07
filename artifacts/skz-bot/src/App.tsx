@@ -76,7 +76,16 @@ const GAME_COMPONENTS: Record<string, React.ComponentType> = {
   geniusgrid: GeniusGridGame, truthscale: TruthScaleGame,
 };
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 // Catches crashes in individual game components so the rest of the app stays alive.
@@ -141,10 +150,10 @@ function GameLoader() {
 function PageWrapper({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
       className="flex-1 overflow-y-auto pb-28 pt-6 px-4"
     >
       {children}

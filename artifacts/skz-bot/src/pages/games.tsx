@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { Trophy, Swords, Zap, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
@@ -13,14 +12,17 @@ function ArenaCard({ game, s, lang }: { game: GameDef; s: Strings; lang: "ar" | 
   const loc = localizeGame(game, lang);
   return (
     <Link href={game.route}>
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+      <div
         data-testid={`card-arena-${game.id}`}
-        className={`relative overflow-hidden rounded-3xl border ${a.border} ${a.card} p-5 shadow-lg ${a.glow} cursor-pointer group mb-3`}>
+        className={`relative overflow-hidden rounded-3xl border ${a.border} ${a.card} p-5 shadow-lg ${a.glow} cursor-pointer group mb-3 active:scale-[0.98] transition-transform`}>
         <div className={`absolute -right-4 -top-4 opacity-15 ${a.bigIcon}`}><Icon size={110} strokeWidth={1.2} /></div>
         <div className="flex items-center justify-between mb-2 relative z-10">
           <div className="flex items-center gap-2">
             <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{loc.tag}</span>
-            <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> {s.livePool}</span>
+            <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-medium">
+              <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+              {s.livePool}
+            </span>
           </div>
           <span className={`font-display font-black ${a.text} text-sm`}>{game.prize} SKZ</span>
         </div>
@@ -35,7 +37,7 @@ function ArenaCard({ game, s, lang }: { game: GameDef; s: Strings; lang: "ar" | 
           <Trophy size={12} />{s.arenaEntry}: {game.entry} SKZ · {loc.tagline}
           <ChevronRight size={13} className="ml-auto text-white/30 group-hover:translate-x-1 transition-transform" />
         </div>
-      </motion.div>
+      </div>
     </Link>
   );
 }
@@ -46,14 +48,17 @@ function SkillCard({ game, s, lang }: { game: GameDef; s: Strings; lang: "ar" | 
   const loc = localizeGame(game, lang);
   return (
     <Link href={game.route}>
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+      <div
         data-testid={`card-game-${game.id}`}
-        className={`relative overflow-hidden rounded-3xl border ${a.border} ${a.card} p-5 shadow-lg ${a.glow} cursor-pointer group`}>
+        className={`relative overflow-hidden rounded-3xl border ${a.border} ${a.card} p-5 shadow-lg ${a.glow} cursor-pointer group active:scale-[0.98] transition-transform`}>
         <div className={`absolute -right-6 -top-6 opacity-20 group-hover:opacity-30 transition-opacity ${a.bigIcon}`}><Icon size={120} strokeWidth={1.2} /></div>
         <div className="flex flex-col gap-3 relative z-10">
           <div className="flex items-center justify-between">
             <span className={`text-[10px] tracking-[0.3em] font-display uppercase ${a.text}`}>{loc.category}</span>
-            <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> {s.playable}</span>
+            <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              {s.playable}
+            </span>
           </div>
           <div className="flex items-end justify-between">
             <div className="flex flex-col gap-1">
@@ -67,7 +72,7 @@ function SkillCard({ game, s, lang }: { game: GameDef; s: Strings; lang: "ar" | 
             <ChevronRight size={14} className="ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
           </div>
         </div>
-      </motion.div>
+      </div>
     </Link>
   );
 }

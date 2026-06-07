@@ -16,6 +16,16 @@ import {
   type CheckinStatus, type ActivityItem, type UserStats,
 } from "@/lib/user-api";
 
+// ── Module-level cache (5 min TTL) ────────────────────────────────────────────
+const HOME_CACHE_TTL = 5 * 60 * 1000;
+interface HomeCache {
+  ts: number;
+  checkin: CheckinStatus | null;
+  stats: UserStats | null;
+  activity: ActivityItem[];
+}
+let _homeCache: HomeCache | null = null;
+
 // ── Activity reason → i18n label ─────────────────────────────────────────────
 function reasonLabel(reason: string, s: Strings): string {
   const map: Record<string, string> = {
@@ -59,12 +69,25 @@ export default function Home() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
-    fetchCheckinStatus().then((status) => {
-      setCheckin(status);
+    const now = Date.now();
+    if (_homeCache && now - _homeCache.ts < HOME_CACHE_TTL) {
+      setCheckin(_homeCache.checkin);
       setCheckinLoading(false);
+      if (_homeCache.stats) setStats(_homeCache.stats);
+      setActivity(_homeCache.activity);
+      return;
+    }
+    Promise.all([
+      fetchCheckinStatus(),
+      fetchUserStats(),
+      fetchUserActivity(),
+    ]).then(([ci, st, act]) => {
+      _homeCache = { ts: Date.now(), checkin: ci, stats: st, activity: act };
+      setCheckin(ci);
+      setCheckinLoading(false);
+      if (st) setStats(st);
+      setActivity(act);
     });
-    fetchUserStats().then((s) => { if (s) setStats(s); });
-    fetchUserActivity().then(setActivity);
   }, []);
 
   const handleCheckin = async () => {
@@ -73,10 +96,16 @@ export default function Home() {
     const result = await claimCheckin();
     if (result.ok && result.reward !== undefined && result.streak !== undefined) {
       setClaimed({ reward: result.reward, streak: result.streak });
-      setCheckin({ checkedInToday: true, streak: result.streak, nextReward: checkin?.nextReward ?? 50 });
+      const newCheckin = { checkedInToday: true, streak: result.streak, nextReward: checkin?.nextReward ?? 50 };
+      setCheckin(newCheckin);
       if (result.newSkz !== undefined) admin.setBalance(result.newSkz);
-      // Refresh activity after checkin
-      fetchUserActivity().then(setActivity);
+      // Refresh activity and invalidate cache
+      fetchUserActivity().then((act) => {
+        setActivity(act);
+        if (_homeCache) {
+          _homeCache = { ..._homeCache, checkin: newCheckin, activity: act, ts: Date.now() };
+        }
+      });
     }
     setClaiming(false);
   };
@@ -303,14 +332,11 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {activity.slice(0, 5).map((item, i) => {
+            {activity.slice(0, 5).map((item) => {
               const isCredit = item.type === "credit";
               return (
-                <motion.div
+                <div
                   key={item.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04 }}
                   className="flex items-center gap-3 bg-card/30 border border-white/5 rounded-xl p-3"
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isCredit ? "bg-green-500/15" : "bg-red-500/15"}`}>
@@ -325,7 +351,7 @@ export default function Home() {
                   <span className={`text-sm font-bold font-mono ${isCredit ? "text-green-400" : "text-red-400"}`}>
                     {isCredit ? "+" : "-"}{item.amount.toLocaleString()} SKZ
                   </span>
-                </motion.div>
+                </div>
               );
             })}
           </div>
