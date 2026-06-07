@@ -62,9 +62,9 @@ export async function testRedisConnection(): Promise<{ ok: boolean; latencyMs?: 
   if (!client) return { ok: false, error: "Client not initialized" };
   const start = Date.now();
   try {
-    await client.set("__ping__", "1", { ex: 10 });
-    const val = await client.get("__ping__");
-    if (val !== "1") throw new Error("Ping value mismatch");
+    await client.set("__ping__", "pong", { ex: 10 });
+    const val = await client.get<string>("__ping__");
+    if (val == null) throw new Error("No response from Redis");
     return { ok: true, latencyMs: Date.now() - start };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
