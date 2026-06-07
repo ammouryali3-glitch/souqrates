@@ -266,6 +266,7 @@ export function seedFinanceSettings(): FinanceSettings {
     priceBufferBuy: 3,
     priceBufferSell: 3,
     tonPrice: 5.24,
+    depositSkzPerTon: 100,
   };
 }
 

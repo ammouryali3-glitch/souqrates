@@ -43,17 +43,19 @@ interface DepositConfig {
 
 async function getDepositConfig(): Promise<DepositConfig> {
   try {
-    const [row] = await db
-      .select()
-      .from(adminConfigTable)
-      .where(eq(adminConfigTable.key, "deposit_config"))
-      .limit(1);
-    if (row?.value) {
-      const c = row.value as Partial<DepositConfig>;
-      return {
-        skzPerTon: typeof c.skzPerTon === "number" && c.skzPerTon > 0 ? c.skzPerTon : DEFAULT_SKZ_PER_TON,
-      };
-    }
+    // Prefer finance.depositSkzPerTon (set by admin panel), fall back to deposit_config.skzPerTon
+    const [financeRow, depositRow] = await Promise.all([
+      db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "finance")).limit(1).then((r) => r[0]),
+      db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "deposit_config")).limit(1).then((r) => r[0]),
+    ]);
+    const fin = (financeRow?.value ?? {}) as { depositSkzPerTon?: number };
+    const dep = (depositRow?.value ?? {}) as { skzPerTon?: number };
+    const rate = typeof fin.depositSkzPerTon === "number" && fin.depositSkzPerTon > 0
+      ? fin.depositSkzPerTon
+      : typeof dep.skzPerTon === "number" && dep.skzPerTon > 0
+        ? dep.skzPerTon
+        : DEFAULT_SKZ_PER_TON;
+    return { skzPerTon: rate };
   } catch { /* use defaults */ }
   return { skzPerTon: DEFAULT_SKZ_PER_TON };
 }

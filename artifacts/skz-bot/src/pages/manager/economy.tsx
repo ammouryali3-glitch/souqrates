@@ -117,6 +117,7 @@ function PackageModal({ open, initial, onClose, onSave }: {
           <div><Label>العملة</Label><Select value={p.currency} onChange={(e) => set("currency", e.target.value as TokenPackage["currency"])}>
             <option value="USDT" className="bg-[#13101f]">USDT</option>
             <option value="TON" className="bg-[#13101f]">TON</option>
+            <option value="STARS" className="bg-[#13101f]">⭐ نجوم (Stars)</option>
           </Select></div>
         </div>
         <label className="flex items-center gap-2 text-sm font-display text-white/70">

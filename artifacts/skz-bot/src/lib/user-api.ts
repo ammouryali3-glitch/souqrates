@@ -40,6 +40,8 @@ export interface WithdrawalRecord {
 export interface WalletData {
   tonDepositWallet: string;
   depositMemo: string;
+  /** SKZ credited per 1 TON deposited */
+  depositRate: number;
   deposits: DepositRecord[];
   withdrawals: WithdrawalRecord[];
 }
@@ -51,6 +53,48 @@ export async function fetchUserWallet(): Promise<WalletData | null> {
     return res.json();
   } catch {
     return null;
+  }
+}
+
+// ── Stars packages ─────────────────────────────────────────────────────────────
+
+export interface StarsPackage {
+  id: string;
+  skz: number;
+  bonus: number;
+  price: number; // Stars count
+  currency: "STARS";
+  active: boolean;
+  label?: string;
+}
+
+export async function fetchStarsPackages(): Promise<StarsPackage[]> {
+  try {
+    const res = await apiFetch("/api/user/stars/packages");
+    if (!res.ok) return [];
+    const data = await res.json() as { packages: StarsPackage[] };
+    return data.packages ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export interface CreateStarsInvoiceResult {
+  url?: string;
+  error?: string;
+}
+
+export async function createStarsInvoice(packageId: string): Promise<CreateStarsInvoiceResult> {
+  try {
+    const res = await apiFetch("/api/user/stars/create-invoice", {
+      method: "POST",
+      body: JSON.stringify({ packageId }),
+    });
+    const json = await res.json() as { url?: string; error?: string };
+    if (!res.ok) return { error: json.error ?? "Failed to create invoice" };
+    return { url: json.url };
+  } catch {
+    return { error: "Connection error" };
   }
 }
 

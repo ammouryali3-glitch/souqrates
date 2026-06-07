@@ -1,16 +1,20 @@
 /**
- * Telegram Bot webhook handler
+ * Telegram Bot webhook handler + Telegram Stars payment support.
  *
  * POST /api/bot/webhook
  *   - Secured via X-Telegram-Bot-Api-Secret-Token header
- *   - Handles /start command → sends welcome message + Mini App button
- *   - Handles /help command
- *   - Silently ignores everything else
+ *   - Handles /start and /help commands
+ *   - Handles pre_checkout_query → answers immediately (required within 10 s)
+ *   - Handles successful_payment → credits SKZ to user
  */
 
 import { Router, type Request, type Response } from "express";
 import { createHmac } from "crypto";
 import { logger } from "../lib/logger";
+import { db } from "@workspace/db";
+import { platformUsersTable, tokenPackagesTable, depositsTable } from "@workspace/db";
+import { eq, sql } from "@workspace/db";
+import { recordLedger } from "../lib/ledger";
 
 const router = Router();
 
@@ -38,12 +42,157 @@ async function callTg(method: string, body: Record<string, unknown>): Promise<un
   return json;
 }
 
-// ── Webhook secret token (derived from bot token — same approach Telegram recommends) ──
+// ── Webhook secret token ──────────────────────────────────────────────────────
 
 function webhookSecret(): string {
-  // Telegram requires secret_token to be 1-256 chars, only A-Za-z0-9_-
-  // We derive it by HMAC-SHA256 of "webhook" using bot token, then hex-encode
   return createHmac("sha256", TOKEN).update("webhook-secret").digest("hex").slice(0, 64);
+}
+
+// ── Telegram Stars — invoice creation ────────────────────────────────────────
+
+/**
+ * Create a Telegram Stars invoice link.
+ * Currency code for Stars is "XTR". provider_token must be empty.
+ * Returns the invoice URL or null on failure.
+ */
+export async function createStarsInvoiceLink(params: {
+  title: string;
+  description: string;
+  payload: string;
+  stars: number;
+}): Promise<string | null> {
+  const result = await callTg("createInvoiceLink", {
+    title: params.title,
+    description: params.description,
+    payload: params.payload,
+    provider_token: "",
+    currency: "XTR",
+    prices: [{ label: params.title, amount: params.stars }],
+  }) as { ok?: boolean; result?: string } | null;
+  if (!result?.ok) return null;
+  return result.result ?? null;
+}
+
+// ── Stars payment handlers ────────────────────────────────────────────────────
+
+async function handlePreCheckoutQuery(query: TgPreCheckoutQuery): Promise<void> {
+  // Must answer within 10 seconds — always approve here; fraud checks happen post-payment
+  await callTg("answerPreCheckoutQuery", {
+    pre_checkout_query_id: query.id,
+    ok: true,
+  });
+  logger.info({ queryId: query.id, fromId: query.from.id }, "stars: pre_checkout approved");
+}
+
+async function handleSuccessfulPayment(tgId: string, payment: TgSuccessfulPayment): Promise<void> {
+  const chargeId = payment.telegram_payment_charge_id;
+  try {
+    const invoicePayload = JSON.parse(payment.invoice_payload) as { packageId?: string };
+    const packageId = invoicePayload.packageId;
+    if (!packageId) {
+      logger.warn({ tgId, chargeId }, "stars: missing packageId in invoice_payload");
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      // Lock user row first for accurate balance reading
+      const [userRow] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, tgId))
+        .for("update")
+        .limit(1);
+
+      if (!userRow) {
+        logger.warn({ tgId, chargeId }, "stars: user not found");
+        return;
+      }
+
+      // Idempotency: use chargeId as deposit PK — skip if already processed
+      const existing = await tx.execute(
+        sql`SELECT id FROM deposits WHERE id = ${chargeId} LIMIT 1`,
+      );
+      if ((existing.rows as unknown[]).length > 0) {
+        logger.info({ chargeId }, "stars: already credited — skipping duplicate");
+        return;
+      }
+
+      // Look up package
+      const [pkg] = await tx
+        .select()
+        .from(tokenPackagesTable)
+        .where(eq(tokenPackagesTable.id, packageId))
+        .limit(1);
+
+      if (!pkg) {
+        logger.warn({ packageId, chargeId }, "stars: package not found");
+        return;
+      }
+
+      const pkgData = pkg.data as { skz?: number; bonus?: number };
+      const totalSkz = (pkgData.skz ?? 0) + (pkgData.bonus ?? 0);
+      if (totalSkz <= 0) {
+        logger.warn({ packageId, totalSkz }, "stars: zero SKZ package — skipping");
+        return;
+      }
+
+      const userData = userRow.data as Record<string, unknown>;
+      const balances = (userData.balances ?? {}) as Record<string, number>;
+      const skzBefore = Math.floor(Number(balances.SKZ ?? 0));
+      const skzAfter = skzBefore + totalSkz;
+      const nowMs = Date.now();
+
+      // Insert deposit record (idempotency anchor)
+      await tx.insert(depositsTable).values({
+        id: chargeId,
+        status: "confirmed",
+        data: {
+          id: chargeId,
+          userId: tgId,
+          userName: String(userData.name ?? ""),
+          currency: "STARS",
+          amount: payment.total_amount,
+          skzCredited: totalSkz,
+          txHash: chargeId,
+          packageId,
+          status: "confirmed",
+          at: nowMs,
+        },
+      }).onConflictDoNothing();
+
+      // Credit SKZ balance
+      await tx.execute(sql`
+        UPDATE platform_users
+        SET
+          data = jsonb_set(
+            jsonb_set(data,
+              '{balances,SKZ}',
+              to_jsonb(COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${totalSkz}::numeric)
+            ),
+            '{lastSeen}',
+            to_jsonb(${nowMs}::bigint)
+          ),
+          updated_at = NOW()
+        WHERE id = ${tgId}
+      `);
+
+      // Audit ledger
+      await recordLedger(tx, {
+        userId: tgId,
+        type: "credit",
+        reason: "stars_purchase",
+        amount: totalSkz,
+        balanceBefore: skzBefore,
+        balanceAfter: skzAfter,
+        ref: chargeId,
+        meta: { stars: payment.total_amount, packageId },
+      });
+    });
+
+    logger.info({ tgId, packageId, chargeId, stars: payment.total_amount }, "stars: purchase credited");
+  } catch (err) {
+    logger.error({ err, tgId, chargeId }, "stars: handleSuccessfulPayment failed");
+  }
 }
 
 // ── Message builders ──────────────────────────────────────────────────────────
@@ -133,7 +282,6 @@ async function handleHelp(chatId: number, _firstName: string, languageCode?: str
 // ── Webhook endpoint ──────────────────────────────────────────────────────────
 
 router.post("/webhook", (req: Request, res: Response) => {
-  // Validate secret token header
   const secret = webhookSecret();
   const incoming = req.headers["x-telegram-bot-api-secret-token"] as string | undefined;
 
@@ -142,20 +290,30 @@ router.post("/webhook", (req: Request, res: Response) => {
     return;
   }
 
-  // Always respond 200 immediately so Telegram doesn't retry
+  // Respond 200 immediately — Telegram requires it before processing
   res.json({ ok: true });
 
-  // Process update async (fire and forget)
   const update = req.body as TgUpdate;
-
   processUpdate(update).catch((err) => {
     logger.error({ err }, "bot: unhandled error in processUpdate");
   });
 });
 
 async function processUpdate(update: TgUpdate) {
+  // Stars: pre_checkout_query must be answered within 10 seconds
+  if (update.pre_checkout_query) {
+    await handlePreCheckoutQuery(update.pre_checkout_query);
+    return;
+  }
+
   const msg = update.message;
-  if (!msg) return; // ignore non-message updates (inline queries, etc.)
+  if (!msg) return;
+
+  // Stars: successful_payment arrives as a message field
+  if (msg.successful_payment && msg.from?.id) {
+    await handleSuccessfulPayment(String(msg.from.id), msg.successful_payment);
+    return;
+  }
 
   const chatId = msg.chat.id;
   const text = msg.text ?? "";
@@ -172,18 +330,35 @@ async function processUpdate(update: TgUpdate) {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface TgSuccessfulPayment {
+  currency: string;
+  total_amount: number;
+  invoice_payload: string;
+  telegram_payment_charge_id: string;
+}
+
+interface TgPreCheckoutQuery {
+  id: string;
+  from: { id: number };
+  currency: string;
+  total_amount: number;
+  invoice_payload: string;
+}
+
 interface TgMessage {
   chat: { id: number };
-  from?: { first_name: string; language_code?: string; username?: string };
+  from?: { id: number; first_name: string; language_code?: string; username?: string };
   text?: string;
+  successful_payment?: TgSuccessfulPayment;
 }
 
 interface TgUpdate {
   update_id: number;
   message?: TgMessage;
+  pre_checkout_query?: TgPreCheckoutQuery;
 }
 
-// ── Webhook registration helper (called at startup) ───────────────────────────
+// ── Webhook registration ──────────────────────────────────────────────────────
 
 export async function registerWebhook(): Promise<void> {
   if (!TOKEN) {
@@ -204,14 +379,13 @@ export async function registerWebhook(): Promise<void> {
   const result = await callTg("setWebhook", {
     url: webhookUrl,
     secret_token: secret,
-    allowed_updates: ["message"],
+    allowed_updates: ["message", "pre_checkout_query"],
     drop_pending_updates: false,
   }) as { ok?: boolean; description?: string } | null;
 
   if (result?.ok) {
     logger.info("bot: webhook registered successfully");
 
-    // Set bot commands so they appear in the Telegram UI
     await callTg("setMyCommands", {
       commands: [
         { command: "start",  description: "بدء التشغيل / Start" },
@@ -219,7 +393,6 @@ export async function registerWebhook(): Promise<void> {
       ],
     });
 
-    // Set bot name and description
     await callTg("setMyName", { name: "Souqrates System" }).catch(() => {});
     await callTg("setMyDescription", { description: "🎮 منصة ألعاب وكسب المكافآت | Gaming & rewards platform\nالعب، تنافس، واربح مع Souqrates System!" }).catch(() => {});
   } else {

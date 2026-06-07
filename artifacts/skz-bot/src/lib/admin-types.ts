@@ -3,7 +3,9 @@
 // pages import types without pulling the whole store.
 
 export type Currency = "SKZ" | "TON" | "USDT" | "STARS";
-export const CURRENCIES: Currency[] = ["SKZ", "TON", "USDT", "STARS"];
+/** Currencies used in on-chain finance tables (excludes STARS which has no withdrawal path). */
+export type TradedCurrency = Exclude<Currency, "STARS">;
+export const CURRENCIES: TradedCurrency[] = ["SKZ", "TON", "USDT"];
 
 export type UserTier = "rookie" | "silver" | "gold" | "vip";
 
@@ -34,7 +36,7 @@ export interface ManagedUser {
   joinedAt: number;
   lastSeen: number;
   tier: UserTier;
-  balances: Record<Currency, number>;
+  balances: Record<TradedCurrency, number>;
   totalDeposit: number; // USDT-equivalent, used for "top depositor" ranking
   totalWins: number; // count of wins, used for "top winner" ranking
   status: "active" | "banned";
@@ -224,10 +226,10 @@ export interface PolicyTexts {
 
 export interface FinanceSettings {
   autoWithdrawMax: number; // USDT-eq threshold for instant auto-approval
-  withdrawMin: Record<Currency, number>;
-  withdrawMax: Record<Currency, number>; // per-operation
-  dailyMax: Record<Currency, number>;
-  gasFee: Record<Currency, number>;
+  withdrawMin: Record<TradedCurrency, number>;
+  withdrawMax: Record<TradedCurrency, number>; // per-operation
+  dailyMax: Record<TradedCurrency, number>;
+  gasFee: Record<TradedCurrency, number>;
   hotWalletCap: number; // USDT — overflow auto-swept to cold wallet
   coldWallet: string;
   autoSweep: boolean;
@@ -235,6 +237,7 @@ export interface FinanceSettings {
   priceBufferBuy: number; // percent added on buy
   priceBufferSell: number; // percent removed on sell
   tonPrice: number; // simulated live TON/USDT
+  depositSkzPerTon: number; // SKZ credited per 1 TON deposited
 }
 
 export interface SecuritySettings {

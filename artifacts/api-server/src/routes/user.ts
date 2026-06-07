@@ -8,8 +8,9 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable } from "@workspace/db";
-import { eq, sql, and, desc } from "@workspace/db";
+import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable, tokenPackagesTable } from "@workspace/db";
+import { eq, sql, and, desc, asc } from "@workspace/db";
+import { createStarsInvoiceLink } from "./bot";
 import { recordLedger } from "../lib/ledger";
 
 const router = Router();
@@ -954,7 +955,7 @@ router.get("/wallet", async (req: Request, res: Response) => {
   if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
 
   try {
-    const [userRow, depositRows, withdrawalRows] = await Promise.all([
+    const [userRow, depositRows, withdrawalRows, depositCfgRow, financeRow] = await Promise.all([
       db.select().from(platformUsersTable).where(eq(platformUsersTable.id, payload.tgId)).limit(1),
       db.execute(sql`
         SELECT data FROM deposits
@@ -966,13 +967,31 @@ router.get("/wallet", async (req: Request, res: Response) => {
         WHERE data->>'userId' = ${payload.tgId}
         ORDER BY created_at DESC LIMIT 50
       `),
+      db.select().from(adminConfigTable)
+        .where(eq(adminConfigTable.key, "deposit_config"))
+        .limit(1)
+        .then((rows) => rows[0]),
+      db.select().from(adminConfigTable)
+        .where(eq(adminConfigTable.key, "finance"))
+        .limit(1)
+        .then((rows) => rows[0]),
     ]);
 
     if (!userRow[0]) { res.status(404).json({ error: "User not found" }); return; }
 
+    // Prefer finance.depositSkzPerTon (admin panel value), fall back to deposit_config.skzPerTon
+    const finCfg = (financeRow?.value ?? {}) as { depositSkzPerTon?: number };
+    const depCfg = (depositCfgRow?.value ?? {}) as { skzPerTon?: number };
+    const depositRate = typeof finCfg.depositSkzPerTon === "number" && finCfg.depositSkzPerTon > 0
+      ? finCfg.depositSkzPerTon
+      : typeof depCfg.skzPerTon === "number" && depCfg.skzPerTon > 0
+        ? depCfg.skzPerTon
+        : 100;
+
     res.json({
       tonDepositWallet: process.env.TON_DEPOSIT_WALLET ?? "",
       depositMemo: payload.tgId,
+      depositRate,
       deposits: (depositRows.rows as Array<{ data: unknown }>).map((r) => r.data),
       withdrawals: (withdrawalRows.rows as Array<{ data: unknown }>).map((r) => r.data),
     });
@@ -1524,6 +1543,67 @@ router.get("/leaderboard/:gameId", async (req: Request, res: Response) => {
     res.json({ leaders, pool, entries, yourRank });
   } catch (err) {
     req.log.error({ err }, "leaderboard error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/stars/packages ──────────────────────────────────────────────
+
+router.get("/stars/packages", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  if (!verifyUserToken(token)) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const rows = await db.select().from(tokenPackagesTable).orderBy(asc(tokenPackagesTable.id));
+    const packages = rows
+      .map((r) => r.data as Record<string, unknown>)
+      .filter((p) => p["currency"] === "STARS" && p["active"] === true);
+    res.json({ packages });
+  } catch (err) {
+    req.log.error({ err }, "stars packages error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/stars/create-invoice ───────────────────────────────────────
+
+router.post("/stars/create-invoice", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const { packageId } = req.body as { packageId?: string };
+  if (!packageId || typeof packageId !== "string") {
+    res.status(400).json({ error: "packageId required" }); return;
+  }
+
+  try {
+    const [row] = await db.select().from(tokenPackagesTable).where(eq(tokenPackagesTable.id, packageId)).limit(1);
+    if (!row) { res.status(404).json({ error: "Package not found" }); return; }
+
+    const pkg = row.data as { skz?: number; bonus?: number; price?: number; currency?: string; active?: boolean };
+    if (pkg.currency !== "STARS") { res.status(400).json({ error: "Not a Stars package" }); return; }
+    if (!pkg.active) { res.status(400).json({ error: "Package not available" }); return; }
+
+    const stars = Math.floor(Number(pkg.price ?? 0));
+    if (stars <= 0) { res.status(400).json({ error: "Invalid Stars price" }); return; }
+
+    const totalSkz = (pkg.skz ?? 0) + (pkg.bonus ?? 0);
+    const invoicePayload = JSON.stringify({ packageId, userId: payload.tgId });
+
+    const url = await createStarsInvoiceLink({
+      title: `${totalSkz.toLocaleString()} SKZ`,
+      description: `احصل على ${totalSkz.toLocaleString()} SKZ مقابل ${stars} ⭐`,
+      payload: invoicePayload,
+      stars,
+    });
+
+    if (!url) { res.status(500).json({ error: "Failed to create invoice" }); return; }
+    res.json({ url });
+  } catch (err) {
+    req.log.error({ err }, "stars create-invoice error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

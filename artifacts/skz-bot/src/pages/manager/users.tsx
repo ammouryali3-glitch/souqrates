@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useAdmin, admin } from "../../lib/admin-store";
 import {
-  CURRENCIES, TIER_LABEL, type Currency, type ManagedUser, type UserTier,
+  CURRENCIES, TIER_LABEL, type Currency, type TradedCurrency, type ManagedUser, type UserTier,
 } from "../../lib/admin-types";
 import {
   SectionHeader, StatCard, Card, Field, Label, Select, Toggle, Button, Pill,
@@ -220,12 +220,12 @@ function UserModal({ user, onClose }: { user: ManagedUser | null; onClose: () =>
 }
 
 function UserModalBody({ user }: { user: ManagedUser }) {
-  const [deltas, setDeltas] = useState<Record<Currency, string>>({ SKZ: "", TON: "", USDT: "" });
+  const [deltas, setDeltas] = useState<Record<TradedCurrency, string>>({ SKZ: "", TON: "", USDT: "" });
 
-  function setDelta(c: Currency, v: string) {
+  function setDelta(c: TradedCurrency, v: string) {
     setDeltas((d) => ({ ...d, [c]: v }));
   }
-  function applyDelta(c: Currency, sign: 1 | -1) {
+  function applyDelta(c: TradedCurrency, sign: 1 | -1) {
     const n = Number(deltas[c]);
     if (!Number.isFinite(n) || n === 0) return;
     admin.adjustUserBalance(user.id, c, sign * Math.abs(n));

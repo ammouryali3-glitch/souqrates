@@ -211,6 +211,17 @@ export default function FinanceSection() {
       <Card title="إعدادات المحفظة والحدود" icon={Settings2}>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
           <div>
+            <Label>معدل الإيداع (SKZ / TON)</Label>
+            <Field
+              type="number"
+              min="1"
+              value={finance.depositSkzPerTon ?? 100}
+              onChange={setNum((v) => ({ depositSkzPerTon: v }))}
+              data-testid="input-deposit-skz-per-ton"
+            />
+            <p className="text-[10px] text-white/40 mt-1">عدد SKZ التي تُضاف مقابل إيداع 1 TON</p>
+          </div>
+          <div>
             <Label>حد السحب التلقائي (USDT)</Label>
             <Field
               type="number"

@@ -10,3 +10,5 @@
 - [Canvas ref null with AnimatePresence](canvas-animatepresence-null.md) — canvasRef.current is null when startGame fires if canvas is inside AnimatePresence mode="wait". Fix: RAF retry guard at top of startGame.
 - [SKZ Bot admin gating](skz-bot-admin-gating.md) — admin toggles (game/section disable, maintenance, ban) must gate at the route in App.tsx, not just hide cards; direct URLs bypass card filtering.
 - [SKZ Bot server-side admin auth](skz-bot-server-auth.md) — JWT HttpOnly cookie via /api/admin/*; DB table admin_accounts; bcrypt hashes; AdminSessionContext replaces sessionStorage.
+- [SKZ Bot deposit rate config](skz-bot-deposit-rate.md) — depositSkzPerTon lives in finance admin config; ton-poller reads finance.depositSkzPerTon first then deposit_config.skzPerTon; default 100. TradedCurrency excludes STARS from finance tables.
+- [SKZ Bot Stars payment flow](skz-bot-stars-payment.md) — Telegram Stars: currency "XTR", provider_token "". pre_checkout_query must be answered <10s. successful_payment arrives as msg field. Idempotency key = telegram_payment_charge_id stored in deposits table.

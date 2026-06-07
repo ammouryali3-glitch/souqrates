@@ -710,7 +710,7 @@ export const admin = {
     update((s) => ({
       ...s,
       users: s.users.map((u) =>
-        u.id === id ? { ...u, balances: { ...u.balances, [currency]: Math.max(0, (u.balances[currency] ?? 0) + delta) } } : u,
+        u.id === id ? { ...u, balances: { ...u.balances, [currency]: Math.max(0, ((u.balances as Record<string, number>)[currency] ?? 0) + delta) } } : u,
       ),
     }));
     apiAdjustUserBalance(id, currency, delta);
