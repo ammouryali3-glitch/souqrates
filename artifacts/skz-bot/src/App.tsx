@@ -240,6 +240,15 @@ function Router() {
 
   const immersive = isManager || (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
 
+  // Lock document touchmove on game/arena routes so the Telegram WebView
+  // doesn't scroll the page during gameplay.
+  useEffect(() => {
+    if (!immersive) return;
+    const prevent = (e: TouchEvent) => { e.preventDefault(); };
+    document.addEventListener("touchmove", prevent, { passive: false });
+    return () => document.removeEventListener("touchmove", prevent);
+  }, [immersive]);
+
   if (banned && !isManager) {
     return (
       <MobileContainer hideHeader>
