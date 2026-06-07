@@ -1015,15 +1015,17 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   const safeCurrency = "TON" as const;
   const safeAmount = Math.floor(skzAmount);
 
-  // Read withdrawal config for min/max/rate enforcement
-  const [wdConfigRow] = await db
-    .select()
-    .from(adminConfigTable)
-    .where(eq(adminConfigTable.key, "withdrawal_config"))
-    .limit(1);
+  // Read withdrawal config: min/max from `finance` (edited by admin), rate from `withdrawal_config`
+  const [financeRow, wdConfigRow] = await Promise.all([
+    db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "finance")).limit(1).then((r) => r[0]),
+    db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "withdrawal_config")).limit(1).then((r) => r[0]),
+  ]);
+  const financeCfg = (financeRow?.value ?? {}) as Record<string, unknown>;
   const wdConfig = (wdConfigRow?.value ?? {}) as Record<string, unknown>;
-  const minSkz = Number(Number.isFinite(Number(wdConfig.minSkz)) ? wdConfig.minSkz : 100);
-  const maxSkz = Number(Number.isFinite(Number(wdConfig.maxSkz)) ? wdConfig.maxSkz : 50000);
+  const financeMin = (financeCfg.withdrawMin as Record<string, unknown> | undefined)?.SKZ;
+  const financeMax = (financeCfg.withdrawMax as Record<string, unknown> | undefined)?.SKZ;
+  const minSkz = Number(Number.isFinite(Number(financeMin)) ? financeMin : (Number.isFinite(Number(wdConfig.minSkz)) ? wdConfig.minSkz : 100));
+  const maxSkz = Number(Number.isFinite(Number(financeMax)) ? financeMax : (Number.isFinite(Number(wdConfig.maxSkz)) ? wdConfig.maxSkz : 50000));
   const skzPerTon = Number(Number.isFinite(Number(wdConfig.skzPerTon)) && Number(wdConfig.skzPerTon) > 0 ? wdConfig.skzPerTon : 100);
 
   if (safeAmount < minSkz) {
@@ -1537,16 +1539,18 @@ router.get("/withdrawal-config", async (req: Request, res: Response) => {
   if (!verifyUserToken(token)) { res.status(401).json({ error: "Invalid session" }); return; }
 
   try {
-    const [row] = await db
-      .select()
-      .from(adminConfigTable)
-      .where(eq(adminConfigTable.key, "withdrawal_config"))
-      .limit(1);
-    const cfg = (row?.value ?? {}) as Record<string, unknown>;
+    const [financeRow, wdRow] = await Promise.all([
+      db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "finance")).limit(1).then((r) => r[0]),
+      db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "withdrawal_config")).limit(1).then((r) => r[0]),
+    ]);
+    const fin = (financeRow?.value ?? {}) as Record<string, unknown>;
+    const wd = (wdRow?.value ?? {}) as Record<string, unknown>;
+    const finMin = (fin.withdrawMin as Record<string, unknown> | undefined)?.SKZ;
+    const finMax = (fin.withdrawMax as Record<string, unknown> | undefined)?.SKZ;
     res.json({
-      minSkz: Number(Number.isFinite(Number(cfg.minSkz)) ? cfg.minSkz : 100),
-      maxSkz: Number(Number.isFinite(Number(cfg.maxSkz)) ? cfg.maxSkz : 50000),
-      skzPerTon: Number(Number.isFinite(Number(cfg.skzPerTon)) && Number(cfg.skzPerTon) > 0 ? cfg.skzPerTon : 100),
+      minSkz: Number(Number.isFinite(Number(finMin)) ? finMin : (Number.isFinite(Number(wd.minSkz)) ? wd.minSkz : 100)),
+      maxSkz: Number(Number.isFinite(Number(finMax)) ? finMax : (Number.isFinite(Number(wd.maxSkz)) ? wd.maxSkz : 50000)),
+      skzPerTon: Number(Number.isFinite(Number(wd.skzPerTon)) && Number(wd.skzPerTon) > 0 ? wd.skzPerTon : 100),
     });
   } catch (err) {
     req.log.error({ err }, "withdrawal-config error");
