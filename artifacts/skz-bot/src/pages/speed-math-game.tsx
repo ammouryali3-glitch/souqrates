@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
+import { useGameFlow } from "@/components/game-flow";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
@@ -66,6 +67,7 @@ export default function SpeedMathGame() {
     level: 1,
   });
 
+  const { requestEntry, requestExit, notifyWin, overlays } = useGameFlow({ ticket, onConfirmedEntry: (tk) => { setTicket(tk as unknown as Ticket); pendingTicketRef.current = tk as unknown as Ticket; setPhase("playing"); } });
   const finishGame = useCallback((won: boolean, finalScore: number) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
@@ -289,7 +291,7 @@ export default function SpeedMathGame() {
                 const canAfford = balance >= t.price;
                 return (
                   <motion.button key={t.id} whileTap={{ scale: 0.97 }} disabled={!canAfford}
-                    onClick={() => { if (!canAfford) return; pendingTicketRef.current = t; setTicket(t); setPhase("playing"); }}
+                    onClick={() => { if (!canAfford) return; requestEntry(t); }}
                     className={`flex items-center justify-between px-5 py-4 rounded-2xl border transition-all ${canAfford ? "bg-white/5 border-yellow-500/30 hover:border-yellow-400/60 cursor-pointer" : "opacity-40 border-white/10 cursor-not-allowed"}`}>
                     <div className="text-left">
                       <div className="font-display font-bold text-white text-base">{t.name}</div>
@@ -310,7 +312,7 @@ export default function SpeedMathGame() {
           <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative flex-1 flex flex-col h-full">
             <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
               <div className="flex items-center gap-3 mb-2">
-                <Link href="/games"><button className="w-8 h-8 shrink-0 rounded-full bg-black/50 border border-yellow-500/30 flex items-center justify-center text-yellow-300"><ArrowLeft size={15} /></button></Link>
+                <button onClick={requestExit} className="w-8 h-8 shrink-0 rounded-full bg-black/50 border border-yellow-500/30 flex items-center justify-center text-yellow-300"><ArrowLeft size={15}/></button>
                 <div className="flex-1 flex flex-col gap-1.5">
                   <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden border border-yellow-500/20"><div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-400 shadow-[0_0_8px_rgba(255,190,0,0.5)] transition-[width] duration-300" style={{width:`${ticket?Math.min(100,(scoreDisp/ticket.target)*100):0}%`}}/></div>
                   <div className="w-full h-1.5 rounded-full bg-white/8 overflow-hidden"><div ref={timerBarRef} className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 transition-none" style={{width:"100%"}}/></div>
@@ -341,6 +343,7 @@ export default function SpeedMathGame() {
           </motion.div>
         )}
       </AnimatePresence>
+      {overlays}
     </div>
   );
 }

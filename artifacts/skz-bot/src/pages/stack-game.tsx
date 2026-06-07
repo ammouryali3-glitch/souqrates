@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useGameFlow } from "@/components/game-flow";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Zap, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
@@ -462,6 +463,7 @@ export default function StackGame() {
     [balance, newGameState, startLoop],
   );
 
+  const { requestEntry, requestExit, notifyWin, overlays } = useGameFlow({ ticket, onConfirmedEntry: (tk) => playTicket(tk as unknown as Ticket) });
   const finishGame = useCallback((finalScore: number, outcome: "win" | "crash" | "time") => {
     const g = gameRef.current;
     if (!g || !g.running) return; // idempotent: ignore duplicate settlement
@@ -482,6 +484,7 @@ export default function StackGame() {
           return next;
         });
       }
+      notifyWin(ticketRef.current?.prize ?? 0);
       setPhase("won");
     } else {
       audioRef.current.gameOver();
@@ -640,14 +643,12 @@ export default function StackGame() {
     <div className="flex-1 relative flex flex-col h-full overflow-hidden bg-[#06070d] select-none">
       {/* HUD top bar */}
       <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 pt-3">
-        <Link href="/games">
-          <button
-            data-testid="button-back-arena"
+        <button onClick={requestExit}
+          data-testid="button-back-arena"
             className="w-10 h-10 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:border-primary/50 transition-colors"
           >
             <ArrowLeft size={18} />
           </button>
-        </Link>
 
         <div className="flex flex-col items-center -mt-1">
           <span className="text-[10px] tracking-[0.3em] text-white/40 font-display uppercase">{gt[getLang()].gameScore}</span>
@@ -779,7 +780,7 @@ export default function StackGame() {
                     <button
                       key={t.id}
                       disabled={!affordable}
-                      onClick={() => affordable && playTicket(t)}
+                      onClick={() => affordable && requestEntry(t)}
                       data-testid={`button-ticket-${t.id}`}
                       className={`w-full flex items-center justify-between rounded-2xl border p-3.5 transition-all ${
                         affordable
@@ -928,6 +929,7 @@ export default function StackGame() {
           </motion.div>
         )}
       </AnimatePresence>
+      {overlays}
     </div>
   );
 }

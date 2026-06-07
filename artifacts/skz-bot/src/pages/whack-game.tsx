@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useGameFlow } from "@/components/game-flow";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
@@ -407,7 +408,7 @@ export default function WhackGame() {
   const finishGame = useCallback((finalScore: number, outcome: "win" | "bomb" | "time") => {
     const g = gameRef.current; if (!g || !g.running) return; g.running = false; startingRef.current = false;
     setBest(prev => { const n = Math.max(prev, finalScore); localStorage.setItem(BEST_KEY, String(n)); return n; });
-    if (outcome === "win") { audioRef.current.goal(); const t = ticketRef.current; if (t) setBalance(prev => { const n = prev + t.prize; localStorage.setItem(BALANCE_KEY, String(n)); return n; }); setPhase("won"); }
+    if (outcome === "win") { audioRef.current.goal(); const t = ticketRef.current; if (t) setBalance(prev => { const n = prev + t.prize; localStorage.setItem(BALANCE_KEY, String(n)); return n; }); notifyWin(ticketRef.current?.prize ?? 0); setPhase("won"); }
     else { audioRef.current.gameOver(); setPhase("lost"); }
   }, []);
 
@@ -479,6 +480,7 @@ export default function WhackGame() {
     if (timerBarRef.current) timerBarRef.current.style.width = "100%";
     setPhase("playing"); startLoop();
   }, [balance, newGameState, startLoop]);
+  const { requestEntry, requestExit, notifyWin, overlays } = useGameFlow({ ticket, onConfirmedEntry: (tk) => playTicket(tk as unknown as Ticket) });
 
   useEffect(() => { const audio = audioRef.current; return () => { cancelAnimationFrame(rafRef.current); audio.dispose(); }; }, []);
   const toggleMute = () => { audioRef.current.muted = !muted; setMuted(!muted); };
@@ -566,6 +568,7 @@ export default function WhackGame() {
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
+      {overlays}
     </div>
   );
 }

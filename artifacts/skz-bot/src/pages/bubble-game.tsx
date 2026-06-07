@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useGameFlow } from "@/components/game-flow";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
@@ -239,7 +240,7 @@ export default function BubbleGame() {
   const finishGame = useCallback((finalScore: number, outcome: "win" | "time") => {
     const g = gameRef.current; if (!g || !g.running) return; g.running = false; startingRef.current = false;
     setBest(prev => { const n = Math.max(prev, finalScore); localStorage.setItem(BEST_KEY, String(n)); return n; });
-    if (outcome === "win") { audioRef.current.goal(); const t = ticketRef.current; if (t) setBalance(prev => { const n = prev + t.prize; localStorage.setItem(BALANCE_KEY, String(n)); return n; }); setPhase("won"); }
+    if (outcome === "win") { audioRef.current.goal(); const t = ticketRef.current; if (t) setBalance(prev => { const n = prev + t.prize; localStorage.setItem(BALANCE_KEY, String(n)); return n; }); notifyWin(ticketRef.current?.prize ?? 0); setPhase("won"); }
     else { audioRef.current.gameOver(); setPhase("lost"); }
   }, []);
 
@@ -541,6 +542,7 @@ export default function BubbleGame() {
     if (timerBarRef.current) timerBarRef.current.style.width = "100%";
     setPhase("playing"); startLoop();
   }, [balance, startLoop]);
+  const { requestEntry, requestExit, notifyWin, overlays } = useGameFlow({ ticket, onConfirmedEntry: (tk) => playTicket(tk as unknown as Ticket) });
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     const g = gameRef.current; if (!g || !g.running) return;
@@ -560,7 +562,7 @@ export default function BubbleGame() {
   return (
     <div className="flex-1 relative flex flex-col h-full overflow-hidden select-none" style={{ background: "#0d0021" }}>
       <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 pt-3">
-        <Link href="/games"><button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur border border-purple-500/30 flex items-center justify-center text-purple-300 hover:text-white transition-colors"><ArrowLeft size={18} /></button></Link>
+        <button onClick={requestExit} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur border border-purple-500/30 flex items-center justify-center text-purple-300 hover:text-white transition-colors"><ArrowLeft size={18}/></button>
         <div className="flex flex-col items-center">
           <span className="text-[10px] tracking-[0.3em] text-purple-300/70 font-display uppercase">{phase === "playing" ? "POPPED" : "BUBBLE SHOOTER"}</span>
           <span data-testid="text-score" className="font-display font-black text-4xl text-purple-300 leading-none drop-shadow-[0_0_18px_rgba(155,89,182,0.9)]">{score}</span>
@@ -616,6 +618,7 @@ export default function BubbleGame() {
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
+      {overlays}
     </div>
   );
 }

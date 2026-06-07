@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useGameFlow } from "@/components/game-flow";
 import { ArrowLeft, Volume2, VolumeX, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
@@ -370,6 +371,7 @@ export default function ColorSwitchGame() {
       audioRef.current.goal();
       const t = ticketRef.current;
       if (t) setBalance(prev=>{const n=prev+t.prize;localStorage.setItem(BALANCE_KEY,String(n));return n;});
+      notifyWin(ticketRef.current?.prize ?? 0);
       setPhase("won");
     } else { audioRef.current.gameOver(); setPhase("lost"); }
   }, []);
@@ -395,6 +397,7 @@ export default function ColorSwitchGame() {
     if (timerBarRef.current) timerBarRef.current.style.width="100%";
     setPhase("playing"); startLoop();
   }, [balance, newGameState, startLoop]);
+  const { requestEntry, requestExit, notifyWin, overlays } = useGameFlow({ ticket, onConfirmedEntry: (tk) => playTicket(tk as unknown as Ticket) });
 
   useEffect(() => { const audio=audioRef.current; return ()=>{cancelAnimationFrame(rafRef.current);audio.dispose();}; }, []);
 
@@ -404,7 +407,7 @@ export default function ColorSwitchGame() {
     <div className="flex-1 relative flex flex-col h-full overflow-hidden bg-[#111118] select-none">
       {/* HUD */}
       <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 pt-3">
-        <Link href="/games"><button data-testid="button-back-arena" className="w-10 h-10 rounded-full bg-white/5 backdrop-blur border border-white/10 flex items-center justify-center text-white/80 hover:text-violet-300 transition-colors"><ArrowLeft size={18}/></button></Link>
+        <button onClick={requestExit} data-testid="button-back-arena" className="w-10 h-10 rounded-full bg-white/5 backdrop-blur border border-white/10 flex items-center justify-center text-white/80 hover:text-violet-300 transition-colors"><ArrowLeft size={18}/></button>
         <div className="flex flex-col items-center -mt-1">
           <span className="text-[10px] tracking-[0.3em] text-violet-400/70 font-display uppercase">{phase==="playing"?"Passed":"Color Switch"}</span>
           <span data-testid="text-score" className="font-display font-black text-4xl text-white leading-none drop-shadow-[0_0_18px_rgba(180,100,255,0.6)]">{score}</span>
@@ -500,6 +503,7 @@ export default function ColorSwitchGame() {
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
+      {overlays}
     </div>
   );
 }

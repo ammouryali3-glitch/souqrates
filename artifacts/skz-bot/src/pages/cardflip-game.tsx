@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useGameFlow } from "@/components/game-flow";
 import { ArrowLeft, RotateCcw, Trophy, Coins } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
@@ -52,11 +53,12 @@ export default function CardFlipGame() {
     if(flipTimeoutRef.current)clearTimeout(flipTimeoutRef.current);
   },[]);
 
+  const { requestEntry, requestExit, notifyWin, overlays } = useGameFlow({ ticket, onConfirmedEntry: (tk) => { setTicket(tk as unknown as Ticket); pendingTicketRef.current = tk as unknown as Ticket; setPhase("playing"); } });
   const finishGame = useCallback((won:boolean)=>{
     if(finishedRef.current)return; finishedRef.current=true; clearTimers();
     if(!ticket)return;
     const fs=scoreRef.current;
-    if(won){const nb=balance-ticket.price+ticket.prize;setBalance(nb);localStorage.setItem(BALANCE_KEY,String(nb));const b=parseInt(localStorage.getItem(BEST_KEY)||"0");if(fs>b){setBest(fs);localStorage.setItem(BEST_KEY,String(fs));}}
+    if(won){const nb=balance-ticket.price+ticket.prize;setBalance(nb);localStorage.setItem(BALANCE_KEY,String(nb));const b=parseInt(localStorage.getItem(BEST_KEY)||"0");if(fs>b){setBest(fs);localStorage.setItem(BEST_KEY,String(fs));}notifyWin(ticket.prize);}
     else{setBalance(b2=>{const nb=Math.max(0,b2-ticket.price);localStorage.setItem(BALANCE_KEY,String(nb));return nb;});}
     setScoreDisp(fs);setPhase(won?"won":"lost");
   },[ticket,balance,clearTimers]);
@@ -133,7 +135,7 @@ export default function CardFlipGame() {
             <p className="text-xs text-white/50 mb-4 max-w-[260px]">Flip cards to find matching pairs from memory! Complete the full board → it resets with all cards reshuffled. How many pairs can you match?</p>
             <div className="flex items-center gap-2 mb-6 bg-white/5 rounded-full px-4 py-2"><Coins size={14} className="text-emerald-400"/><span className="font-display font-bold text-white">{balance.toLocaleString()} SKZ</span></div>
             <div className="flex flex-col gap-3 w-full">{TICKETS.map(tk=>(
-              <button key={tk.id} disabled={balance<tk.price} onClick={()=>{setTicket(tk);pendingTicketRef.current=tk;setPhase("playing");}} className="flex items-center justify-between px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-all">
+              <button key={tk.id} disabled={balance<tk.price} onClick={() => requestEntry(tk)} className="flex items-center justify-between px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-all">
                 <div className="text-left"><div className="font-display font-bold text-white text-base">{tk.name}</div><div className="text-xs text-white/40">PAIRS {tk.target} · {tk.time}S</div></div>
                 <div className="text-right"><div className="font-display font-bold text-emerald-300 text-lg flex items-center gap-1"><Coins size={13} className="text-emerald-400"/>{tk.prize}</div><div className="text-xs text-white/40">ENTRY {tk.price}</div></div>
               </button>
@@ -144,7 +146,7 @@ export default function CardFlipGame() {
         {phase==="playing"&&(<motion.div key="play" initial={{opacity:0}} animate={{opacity:1}} className="relative flex-1 flex flex-col h-full">
           <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
             <div className="flex items-center gap-3 mb-2">
-              <Link href="/games"><button className="w-8 h-8 shrink-0 rounded-full bg-black/50 border border-emerald-500/30 flex items-center justify-center text-emerald-300"><ArrowLeft size={15}/></button></Link>
+              <button onClick={requestExit} className="w-8 h-8 shrink-0 rounded-full bg-black/50 border border-emerald-500/30 flex items-center justify-center text-emerald-300"><ArrowLeft size={15}/></button>
               <div className="flex-1 flex flex-col gap-1.5">
                 <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden border border-emerald-500/20"><div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-[width] duration-300" style={{width:`${ticket?Math.min(100,(scoreDisp/ticket.target)*100):0}%`}}/></div>
                 <div className="w-full h-1.5 rounded-full bg-white/8 overflow-hidden"><div ref={timerBarRef} className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-none" style={{width:"100%"}}/></div>
@@ -182,6 +184,7 @@ export default function CardFlipGame() {
           </div>
         </motion.div>)}
       </AnimatePresence>
+      {overlays}
     </div>
   );
 }
