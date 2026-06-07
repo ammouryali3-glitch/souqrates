@@ -129,9 +129,10 @@ router.post("/users", requirePermission("users"), async (req: Request, res: Resp
 });
 
 // Allow-list: only these top-level fields can be patched by admins.
-// Balances, purchases, game state, and identity fields are intentionally excluded.
+// Balances are adjusted via the dedicated /adjust-balance endpoint (with ledger).
+// Identity fields (tgId, wallet, etc.) are intentionally excluded.
 const ALLOWED_USER_PATCH_FIELDS = new Set([
-  "status", "restrictions", "note", "tags", "displayName",
+  "status", "restrictions", "note", "tags", "displayName", "tier", "flagged",
 ]);
 
 router.patch("/users/:id", requirePermission("users"), async (req: Request, res: Response) => {
@@ -165,6 +166,66 @@ router.patch("/users/:id", requirePermission("users"), async (req: Request, res:
     const e = err as { status?: number };
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
     req.log.error({ err }, "patch user error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Admin balance adjustment (with ledger) ────────────────────────────────────
+
+const ALLOWED_BALANCE_CURRENCIES = new Set(["SKZ", "TON", "USDT"]);
+
+router.post("/users/:id/adjust-balance", requirePermission("users"), async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { currency, delta, reason } = req.body ?? {};
+
+  if (typeof currency !== "string" || !ALLOWED_BALANCE_CURRENCIES.has(currency)) {
+    res.status(400).json({ error: "currency must be SKZ, TON, or USDT" });
+    return;
+  }
+  if (typeof delta !== "number" || !Number.isFinite(delta) || delta === 0) {
+    res.status(400).json({ error: "delta must be a non-zero finite number" });
+    return;
+  }
+
+  try {
+    let newData: object = {};
+
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, id))
+        .for("update")
+        .limit(1);
+      if (!existing) throw Object.assign(new Error("not_found"), { status: 404 });
+
+      const data = existing.data as Record<string, unknown>;
+      const balances = ((data.balances ?? {}) as Record<string, unknown>);
+      const before = Number(balances[currency] ?? 0);
+      const after = Math.max(0, before + delta);
+
+      newData = { ...data, balances: { ...balances, [currency]: after } };
+
+      await tx
+        .update(platformUsersTable)
+        .set({ data: newData, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, id));
+
+      await recordLedger(tx, {
+        userId: id,
+        type: delta > 0 ? "credit" : "debit",
+        reason: "admin",
+        amount: Math.abs(Math.floor(Math.abs(delta))),
+        balanceBefore: before,
+        balanceAfter: after,
+      });
+    });
+
+    res.json(newData);
+  } catch (err) {
+    const e = err as { status?: number };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    req.log.error({ err }, "adjust-balance error");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -842,6 +903,34 @@ router.post("/referrers", requirePermission("affiliate"), async (req: Request, r
     res.status(201).json({ id: refId });
   } catch (err) {
     req.log.error({ err }, "upsert referrer error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/referrers/:id", requirePermission("affiliate"), async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  try {
+    const [existing] = await db.select().from(referrersTable).where(eq(referrersTable.id, id)).limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "Referrer not found" });
+      return;
+    }
+    const merged = { ...(existing.data as object), ...req.body, id };
+    await db.update(referrersTable).set({ data: merged, updatedAt: new Date() }).where(eq(referrersTable.id, id));
+    res.json(merged);
+  } catch (err) {
+    req.log.error({ err }, "patch referrer error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/referrers/:id", requirePermission("affiliate"), async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  try {
+    await db.delete(referrersTable).where(eq(referrersTable.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "delete referrer error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

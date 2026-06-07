@@ -46,6 +46,9 @@ import {
   apiPatchProduct,
   apiDeleteProduct,
   apiUpsertReferrer,
+  apiPatchReferrer,
+  apiDeleteReferrer,
+  apiAdjustUserBalance,
 } from "./admin-api";
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -708,8 +711,7 @@ export const admin = {
         u.id === id ? { ...u, balances: { ...u.balances, [currency]: Math.max(0, (u.balances[currency] ?? 0) + delta) } } : u,
       ),
     }));
-    const user = state.users.find((u) => u.id === id);
-    if (user) apiPatchUser(id, { balances: user.balances });
+    apiAdjustUserBalance(id, currency, delta);
   },
   setUserTier(id: string, tier: ManagedUser["tier"]) {
     update((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, tier } : u)) }));
@@ -726,13 +728,14 @@ export const admin = {
     apiPatchWithdrawal(id, { status });
   },
   approveAllAutoWithdrawals() {
+    const toApprove = state.withdrawals
+      .filter((w) => w.status === "pending" && w.auto)
+      .map((w) => w.id);
     update((s) => ({
       ...s,
       withdrawals: s.withdrawals.map((w) => (w.status === "pending" && w.auto ? { ...w, status: "approved" } : w)),
     }));
-    state.withdrawals
-      .filter((w) => w.status === "approved" && w.auto)
-      .forEach((w) => apiPatchWithdrawal(w.id, { status: "approved" }));
+    toApprove.forEach((id) => apiPatchWithdrawal(id, { status: "approved" }));
   },
   setFinance(patch: Partial<FinanceSettings>) {
     update((s) => ({ ...s, finance: { ...s.finance, ...patch } }));
@@ -747,6 +750,23 @@ export const admin = {
   setSecurity(patch: Partial<SecuritySettings>) {
     update((s) => ({ ...s, security: { ...s.security, ...patch } }));
     putAdminConfig("security", state.security);
+  },
+
+  // ── Referrers ─────────────────────────────────────────────────────────────────
+  addReferrer(r: Omit<Referrer, "id">): Referrer {
+    const created: Referrer = { ...r, id: genId() };
+    update((s) => ({ ...s, referrers: [...s.referrers, created] }));
+    apiUpsertReferrer(created);
+    return created;
+  },
+  updateReferrer(id: string, patch: Partial<Referrer>) {
+    update((s) => ({ ...s, referrers: s.referrers.map((r) => (r.id === id ? { ...r, ...patch, id } : r)) }));
+    const updated = state.referrers.find((r) => r.id === id);
+    if (updated) apiPatchReferrer(id, patch);
+  },
+  deleteReferrer(id: string) {
+    update((s) => ({ ...s, referrers: s.referrers.filter((r) => r.id !== id) }));
+    apiDeleteReferrer(id);
   },
 
   // ── Affiliate ────────────────────────────────────────────────────────────────

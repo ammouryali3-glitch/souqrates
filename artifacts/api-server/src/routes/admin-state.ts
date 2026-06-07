@@ -43,6 +43,8 @@ const VALID_CONFIG_KEYS = new Set([
   "roles",
   "deposit_config",
   "withdrawal_config",
+  "contact_info",
+  "policies",
 ]);
 
 /**
@@ -62,6 +64,8 @@ const KEY_PERMISSION: Record<string, string> = {
   withdrawal_config: "finance",
   referral_config: "affiliate",
   daily_checkin: "content",
+  contact_info: "content",
+  policies: "content",
 };
 
 function checkConfigPermission(

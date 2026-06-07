@@ -388,3 +388,40 @@ export async function apiUpsertReferrer(referrer: object): Promise<void> {
     console.warn("[admin-api] apiUpsertReferrer network error:", err);
   }
 }
+
+export async function apiPatchReferrer(id: string, patch: object): Promise<void> {
+  try {
+    const res = await apiFetch(`/api/admin/referrers/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+    warnOnFailure("apiPatchReferrer", res);
+  } catch (err) {
+    console.warn("[admin-api] apiPatchReferrer network error:", err);
+  }
+}
+
+export async function apiDeleteReferrer(id: string): Promise<void> {
+  try {
+    const res = await apiFetch(`/api/admin/referrers/${id}`, { method: "DELETE" });
+    warnOnFailure("apiDeleteReferrer", res);
+  } catch (err) {
+    console.warn("[admin-api] apiDeleteReferrer network error:", err);
+  }
+}
+
+// ── Balance adjustment ─────────────────────────────────────────────────────────
+
+export async function apiAdjustUserBalance(
+  id: string,
+  currency: string,
+  delta: number,
+  reason?: string,
+): Promise<void> {
+  try {
+    const res = await apiFetch(`/api/admin/users/${id}/adjust-balance`, {
+      method: "POST",
+      body: JSON.stringify({ currency, delta, reason: reason ?? "admin_adjustment" }),
+    });
+    warnOnFailure("apiAdjustUserBalance", res);
+  } catch (err) {
+    console.warn("[admin-api] apiAdjustUserBalance network error:", err);
+  }
+}
