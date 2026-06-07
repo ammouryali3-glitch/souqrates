@@ -1,4 +1,5 @@
 - [SKZ Bot canvas games](skz-bot-games.md) — full-screen /games/<name> routes; must stop rAF on game-over and close AudioContext on unmount.
+- [Testing Telegram-auth payment endpoints](testing-telegram-payment.md) — sign initData from BOT_TOKEN to auth; withdraw is rate-limited 3/15min; known deposit/withdraw idempotency gaps.
 - [Admin panel audit findings](admin-panel-bugs.md) — rules for ALLOWED_USER_PATCH_FIELDS, VALID_CONFIG_KEYS, balance adjustment endpoint, approveAll pattern, referrers CRUD.
 - [SKZ Bot Phase 2 financial layer](skz-bot-phase2-financials.md) — ledger table, daily check-in, referral reward bootstrap; pattern for balance mutations.
 - [drizzle-orm peer-fork](drizzle-upstash-peer-fork.md) — adding @upstash/redis forks drizzle into a 2nd type-brand; fix = re-export operators from @workspace/db, import from there not "drizzle-orm".
