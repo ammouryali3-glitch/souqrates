@@ -23,7 +23,8 @@ export type LedgerReason =
   | "refund"
   | "bonus"
   | "starting_balance"
-  | "admin";
+  | "admin"
+  | "stars_purchase";
 
 export interface LedgerEntry {
   userId: string;

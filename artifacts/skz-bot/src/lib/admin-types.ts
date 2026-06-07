@@ -2,8 +2,8 @@
 // Kept separate from admin-store to avoid a giant file and to let section
 // pages import types without pulling the whole store.
 
-export type Currency = "SKZ" | "TON" | "USDT";
-export const CURRENCIES: Currency[] = ["SKZ", "TON", "USDT"];
+export type Currency = "SKZ" | "TON" | "USDT" | "STARS";
+export const CURRENCIES: Currency[] = ["SKZ", "TON", "USDT", "STARS"];
 
 export type UserTier = "rookie" | "silver" | "gold" | "vip";
 
