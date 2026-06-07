@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Database, Cloud, AlertCircle, Globe, CheckCircle2, XCircle,
   Loader2, Save, TestTube2, ChevronDown, ChevronUp, Copy, Check,
-  ExternalLink, RefreshCw,
+  ExternalLink, RefreshCw, Clock,
 } from "lucide-react";
 
 interface IntegrationCfg {
@@ -28,8 +28,15 @@ const DEFAULT_CFG: IntegrationCfg = {
 
 type IntegrationName = "redis" | "r2" | "sentry" | "cloudflare";
 
-function StatusBadge({ connected, enabled }: { connected: boolean; enabled: boolean }) {
-  if (!enabled) return (
+/** Badge based on the SAVED (server-confirmed) config, not local draft */
+function StatusBadge({ connected, savedEnabled, isDirty }: { connected: boolean; savedEnabled: boolean; isDirty: boolean }) {
+  if (isDirty) return (
+    <span className="flex items-center gap-1.5 text-[11px] font-display font-bold text-amber-400/80">
+      <Clock size={12} />
+      بانتظار الحفظ
+    </span>
+  );
+  if (!savedEnabled) return (
     <span className="flex items-center gap-1.5 text-[11px] font-display font-bold text-white/30">
       <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
       معطّل
@@ -127,6 +134,8 @@ const WORKER_SCRIPT_URL = "scripts/src/cloudflare-worker.js";
 
 export default function IntegrationsSection() {
   const [cfg, setCfg] = useState<IntegrationCfg>(DEFAULT_CFG);
+  /** Last config confirmed by the server (used for status badge) */
+  const [savedCfg, setSavedCfg] = useState<IntegrationCfg>(DEFAULT_CFG);
   const [status, setStatus] = useState<IntegrationStatus>({
     redis: { connected: false },
     r2: { connected: false },
@@ -140,6 +149,12 @@ export default function IntegrationsSection() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ redis: true, r2: false, sentry: false, cloudflare: false });
   const [cfWorker, setCfWorker] = useState("");
 
+  /** True when the form has unsaved changes vs the last server response */
+  const dirty = useMemo(
+    () => JSON.stringify(cfg) !== JSON.stringify(savedCfg),
+    [cfg, savedCfg],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -147,6 +162,7 @@ export default function IntegrationsSection() {
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json() as { config: IntegrationCfg; status: IntegrationStatus };
       setCfg(data.config);
+      setSavedCfg(data.config);
       setStatus(data.status);
     } catch {
       // keep defaults
@@ -159,7 +175,6 @@ export default function IntegrationsSection() {
 
   // Load Cloudflare worker script for display
   useEffect(() => {
-    fetch("/api/health").then(() => {}).catch(() => {});
     fetch(WORKER_SCRIPT_URL)
       .then((r) => r.ok ? r.text() : Promise.resolve(""))
       .then(setCfWorker)
@@ -178,7 +193,10 @@ export default function IntegrationsSection() {
       if (!res.ok) throw new Error("Save failed");
       const data = await res.json() as { config: IntegrationCfg; status: IntegrationStatus };
       setCfg(data.config);
+      setSavedCfg(data.config);
       setStatus(data.status);
+      // Clear stale test results after save since server config changed
+      setTestResult({});
     } catch {
       // ignore
     } finally {
@@ -277,20 +295,30 @@ export default function IntegrationsSection() {
           </button>
           <button
             onClick={save}
-            disabled={saving}
-            className="flex items-center gap-2 px-5 h-9 rounded-xl bg-primary text-black font-display font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50"
+            disabled={saving || !dirty}
+            className={`flex items-center gap-2 px-5 h-9 rounded-xl font-display font-bold text-sm transition-all disabled:opacity-50 ${dirty ? "bg-primary text-black hover:bg-primary/90" : "bg-white/8 text-white/40 border border-white/10"}`}
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            حفظ الكل
+            {dirty ? "حفظ التغييرات" : "محفوظ"}
           </button>
         </div>
       </div>
+
+      {/* Unsaved changes banner */}
+      {dirty && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300/80 text-[11px] font-display">
+          <Clock size={12} className="shrink-0" />
+          يوجد تغييرات غير محفوظة — اضغط «حفظ التغييرات» لتطبيقها على الخادم
+        </div>
+      )}
 
       {cards.map((card) => {
         const isOpen = expanded[card.id];
         const stat = status[card.id];
         const tr = testResult[card.id];
         const isTesting = testing === card.id;
+        const cardDirty = JSON.stringify(cfg[card.id]) !== JSON.stringify(savedCfg[card.id]);
+        const canTest = savedCfg[card.id].enabled && !cardDirty && !isTesting;
 
         return (
           <div key={card.id} className="rounded-2xl border border-white/8 bg-[#0e0b1e] overflow-hidden">
@@ -306,7 +334,11 @@ export default function IntegrationsSection() {
                 <div className="font-display font-black text-sm text-white">{card.title}</div>
                 <div className="text-[11px] text-white/35 font-display">{card.subtitle}</div>
               </div>
-              <StatusBadge connected={stat.connected} enabled={cfg[card.id].enabled} />
+              <StatusBadge
+                connected={stat.connected}
+                savedEnabled={savedCfg[card.id].enabled}
+                isDirty={cardDirty}
+              />
               {isOpen ? <ChevronUp size={15} className="text-white/30 shrink-0" /> : <ChevronDown size={15} className="text-white/30 shrink-0" />}
             </button>
 
@@ -317,7 +349,9 @@ export default function IntegrationsSection() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-display font-bold text-white">تفعيل الخدمة</div>
-                    <div className="text-[11px] text-white/35 font-display mt-0.5">تفعيل أو إيقاف {card.title}</div>
+                    <div className="text-[11px] text-white/35 font-display mt-0.5">
+                      {cardDirty ? "احفظ التغييرات لتطبيق الإعدادات على الخادم" : `تفعيل أو إيقاف ${card.title}`}
+                    </div>
                   </div>
                   <Toggle
                     value={cfg[card.id].enabled}
@@ -481,14 +515,22 @@ export default function IntegrationsSection() {
                           : `✗ ${tr.error ?? "فشل"}`}
                       </span>
                     )}
-                    <button
-                      onClick={() => test(card.id)}
-                      disabled={!cfg[card.id].enabled || isTesting}
-                      className="flex items-center gap-1.5 px-4 h-8 rounded-xl bg-white/6 border border-white/8 text-[11px] font-display font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
-                    >
-                      {isTesting ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />}
-                      اختبار الاتصال
-                    </button>
+                    <div className="relative group">
+                      <button
+                        onClick={() => canTest && test(card.id)}
+                        disabled={!canTest}
+                        className="flex items-center gap-1.5 px-4 h-8 rounded-xl bg-white/6 border border-white/8 text-[11px] font-display font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        {isTesting ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />}
+                        اختبار الاتصال
+                      </button>
+                      {/* Tooltip when disabled */}
+                      {!canTest && (
+                        <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1.5 rounded-lg bg-black/90 border border-white/10 text-[10px] font-display text-white/60 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          {cardDirty ? "احفظ التغييرات أولاً" : "فعّل الخدمة أولاً"}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
