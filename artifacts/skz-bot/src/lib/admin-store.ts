@@ -356,6 +356,8 @@ function applyFullAdminState(
     apiKeys: Array.isArray(cfg.api_keys) ? (cfg.api_keys as ApiKey[]) : seeded.apiKeys,
     roles: Array.isArray(cfg.roles) ? (cfg.roles as AdminRole[]) : state.roles,
     cms: cfg.cms ? { ...seeded.cms, ...(cfg.cms as Partial<CmsTexts>) } : seeded.cms,
+    contactInfo: cfg.contact_info ? { ...seeded.contactInfo, ...(cfg.contact_info as Partial<ContactInfo>) } : state.contactInfo,
+    policies: cfg.policies ? { ...seeded.policies, ...(cfg.policies as Partial<PolicyTexts>) } : state.policies,
     finance: cfg.finance ? { ...seeded.finance, ...(cfg.finance as Partial<FinanceSettings>) } : seeded.finance,
     security: cfg.security ? { ...seeded.security, ...(cfg.security as Partial<SecuritySettings>) } : seeded.security,
     backup: cfg.backup ? { ...seeded.backup, ...(cfg.backup as Partial<BackupSettings>) } : seeded.backup,
