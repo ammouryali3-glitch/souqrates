@@ -17,13 +17,13 @@ export function initR2(config: R2Config): void {
   try {
     s3 = new S3Client({
       region: "auto",
-      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+      endpoint: `https://${config.accountId.trim()}.r2.cloudflarestorage.com`,
       credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
+        accessKeyId: config.accessKeyId.trim(),
+        secretAccessKey: config.secretAccessKey.trim(),
       },
     });
-    cfg = { bucketName: config.bucketName, publicUrl: config.publicUrl.replace(/\/$/, "") };
+    cfg = { bucketName: config.bucketName.trim(), publicUrl: config.publicUrl.trim().replace(/\/$/, "") };
     logger.info("Cloudflare R2 client initialized");
   } catch (err) {
     s3 = null;

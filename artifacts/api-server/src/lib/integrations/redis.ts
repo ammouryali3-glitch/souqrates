@@ -11,7 +11,7 @@ export interface RedisConfig {
 
 export function initRedis(config: RedisConfig): void {
   try {
-    client = new Redis({ url: config.restUrl, token: config.restToken });
+    client = new Redis({ url: config.restUrl.trim(), token: config.restToken.trim() });
     logger.info("Upstash Redis client initialized");
   } catch (err) {
     client = null;
