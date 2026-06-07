@@ -5,12 +5,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { MobileContainer } from "@/components/layout/MobileContainer";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { NotificationBanner } from "@/components/NotificationBanner";
+import { SplashScreen } from "@/components/SplashScreen";
 import { AnimatePresence, motion } from "framer-motion";
 import { Ban, Wrench, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/lib/admin-store";
 import { ALL_GAMES, getGameById } from "@/lib/games-data";
 import { setCurrentGameContext, useTelegramUser } from "@/lib/telegram-user";
-import { Component, Suspense, lazy, useEffect, useRef } from "react";
+import { Component, Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 
 // Non-game pages — loaded eagerly (they're small)
@@ -307,9 +308,12 @@ function Router() {
 }
 
 function App() {
+  const [splashDone, setSplashDone] = useState(false);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
