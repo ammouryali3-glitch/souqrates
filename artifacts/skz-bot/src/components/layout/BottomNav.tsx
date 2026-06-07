@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Gamepad2, ShoppingCart, Wallet, Users, Mail, FileText } from "lucide-react";
+import { Home, Gamepad2, ShoppingCart, Wallet, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLang, setLang, t } from "@/lib/i18n";
 
@@ -9,73 +9,87 @@ export function BottomNav() {
   const s = t[lang];
 
   const tabs = [
-    { path: "/", icon: Home, label: s.home },
-    { path: "/games", icon: Gamepad2, label: s.games },
-    { path: "/shop", icon: ShoppingCart, label: s.shop },
-    { path: "/wallet", icon: Wallet, label: s.wallet },
-    { path: "/referrals", icon: Users, label: s.referrals },
+    { path: "/",          icon: Home,        label: s.home },
+    { path: "/games",     icon: Gamepad2,    label: s.games },
+    { path: "/shop",      icon: ShoppingCart, label: s.shop },
+    { path: "/wallet",    icon: Wallet,      label: s.wallet },
+    { path: "/referrals", icon: Users,       label: s.referrals },
   ];
 
   return (
-    <div className="absolute bottom-0 w-full px-4 pb-4 pt-3 bg-card/80 backdrop-blur-xl border-t border-white/10 z-50 rounded-t-3xl">
-      <div className="flex justify-between items-center max-w-sm mx-auto">
+    <div
+      className="absolute bottom-0 w-full z-50"
+      style={{
+        background: "rgba(10,8,20,0.92)",
+        backdropFilter: "blur(20px)",
+        borderTop: "1px solid rgba(255,255,255,0.07)",
+      }}
+    >
+      <div className="flex justify-around items-end pt-2 pb-4 px-2 max-w-sm mx-auto">
         {tabs.map((tab) => {
           const isActive = location === tab.path;
           const Icon = tab.icon;
           return (
             <Link key={tab.path} href={tab.path}>
-              <div className="relative flex flex-col items-center justify-center w-14 h-12 cursor-pointer group">
+              <div className="relative flex flex-col items-center justify-center gap-1 w-[58px] cursor-pointer">
+                {/* Active indicator pill at top */}
                 {isActive && (
                   <motion.div
-                    layoutId="bubble"
-                    className="absolute inset-0 bg-primary/10 rounded-2xl -z-10"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    layoutId="nav-pill"
+                    className="absolute -top-2 w-8 h-0.5 rounded-full"
+                    style={{
+                      background: "linear-gradient(90deg, #c9a227, #f0d060)",
+                      boxShadow: "0 0 8px rgba(212,175,55,0.8)",
+                    }}
+                    transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
                   />
                 )}
-                <Icon
-                  size={22}
-                  className={`transition-colors duration-300 ${
-                    isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                  }`}
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
+
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-200"
+                  style={isActive ? {
+                    background: "linear-gradient(135deg, rgba(201,162,39,0.2), rgba(240,208,96,0.1))",
+                    boxShadow: "0 0 12px rgba(212,175,55,0.2)",
+                  } : {}}
+                >
+                  <Icon
+                    size={21}
+                    strokeWidth={isActive ? 2.5 : 1.8}
+                    style={{ color: isActive ? "#f0d060" : "rgba(255,255,255,0.4)" }}
+                  />
+                </div>
+
                 <span
-                  className={`text-[10px] mt-1 font-medium transition-all duration-300 ${
-                    isActive ? "text-primary opacity-100" : "text-muted-foreground opacity-0 group-hover:opacity-100"
-                  }`}
+                  className="text-[10px] font-medium leading-none transition-all duration-200"
+                  style={{ color: isActive ? "#f0d060" : "rgba(255,255,255,0.35)" }}
                 >
                   {tab.label}
                 </span>
-                {isActive && (
-                  <div className="absolute -top-3 w-1 h-1 rounded-full bg-primary shadow-[0_0_8px_2px_rgba(212,175,55,0.5)]" />
-                )}
               </div>
             </Link>
           );
         })}
       </div>
 
-      {/* Footer row: language toggle + contact + policies */}
-      <div className="flex items-center justify-between mt-2 max-w-sm mx-auto">
+      {/* Minimal footer */}
+      <div className="flex items-center justify-between pb-2 px-6 max-w-sm mx-auto">
         <button
           onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/6 border border-white/10 text-white/35 text-[10px] font-bold tracking-wider hover:text-white/60 transition-all"
+          className="text-[9px] font-bold tracking-widest transition-colors"
+          style={{ color: "rgba(255,255,255,0.2)" }}
         >
           {s.langSwitch}
         </button>
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Link href="/contact">
-            <div className={`flex items-center gap-1 text-[10px] font-display transition-colors ${location === "/contact" ? "text-primary" : "text-white/30 hover:text-white/55"}`}>
-              <Mail size={11} />
+            <span className="text-[9px] transition-colors" style={{ color: location === "/contact" ? "#c9a227" : "rgba(255,255,255,0.2)" }}>
               {s.navContact}
-            </div>
+            </span>
           </Link>
           <Link href="/policies">
-            <div className={`flex items-center gap-1 text-[10px] font-display transition-colors ${location === "/policies" ? "text-primary" : "text-white/30 hover:text-white/55"}`}>
-              <FileText size={11} />
+            <span className="text-[9px] transition-colors" style={{ color: location === "/policies" ? "#c9a227" : "rgba(255,255,255,0.2)" }}>
               {s.navPolicies}
-            </div>
+            </span>
           </Link>
         </div>
       </div>

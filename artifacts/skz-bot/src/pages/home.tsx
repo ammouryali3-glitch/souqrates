@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Trophy, Users, ShoppingBag, Coins,
+  Trophy, Users, ShoppingBag, Coins,
   ArrowUpRight, ArrowDownLeft, Flame, Gamepad2,
-  CheckCircle2, UserCircle2, CalendarCheck,
+  CheckCircle2, UserCircle2, CalendarCheck, ArrowRight,
+  TrendingUp,
 } from "lucide-react";
 import { Link } from "wouter";
 import { NumberTicker } from "@/components/ui/number-ticker";
-import { Card } from "@/components/ui/card";
 import { useAdmin, useBalance, admin } from "@/lib/admin-store";
 import { useLang, t, type Strings } from "@/lib/i18n";
 import { useTelegramUser } from "@/lib/telegram-user";
@@ -16,7 +16,6 @@ import {
   type CheckinStatus, type ActivityItem, type UserStats,
 } from "@/lib/user-api";
 
-// ── Module-level cache (5 min TTL) ────────────────────────────────────────────
 const HOME_CACHE_TTL = 5 * 60 * 1000;
 interface HomeCache {
   ts: number;
@@ -26,7 +25,6 @@ interface HomeCache {
 }
 let _homeCache: HomeCache | null = null;
 
-// ── Activity reason → i18n label ─────────────────────────────────────────────
 function reasonLabel(reason: string, s: Strings): string {
   const map: Record<string, string> = {
     game_win: s.activityReasonGameWin,
@@ -51,8 +49,6 @@ function timeAgo(dateStr: string, s: Strings): string {
   return s.timeAgoDays(Math.floor(diff / 86_400_000));
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function Home() {
   const { settings } = useAdmin();
   const skzBalance = useBalance();
@@ -64,7 +60,6 @@ export default function Home() {
   const [checkinLoading, setCheckinLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState<{ reward: number; streak: number } | null>(null);
-
   const [stats, setStats] = useState<UserStats | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
@@ -77,11 +72,7 @@ export default function Home() {
       setActivity(_homeCache.activity);
       return;
     }
-    Promise.all([
-      fetchCheckinStatus(),
-      fetchUserStats(),
-      fetchUserActivity(),
-    ]).then(([ci, st, act]) => {
+    Promise.all([fetchCheckinStatus(), fetchUserStats(), fetchUserActivity()]).then(([ci, st, act]) => {
       _homeCache = { ts: Date.now(), checkin: ci, stats: st, activity: act };
       setCheckin(ci);
       setCheckinLoading(false);
@@ -99,67 +90,54 @@ export default function Home() {
       const newCheckin = { checkedInToday: true, streak: result.streak, nextReward: checkin?.nextReward ?? 50 };
       setCheckin(newCheckin);
       if (result.newSkz !== undefined) admin.setBalance(result.newSkz);
-      // Refresh activity and invalidate cache
       fetchUserActivity().then((act) => {
         setActivity(act);
-        if (_homeCache) {
-          _homeCache = { ..._homeCache, checkin: newCheckin, activity: act, ts: Date.now() };
-        }
+        if (_homeCache) _homeCache = { ..._homeCache, checkin: newCheckin, activity: act, ts: Date.now() };
       });
     }
     setClaiming(false);
   };
 
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Brand header */}
-      <div className="flex flex-col items-center text-center mt-4 -mb-2">
-        <h1
-          className="text-xl font-display font-black tracking-wide"
-          style={{ color: settings.accent, textShadow: `0 0 16px ${settings.accent}66` }}
-        >
-          {settings.appName}
-        </h1>
-        {settings.welcomeMessage && (
-          <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">{settings.welcomeMessage}</p>
-        )}
-      </div>
+  const accent = settings.accent || "#c9a227";
 
-      {/* Player identity */}
+  return (
+    <div className="flex flex-col gap-5">
+
+      {/* ── User identity strip ──────────────────────────────────────── */}
       {inTelegram && tgUser && (
         <motion.div
-          initial={{ opacity: 0, y: -6 }}
+          initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-1"
+          className="flex items-center gap-3 px-1 mt-1"
         >
           {tgUser.photo_url ? (
             <img
               src={tgUser.photo_url}
               alt={tgUser.first_name}
-              className="w-10 h-10 rounded-full object-cover shrink-0"
-              style={{ border: `2px solid ${settings.accent}55` }}
+              className="w-11 h-11 rounded-full object-cover shrink-0"
+              style={{ border: `2px solid ${accent}60`, boxShadow: `0 0 12px ${accent}30` }}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
             />
           ) : (
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: `${settings.accent}22`, color: settings.accent }}
+              className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: `${accent}20`, border: `2px solid ${accent}40` }}
             >
-              <UserCircle2 size={22} />
+              <UserCircle2 size={22} style={{ color: accent }} />
             </div>
           )}
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-white truncate leading-tight">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-[15px] font-bold text-white truncate leading-tight">
               {tgUser.first_name}{tgUser.last_name ? ` ${tgUser.last_name}` : ""}
             </span>
             {tgUser.username && (
-              <span className="text-[11px] text-muted-foreground truncate leading-tight">@{tgUser.username}</span>
+              <span className="text-[11px] text-white/35 truncate leading-tight">@{tgUser.username}</span>
             )}
           </div>
           {tgUser.is_premium && (
             <span
-              className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-              style={{ background: `${settings.accent}22`, color: settings.accent }}
+              className="text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 font-display tracking-wider"
+              style={{ background: `${accent}20`, color: accent, border: `1px solid ${accent}40` }}
             >
               {s.premiumBadge}
             </span>
@@ -167,41 +145,123 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* Daily Check-In Card */}
+      {/* ── Balance Hero Card ──────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="relative overflow-hidden rounded-3xl p-6"
+        style={{
+          background: "linear-gradient(135deg, rgba(201,162,39,0.18) 0%, rgba(120,40,200,0.12) 50%, rgba(10,8,20,0.9) 100%)",
+          border: "1px solid rgba(201,162,39,0.25)",
+          boxShadow: "0 8px 40px rgba(201,162,39,0.1), inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
+        {/* Ambient radials */}
+        <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full pointer-events-none"
+          style={{ background: `radial-gradient(circle, ${accent}22 0%, transparent 70%)` }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(120,40,200,0.15) 0%, transparent 70%)" }} />
+
+        <p className="text-xs text-white/40 font-display tracking-[0.2em] uppercase mb-1 relative z-10">{s.totalBalance}</p>
+
+        <div className="flex items-end gap-2 mb-5 relative z-10">
+          {balanceLoading ? (
+            <div className="h-14 w-40 rounded-2xl animate-pulse" style={{ background: "rgba(255,255,255,0.08)" }} />
+          ) : (
+            <>
+              <span
+                className="text-[52px] font-display font-black leading-none"
+                style={{
+                  background: `linear-gradient(135deg, #fff 40%, ${accent})`,
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  filter: "drop-shadow(0 0 20px rgba(212,175,55,0.3))",
+                }}
+              >
+                <NumberTicker value={skzBalance} decimals={0} />
+              </span>
+              <span
+                className="text-xl font-display font-black mb-2 tracking-widest"
+                style={{ color: accent }}
+              >
+                SKZ
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Quick action pills inside hero */}
+        <div className={`flex gap-2 relative z-10 transition-opacity duration-300 ${balanceLoading ? "opacity-30 pointer-events-none" : ""}`}>
+          <Link href="/games" className="flex-1">
+            <div
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-display font-bold tracking-wide active:scale-95 transition-transform"
+              style={{ background: "rgba(138,80,255,0.2)", border: "1px solid rgba(138,80,255,0.3)", color: "#a78bfa" }}
+            >
+              <Gamepad2 size={13} /> {s.play}
+            </div>
+          </Link>
+          <Link href="/shop" className="flex-1">
+            <div
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-display font-bold tracking-wide active:scale-95 transition-transform"
+              style={{ background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#60a5fa" }}
+            >
+              <ShoppingBag size={13} /> {s.shop}
+            </div>
+          </Link>
+          <Link href="/wallet" className="flex-1">
+            <div
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-display font-bold tracking-wide active:scale-95 transition-transform"
+              style={{ background: "rgba(201,162,39,0.15)", border: "1px solid rgba(201,162,39,0.3)", color: accent }}
+            >
+              <Coins size={13} /> {s.wallet}
+            </div>
+          </Link>
+        </div>
+      </motion.div>
+
+      {/* ── Daily Check-In ────────────────────────────────────────────── */}
       {!checkinLoading && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <AnimatePresence mode="wait">
             {claimed ? (
               <motion.div
                 key="claimed"
-                initial={{ scale: 0.95, opacity: 0 }}
+                initial={{ scale: 0.96, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center gap-3 p-3 rounded-2xl border"
-                style={{ borderColor: `${settings.accent}55`, background: `linear-gradient(135deg, ${settings.accent}22, transparent)` }}
+                className="flex items-center gap-4 p-4 rounded-2xl"
+                style={{
+                  background: `linear-gradient(135deg, ${accent}20, rgba(74,222,128,0.08))`,
+                  border: `1px solid ${accent}40`,
+                }}
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${settings.accent}30`, color: settings.accent }}>
-                  <CheckCircle2 size={20} />
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: `${accent}25` }}>
+                  <CheckCircle2 size={22} style={{ color: accent }} />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-display font-bold text-white">+{claimed.reward.toLocaleString()} SKZ</div>
-                  <div className="text-[11px] text-muted-foreground">{s.checkinDone(claimed.streak)}</div>
+                  <div className="text-sm font-display font-black text-white">+{claimed.reward.toLocaleString()} SKZ</div>
+                  <div className="text-[11px] text-white/40 mt-0.5">{s.checkinDone(claimed.streak)}</div>
                 </div>
               </motion.div>
             ) : checkin?.checkedInToday ? (
               <motion.div
                 key="done"
-                className="flex items-center gap-3 p-3 rounded-2xl border border-white/10 bg-card/30"
+                className="flex items-center gap-4 p-4 rounded-2xl"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-white/10 text-muted-foreground">
-                  <CalendarCheck size={20} />
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-white/10">
+                  <CalendarCheck size={20} className="text-white/50" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-white">{s.checkin}</div>
-                  <div className="text-[11px] text-muted-foreground">{s.checkinDone(checkin.streak)}</div>
+                  <div className="text-sm font-semibold text-white/70">{s.checkin}</div>
+                  <div className="text-[11px] text-white/30 mt-0.5">{s.checkinDone(checkin.streak)}</div>
                 </div>
                 {checkin.streak > 0 && (
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${settings.accent}22`, color: settings.accent }}>
-                    {s.checkinStreak(checkin.streak)}
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full font-display"
+                    style={{ background: `${accent}18`, color: accent }}>
+                    🔥 {checkin.streak}
                   </span>
                 )}
               </motion.div>
@@ -210,153 +270,133 @@ export default function Home() {
                 key="claim"
                 onClick={handleCheckin}
                 disabled={claiming}
-                whileTap={{ scale: 0.97 }}
-                className="w-full flex items-center gap-3 p-3 rounded-2xl border text-right disabled:opacity-60"
-                style={{ borderColor: `${settings.accent}55`, background: `linear-gradient(135deg, ${settings.accent}22, transparent)` }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl text-right disabled:opacity-50 active:scale-[0.98] transition-transform"
+                style={{
+                  background: `linear-gradient(135deg, ${accent}18, rgba(138,80,255,0.1))`,
+                  border: `1px solid ${accent}45`,
+                  boxShadow: `0 4px 20px ${accent}15`,
+                }}
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${settings.accent}30`, color: settings.accent }}>
-                  {claiming ? (
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CalendarCheck size={20} />
-                  )}
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: `${accent}25` }}>
+                  {claiming
+                    ? <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: `${accent}40`, borderTopColor: accent }} />
+                    : <CalendarCheck size={20} style={{ color: accent }} />}
                 </div>
                 <div className="flex-1 text-left">
-                  <div className="text-sm font-display font-bold text-white">{s.checkin}</div>
-                  <div className="text-[11px] text-muted-foreground">{s.checkinClaim(checkin?.nextReward ?? 50)}</div>
+                  <div className="text-sm font-display font-black text-white">{s.checkin}</div>
+                  <div className="text-[11px] text-white/40 mt-0.5">{s.checkinClaim(checkin?.nextReward ?? 50)}</div>
                 </div>
-                <ArrowRight size={16} style={{ color: settings.accent }} />
+                <ArrowRight size={16} style={{ color: accent }} />
               </motion.button>
             )}
           </AnimatePresence>
         </motion.div>
       )}
 
-      {/* Balance */}
-      <div className="flex flex-col items-center justify-center mt-2 mb-2">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", duration: 0.8 }}
-          className="relative"
+      {/* ── Stats Row ─────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="grid grid-cols-2 gap-3"
+      >
+        <div
+          className="flex flex-col gap-2 p-4 rounded-2xl"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
         >
-          <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
-          <h2 className="text-muted-foreground text-sm font-medium tracking-widest uppercase mb-1 text-center">{s.totalBalance}</h2>
-          <div className="flex items-center gap-2 relative justify-center">
-            {balanceLoading ? (
-              <div className="h-12 w-36 rounded-xl bg-white/10 animate-pulse" />
-            ) : (
-              <span className="text-5xl font-display font-bold tracking-tight text-white drop-shadow-[0_0_15px_rgba(212,175,55,0.6)]">
-                <NumberTicker value={skzBalance} decimals={0} />
-              </span>
-            )}
-            <span className="text-xl font-display font-black text-primary mt-3 tracking-widest drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]">SKZ</span>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className={`grid grid-cols-3 gap-3 transition-opacity duration-300 ${balanceLoading ? "opacity-40 pointer-events-none" : ""}`}>
-        <Link href="/games" className="group">
-          <div className="flex flex-col items-center justify-center bg-card/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 gap-2 transition-all hover:bg-card/60 hover:border-primary/30">
-            <div className="w-10 h-10 rounded-full bg-accent/20 text-accent flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Gamepad2 size={20} />
-            </div>
-            <span className="text-xs font-medium text-foreground">{s.play}</span>
-          </div>
-        </Link>
-        <Link href="/shop" className="group">
-          <div className="flex flex-col items-center justify-center bg-card/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 gap-2 transition-all hover:bg-card/60 hover:border-primary/30">
-            <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <ShoppingBag size={20} />
-            </div>
-            <span className="text-xs font-medium text-foreground">{s.shop}</span>
-          </div>
-        </Link>
-        <Link href="/wallet" className="group">
-          <div className="flex flex-col items-center justify-center bg-card/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 gap-2 transition-all hover:bg-card/60 hover:border-primary/30">
-            <div className="w-10 h-10 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Coins size={20} />
-            </div>
-            <span className="text-xs font-medium text-foreground">{s.wallet}</span>
-          </div>
-        </Link>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-card/40 backdrop-blur-md border-white/5 p-4 flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <Trophy size={14} className="text-primary" />
-            <span className="text-xs font-medium">{s.totalWon}</span>
+          <div className="flex items-center gap-1.5">
+            <Trophy size={13} style={{ color: accent }} />
+            <span className="text-[10px] text-white/40 font-medium tracking-wide uppercase">{s.totalWon}</span>
           </div>
           {stats ? (
-            <span className="text-lg font-display font-bold text-white">
-              {stats.totalWon.toLocaleString()} SKZ
-            </span>
+            <span className="text-lg font-display font-black text-white">{stats.totalWon.toLocaleString()} <span className="text-xs font-normal text-white/40">SKZ</span></span>
           ) : (
-            <div className="h-6 w-20 rounded bg-white/10 animate-pulse" />
+            <div className="h-6 w-20 rounded-lg animate-pulse bg-white/8" />
           )}
-        </Card>
-        <Card className="bg-card/40 backdrop-blur-md border-white/5 p-4 flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <Users size={14} className="text-accent" />
-            <span className="text-xs font-medium">{s.network}</span>
+        </div>
+        <div
+          className="flex flex-col gap-2 p-4 rounded-2xl"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          <div className="flex items-center gap-1.5">
+            <Users size={13} className="text-violet-400" />
+            <span className="text-[10px] text-white/40 font-medium tracking-wide uppercase">{s.network}</span>
           </div>
           {stats ? (
-            <span className="text-lg font-display font-bold text-white">
-              {stats.refCount} {s.refs}
-            </span>
+            <span className="text-lg font-display font-black text-white">{stats.refCount} <span className="text-xs font-normal text-white/40">{s.refs}</span></span>
           ) : (
-            <div className="h-6 w-16 rounded bg-white/10 animate-pulse" />
+            <div className="h-6 w-16 rounded-lg animate-pulse bg-white/8" />
           )}
-        </Card>
-      </div>
+        </div>
+      </motion.div>
 
-      {/* Activity Feed */}
-      <div className="flex flex-col gap-3 mt-2">
+      {/* ── Activity Feed ─────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="flex flex-col gap-3 pb-2"
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
-            <Flame size={16} className="text-orange-500" />
-            {s.liveActivity.toUpperCase()}
+          <h3 className="text-xs font-display font-bold tracking-[0.15em] uppercase text-white/50 flex items-center gap-2">
+            <Flame size={13} className="text-orange-400" />
+            {s.liveActivity}
           </h3>
-          <Link href="/wallet" className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-            {s.viewAll} <ArrowRight size={12} />
+          <Link href="/wallet">
+            <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: accent }}>
+              {s.viewAll} <ArrowRight size={11} />
+            </span>
           </Link>
         </div>
 
         {activity.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/50 gap-2">
-            <ArrowUpRight size={28} className="opacity-30" />
-            <span className="text-xs">{s.noActivity}</span>
+          <div className="flex flex-col items-center justify-center py-10 gap-3"
+            style={{ background: "rgba(255,255,255,0.02)", borderRadius: "1rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <TrendingUp size={28} className="text-white/15" />
+            <span className="text-xs text-white/25">{s.noActivity}</span>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {activity.slice(0, 5).map((item) => {
+            {activity.slice(0, 5).map((item, i) => {
               const isCredit = item.type === "credit";
               return (
-                <div
+                <motion.div
                   key={item.id}
-                  className="flex items-center gap-3 bg-card/30 border border-white/5 rounded-xl p-3"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.22 + i * 0.05 }}
+                  className="flex items-center gap-3 p-3 rounded-2xl"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isCredit ? "bg-green-500/15" : "bg-red-500/15"}`}>
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={isCredit
+                      ? { background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.2)" }
+                      : { background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.2)" }}
+                  >
                     {isCredit
                       ? <ArrowDownLeft size={14} className="text-green-400" />
                       : <ArrowUpRight size={14} className="text-red-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-white truncate">{reasonLabel(item.reason, s)}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(item.createdAt, s)}</div>
+                    <div className="text-[13px] font-semibold text-white/85 truncate">{reasonLabel(item.reason, s)}</div>
+                    <div className="text-[10px] text-white/30 mt-0.5">{timeAgo(item.createdAt, s)}</div>
                   </div>
-                  <span className={`text-sm font-bold font-mono ${isCredit ? "text-green-400" : "text-red-400"}`}>
-                    {isCredit ? "+" : "-"}{item.amount.toLocaleString()} SKZ
+                  <span
+                    className="text-[13px] font-display font-black tabular-nums"
+                    style={{ color: isCredit ? "#4ade80" : "#f87171" }}
+                  >
+                    {isCredit ? "+" : "-"}{item.amount.toLocaleString()}
+                    <span className="text-[10px] font-normal ml-0.5 opacity-60">SKZ</span>
                   </span>
-                </div>
+                </motion.div>
               );
             })}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
