@@ -98,8 +98,16 @@ async function savePollerState(state: PollerState): Promise<void> {
 // ── Credit helper ─────────────────────────────────────────────────────────────
 
 /**
- * Credit a confirmed TON deposit to a user.
- * Returns false if the deposit was already processed (txHash exists as a deposit ID).
+ * Credit a confirmed TON deposit to a user — exactly once.
+ *
+ * Idempotency guarantee: the deposit row (keyed by txHash) is inserted FIRST
+ * inside the transaction. If the INSERT is skipped by the unique-conflict guard
+ * (meaning another concurrent process already claimed this txHash), the balance
+ * credit and ledger entry are never written. This prevents double-crediting even
+ * under concurrent poller instances.
+ *
+ * Returns true if the deposit was newly credited, false if already processed or
+ * the user was not found.
  */
 async function creditDeposit(
   txHash: string,
@@ -107,92 +115,101 @@ async function creditDeposit(
   rawAmount: number,  // native units: nanotons
   skzRate: number,    // SKZ per 1 TON
 ): Promise<boolean> {
-  // Convert nanotons to TON.
   const amount = rawAmount / 1e9;
   const skzCredit = Math.floor(amount * skzRate);
 
   if (skzCredit <= 0) return false;
 
-  // Check if already processed
-  const existing = await db.select().from(depositsTable).where(eq(depositsTable.id, txHash)).limit(1);
-  if (existing.length > 0) return false;
+  const nowMs = Date.now();
+  let credited = false;
 
-  // Look up user
-  const [userRow] = await db
-    .select()
-    .from(platformUsersTable)
-    .where(eq(platformUsersTable.id, tgId))
-    .limit(1);
-  if (!userRow) {
-    logger.warn({ tgId, txHash }, "ton-poller: deposit memo tgId not found in DB");
+  try {
+    await db.transaction(async (tx) => {
+      // 1. Lock the user row so we read an accurate balance for the ledger.
+      const [userRow] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, tgId))
+        .for("update")
+        .limit(1);
+
+      if (!userRow) {
+        logger.warn({ tgId, txHash }, "ton-poller: deposit memo tgId not found in DB");
+        return;
+      }
+
+      const userData = userRow.data as Record<string, unknown>;
+      const userName = String(userData.name ?? "");
+      const skzBefore = Math.floor(Number(
+        (userData.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      ));
+      const skzAfter = skzBefore + skzCredit;
+
+      const depositData = {
+        id: txHash,
+        userId: tgId,
+        userName,
+        currency: "TON",
+        amount,
+        skzCredited: skzCredit,
+        txHash,
+        status: "confirmed",
+        at: nowMs,
+      };
+
+      // 2. Try to claim this txHash. ON CONFLICT DO NOTHING means a second concurrent
+      //    call for the same hash inserts nothing and returns an empty array → bail out.
+      const inserted = await tx
+        .insert(depositsTable)
+        .values({ id: txHash, status: "confirmed", data: depositData })
+        .onConflictDoNothing()
+        .returning({ id: depositsTable.id });
+
+      if (inserted.length === 0) return; // already processed by another call
+
+      // 3. Credit SKZ balance atomically.
+      await tx.execute(sql`
+        UPDATE platform_users
+        SET
+          data = jsonb_set(
+            jsonb_set(
+              jsonb_set(data,
+                '{balances,SKZ}',
+                to_jsonb(COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${skzCredit}::numeric)
+              ),
+              '{totalDeposit}',
+              to_jsonb(COALESCE((data #>> '{totalDeposit}')::numeric, 0) + ${amount}::numeric)
+            ),
+            '{lastSeen}',
+            to_jsonb(${nowMs}::bigint)
+          ),
+          updated_at = NOW()
+        WHERE id = ${tgId}
+      `);
+
+      // 4. Record in ledger.
+      await recordLedger(tx, {
+        userId: tgId,
+        type: "credit",
+        reason: "deposit",
+        amount: skzCredit,
+        balanceBefore: skzBefore,
+        balanceAfter: skzAfter,
+        ref: txHash,
+        meta: { tonAmount: amount, txHash },
+      });
+
+      credited = true;
+    });
+  } catch (err) {
+    logger.error({ tgId, txHash, err }, "ton-poller: creditDeposit transaction failed");
     return false;
   }
 
-  const userData = userRow.data as Record<string, unknown>;
-  const userName = String(userData.name ?? "");
-
-  // Credit SKZ and update totalDeposit atomically
-  const nowMs = Date.now();
-
-  const skzBefore = Math.floor(Number((userData.balances as Record<string, unknown> | undefined)?.SKZ ?? 0));
-  const skzAfter = skzBefore + skzCredit;
-
-  await db.transaction(async (tx) => {
-    // Credit SKZ balance and update totalDeposit (totalDeposit tracked in TON)
-    await tx.execute(sql`
-      UPDATE platform_users
-      SET
-        data = jsonb_set(
-          jsonb_set(
-            jsonb_set(data,
-              '{balances,SKZ}',
-              to_jsonb(COALESCE((data #>> '{balances,SKZ}')::numeric, 0) + ${skzCredit}::numeric)
-            ),
-            '{totalDeposit}',
-            to_jsonb(COALESCE((data #>> '{totalDeposit}')::numeric, 0) + ${amount}::numeric)
-          ),
-          '{lastSeen}',
-          to_jsonb(${nowMs}::bigint)
-        ),
-        updated_at = NOW()
-      WHERE id = ${tgId}
-    `);
-
-    // Create confirmed deposit record
-    const depositData = {
-      id: txHash,
-      userId: tgId,
-      userName,
-      currency: "TON",
-      amount,
-      skzCredited: skzCredit,
-      txHash,
-      status: "confirmed",
-      at: nowMs,
-    };
-
-    await tx
-      .insert(depositsTable)
-      .values({ id: txHash, status: "confirmed", data: depositData })
-      .onConflictDoNothing();
-
-    await recordLedger(tx, {
-      userId: tgId,
-      type: "credit",
-      reason: "deposit",
-      amount: skzCredit,
-      balanceBefore: skzBefore,
-      balanceAfter: skzAfter,
-      ref: txHash,
-      meta: { tonAmount: amount, txHash },
-    });
-  });
-
-  logger.info(
-    { tgId, txHash, amount, skzCredit },
-    "ton-poller: TON deposit confirmed and credited",
-  );
-  return true;
+  if (credited) {
+    logger.info({ tgId, txHash, amount, skzCredit }, "ton-poller: TON deposit confirmed and credited");
+  }
+  return credited;
 }
 
 // ── Parse tgId from TON comment ──────────────────────────────────────────────

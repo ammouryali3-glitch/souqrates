@@ -998,7 +998,7 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   const payload = verifyUserToken(token);
   if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
 
-  const { skzAmount, destWallet } = req.body ?? {};
+  const { skzAmount, destWallet, idempotencyKey } = req.body ?? {};
 
   if (typeof skzAmount !== "number" || !Number.isFinite(skzAmount) || skzAmount <= 0) {
     res.status(400).json({ error: "skzAmount must be a positive number" }); return;
@@ -1010,6 +1010,8 @@ router.post("/withdraw", async (req: Request, res: Response) => {
   if (!TON_ADDR_RE.test(destWallet.trim())) {
     res.status(400).json({ error: "Invalid TON wallet address format" }); return;
   }
+  const safeIdempotencyKey: string | null =
+    typeof idempotencyKey === "string" && idempotencyKey.trim() ? idempotencyKey.trim() : null;
   const safeCurrency = "TON" as const;
   const safeAmount = Math.floor(skzAmount);
 
@@ -1037,7 +1039,30 @@ router.post("/withdraw", async (req: Request, res: Response) => {
     let newSkz = 0;
     let withdrawalId = "";
 
+    let idempotentHit = false;
+
     await db.transaction(async (tx) => {
+      // ── Idempotency guard ──────────────────────────────────────────────────
+      // If the caller supplies an idempotencyKey, check for an existing
+      // withdrawal with the same key for this user. If found, return the
+      // original result without debiting the balance again.
+      if (safeIdempotencyKey) {
+        const existing = await tx.execute(sql`
+          SELECT data FROM withdrawals
+          WHERE data->>'userId' = ${payload.tgId}
+            AND data->>'idempotencyKey' = ${safeIdempotencyKey}
+          LIMIT 1
+        `);
+        const rows = existing.rows as Array<{ data: Record<string, unknown> }>;
+        if (rows.length > 0) {
+          const wd = rows[0]!.data;
+          withdrawalId = String(wd.id ?? "");
+          newSkz = Number(wd.balanceAfter ?? 0);
+          idempotentHit = true;
+          return;
+        }
+      }
+
       const [row] = await tx
         .select()
         .from(platformUsersTable)
@@ -1086,7 +1111,7 @@ router.post("/withdraw", async (req: Request, res: Response) => {
 
       // Create withdrawal record
       withdrawalId = randomBytes(12).toString("hex");
-      const withdrawalData = {
+      const withdrawalData: Record<string, unknown> = {
         id: withdrawalId,
         userId: payload.tgId,
         userName: String(data.name ?? ""),
@@ -1099,6 +1124,8 @@ router.post("/withdraw", async (req: Request, res: Response) => {
         status: "pending",
         wallet: destWallet.trim(),
         auto: safeAmount <= 1000,
+        balanceAfter: newSkzValue,
+        ...(safeIdempotencyKey ? { idempotencyKey: safeIdempotencyKey } : {}),
       };
 
       await tx
@@ -1107,6 +1134,10 @@ router.post("/withdraw", async (req: Request, res: Response) => {
 
       newSkz = newSkzValue;
     });
+
+    if (idempotentHit) {
+      req.log.info({ tgId: payload.tgId, withdrawalId }, "withdrawal idempotent replay");
+    }
 
     req.log.info(
       { tgId: payload.tgId, withdrawalId, skzAmount: safeAmount, tonAmount, currency: safeCurrency },

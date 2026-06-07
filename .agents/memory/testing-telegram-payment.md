@@ -24,8 +24,7 @@ balance immediately, so each successful call consumes real balance on the test u
 **Splash screen** (`SplashScreen.tsx`) is purely time-based (~2.2s), independent of API/auth —
 screenshots taken mid-animation just caught it loading; it always completes.
 
-**Known payment-integrity gaps (flagged, not yet fixed):** deposit credit in `ton-poller.ts`
-is not exactly-once under concurrency (duplicate-check outside tx + always-credit can double-credit);
-withdrawal reject/refund reads status outside the lock (double-refund risk); withdraw submit has
-no client idempotency key (retry → duplicate debit). Fix by inserting the unique-key row first and
-crediting only on successful insert (RETURNING), all in one transaction with a status-transition guard.
+**Payment-integrity fixes applied:**
+- `ton-poller.ts creditDeposit`: deposit INSERT now happens first inside the tx; `onConflictDoNothing().returning()` → if returned array is empty, skip credit. User row locked with FOR UPDATE for accurate ledger values.
+- `admin-entities.ts PATCH /withdrawals/:id`: withdrawal row is now fetched inside the tx with FOR UPDATE, so concurrent rejects both see the already-updated status and only one triggers the refund.
+- `user.ts POST /withdraw`: accepts optional `idempotencyKey` in body; if supplied, checks withdrawals table inside the tx before debiting — returns original result on replay without a second debit.

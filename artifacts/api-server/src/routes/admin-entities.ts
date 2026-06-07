@@ -367,21 +367,33 @@ router.patch("/withdrawals/:id", requirePermission("finance"), async (req: Reque
     }
     const patchedStatus = patch.status as "pending" | "approved" | "rejected" | "completed" | undefined;
 
-    const [existing] = await db.select().from(withdrawalsTable).where(eq(withdrawalsTable.id, id)).limit(1);
-    if (!existing) {
-      res.status(404).json({ error: "Withdrawal not found" });
-      return;
-    }
-    const merged = { ...(existing.data as object), ...patch, id };
-    const newStatus: "pending" | "approved" | "rejected" | "completed" = patchedStatus ?? existing.status;
+    let merged: Record<string, unknown> | null = null;
 
     await db.transaction(async (tx) => {
+      // Lock the row inside the transaction so concurrent PATCH requests
+      // cannot both read "pending" and both execute a refund.
+      const [existing] = await tx
+        .select()
+        .from(withdrawalsTable)
+        .where(eq(withdrawalsTable.id, id))
+        .for("update")
+        .limit(1);
+
+      if (!existing) {
+        throw Object.assign(new Error("Withdrawal not found"), { status: 404 });
+      }
+
+      merged = { ...(existing.data as object), ...patch, id };
+      const newStatus: "pending" | "approved" | "rejected" | "completed" = patchedStatus ?? existing.status;
+
       await tx
         .update(withdrawalsTable)
         .set({ status: newStatus, data: merged })
         .where(eq(withdrawalsTable.id, id));
 
       // If admin rejects a pending withdrawal, credit the SKZ back to the user.
+      // existing.status is read inside the locked transaction, so only one
+      // concurrent request can ever see "pending" and trigger the refund.
       if (newStatus === "rejected" && existing.status === "pending") {
         const wdData = existing.data as Record<string, unknown>;
         const userId = String(wdData.userId ?? "");
@@ -434,8 +446,11 @@ router.patch("/withdrawals/:id", requirePermission("finance"), async (req: Reque
       }
     });
 
+    if (!merged) { res.status(404).json({ error: "Withdrawal not found" }); return; }
     res.json(merged);
   } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 404) { res.status(404).json({ error: e.message ?? "Withdrawal not found" }); return; }
     req.log.error({ err }, "patch withdrawal error");
     res.status(500).json({ error: "Internal server error" });
   }
