@@ -12,7 +12,7 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
 import { emailOtpsTable, platformUsersTable, adminConfigTable } from "@workspace/db";
-import { eq, and } from "@workspace/db";
+import { eq, and, desc } from "@workspace/db";
 
 const router = Router();
 
@@ -110,12 +110,12 @@ router.post("/send-otp", async (req: Request, res: Response) => {
   try {
     const now = new Date();
 
-    // Rate limit: one OTP per minute per email
+    // Rate limit: one OTP per minute per email. Use desc to find the most recent.
     const [recent] = await db
       .select()
       .from(emailOtpsTable)
       .where(eq(emailOtpsTable.email, normalizedEmail))
-      .orderBy(emailOtpsTable.createdAt)
+      .orderBy(desc(emailOtpsTable.createdAt))
       .limit(1);
 
     if (recent) {
@@ -143,7 +143,14 @@ router.post("/send-otp", async (req: Request, res: Response) => {
       expiresAt,
     });
 
-    await sendOtpEmail(normalizedEmail, code);
+    // If email send fails, delete the inserted OTP so the user is not trapped
+    // by the rate limit on their next retry attempt.
+    try {
+      await sendOtpEmail(normalizedEmail, code);
+    } catch (sendErr) {
+      await db.delete(emailOtpsTable).where(eq(emailOtpsTable.id, id));
+      throw sendErr;
+    }
 
     res.json({ ok: true });
   } catch (err) {
