@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb, timestamp, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, jsonb, timestamp, integer, index, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -76,6 +76,21 @@ export const referrersTable = pgTable("referrers", {
   data: jsonb("data").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Email OTP codes for browser-based login (non-Telegram users).
+ * Each row is single-use; expired or used rows are cleaned up on login.
+ */
+export const emailOtpsTable = pgTable("email_otps", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  code: text("code").notNull(),
+  used: boolean("used").notNull().default(false),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("email_otps_email_idx").on(t.email),
+]);
 
 /**
  * Financial ledger — one immutable row for every SKZ credit or debit.

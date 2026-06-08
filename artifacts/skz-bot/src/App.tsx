@@ -24,6 +24,7 @@ import Manager from "@/pages/manager";
 import Contact from "@/pages/contact";
 import Policies from "@/pages/policies";
 import NotFound from "@/pages/not-found";
+import LoginPage from "@/pages/login";
 
 // Games — lazy-loaded so they don't bloat the initial bundle.
 // Each game chunk is only fetched when the user actually navigates to that route.
@@ -223,6 +224,7 @@ function BanScreen() {
 function Router() {
   const [location] = useLocation();
   const { banned, settings } = useAdmin();
+  const { ready, inTelegram, isWebUser, dbUser, loading } = useTelegramUser();
   const isManager = location === "/manager";
 
   // Pre-fetch a game-session nonce on every game or arena route entry.
@@ -249,6 +251,19 @@ function Router() {
     document.addEventListener("touchmove", prevent, { passive: false });
     return () => document.removeEventListener("touchmove", prevent);
   }, [immersive]);
+
+  // Browser users who are not yet authenticated see the login page.
+  // We wait until ready so we don't flash the login page before the
+  // session-restore attempt from /api/user/me completes.
+  if (!inTelegram && !isManager) {
+    if (loading || !ready) {
+      // Still checking session — show nothing (splash is visible)
+      return null;
+    }
+    if (!dbUser && !isWebUser) {
+      return <LoginPage />;
+    }
+  }
 
   if (banned && !isManager) {
     return (

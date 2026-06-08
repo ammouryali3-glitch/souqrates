@@ -70,7 +70,10 @@ export interface TelegramUserState {
   tgUser: TelegramUser | null;
   dbUser: Record<string, unknown> | null;
   inTelegram: boolean;
+  /** true once we know the user's auth status (whether logged in or not) */
   ready: boolean;
+  /** true when a web (email) user is authenticated */
+  isWebUser: boolean;
 }
 
 const initialState: TelegramUserState = {
@@ -79,6 +82,7 @@ const initialState: TelegramUserState = {
   dbUser: null,
   inTelegram: false,
   ready: false,
+  isWebUser: false,
 };
 
 // Synchronously detect Telegram at module load so the very first render already
@@ -87,13 +91,14 @@ const initialState: TelegramUserState = {
 function buildInitialTgState(): TelegramUserState {
   if (typeof window === "undefined") return { ...initialState };
   const twa = getTelegramWebApp();
-  if (!twa?.initData) return { ...initialState };
+  if (!twa?.initData) return { ...initialState, loading: true };
   return {
     loading: true,
     inTelegram: true,
     tgUser: twa.initDataUnsafe?.user ?? null,
     dbUser: null,
     ready: false,
+    isWebUser: false,
   };
 }
 
@@ -127,56 +132,76 @@ export function useTelegramUser(): TelegramUserState {
 /**
  * Called once on app startup (from admin-store.ts initFromApi).
  * Returns the server-confirmed SKZ balance, or null if not available.
+ *
+ * Flow:
+ *  - Inside Telegram: uses initData HMAC as before.
+ *  - In browser: tries GET /api/user/me with the existing cookie.
+ *    If the cookie is valid, restores the web session silently.
+ *    If not, leaves ready=true with no dbUser → App.tsx shows login page.
  */
 export async function initTelegramUser(): Promise<number | null> {
   const twa = getTelegramWebApp();
 
-  if (!twa) {
-    setTgState({ loading: false, inTelegram: false, ready: true });
-    return null;
-  }
+  if (twa) {
+    // ── Telegram path ──────────────────────────────────────────────────────
+    const initData = twa.initData;
+    const tgUser = twa.initDataUnsafe?.user ?? null;
 
-  const initData = twa.initData;
-  const tgUser = twa.initDataUnsafe?.user ?? null;
+    setTgState({ loading: true, inTelegram: true, tgUser });
 
-  setTgState({ loading: true, inTelegram: true, tgUser });
+    try { twa.ready(); twa.expand(); } catch { /* ignore */ }
 
-  try {
-    twa.ready();
-    twa.expand();
-  } catch {
-    /* ignore */
-  }
-
-  if (!initData) {
-    setTgState({ loading: false, inTelegram: false, ready: true });
-    return null;
-  }
-
-  try {
-    const res = await apiFetch("/api/user/init", {
-      method: "POST",
-      body: JSON.stringify({ initData }),
-    });
-
-    if (!res.ok) {
-      setTgState({ loading: false, ready: true });
+    if (!initData) {
+      setTgState({ loading: false, inTelegram: false, ready: true });
       return null;
     }
 
-    const json = (await res.json()) as { user: Record<string, unknown> };
-    const dbUser = json.user;
-    const balances = (dbUser.balances ?? {}) as Record<string, number>;
-    const skz = typeof balances.SKZ === "number" ? balances.SKZ : null;
-
-    if (skz !== null) setServerConfirmedBalance(skz);
-
-    setTgState({ loading: false, dbUser, ready: true });
-    return skz;
-  } catch {
-    setTgState({ loading: false, ready: true });
-    return null;
+    try {
+      const res = await apiFetch("/api/user/init", {
+        method: "POST",
+        body: JSON.stringify({ initData }),
+      });
+      if (!res.ok) { setTgState({ loading: false, ready: true }); return null; }
+      const json = (await res.json()) as { user: Record<string, unknown> };
+      const dbUser = json.user;
+      const balances = (dbUser.balances ?? {}) as Record<string, number>;
+      const skz = typeof balances.SKZ === "number" ? balances.SKZ : null;
+      if (skz !== null) setServerConfirmedBalance(skz);
+      setTgState({ loading: false, dbUser, ready: true, inTelegram: true });
+      return skz;
+    } catch {
+      setTgState({ loading: false, ready: true });
+      return null;
+    }
   }
+
+  // ── Browser (web) path ─────────────────────────────────────────────────
+  // Try to restore session from existing cookie (email-OTP login).
+  try {
+    const res = await apiFetch("/api/user/me");
+    if (res.ok) {
+      const json = (await res.json()) as { user: Record<string, unknown> };
+      const dbUser = json.user;
+      const balances = (dbUser.balances ?? {}) as Record<string, number>;
+      const skz = typeof balances.SKZ === "number" ? balances.SKZ : null;
+      if (skz !== null) setServerConfirmedBalance(skz);
+      setTgState({ loading: false, dbUser, ready: true, inTelegram: false, isWebUser: true });
+      return skz;
+    }
+  } catch { /* network error */ }
+
+  // No valid session → ready=true, no dbUser → login page shows
+  setTgState({ loading: false, inTelegram: false, ready: true, isWebUser: false });
+  return null;
+}
+
+/**
+ * Called from LoginPage after successful email OTP verification.
+ * Injects the user into state exactly like a successful initTelegramUser call.
+ */
+export function notifyEmailLoginSuccess(dbUser: Record<string, unknown>, skz: number): void {
+  setServerConfirmedBalance(skz);
+  setTgState({ loading: false, dbUser, ready: true, inTelegram: false, isWebUser: true });
 }
 
 // ── Game session nonces ───────────────────────────────────────────────────────
@@ -203,7 +228,8 @@ export async function setCurrentGameContext(contextId: string): Promise<void> {
   currentContextId = contextId;
   prefetchedSessionId = null; // reset stale nonce from previous context
 
-  if (!tgState.inTelegram || !tgState.ready || !tgState.dbUser) return;
+  if (!tgState.ready || !tgState.dbUser) return;
+  if (!tgState.inTelegram && !tgState.isWebUser) return;
 
   try {
     const res = await apiFetch("/api/user/game-session", {
@@ -300,7 +326,9 @@ async function flushBalanceEvent(): Promise<void> {
   syncTimer = null;
   if (inflight || pendingBalance === null || confirmedBalance === null) return;
   if (pendingBalance === confirmedBalance) return;
-  if (!tgState.inTelegram || !tgState.ready || !tgState.dbUser) return;
+  if (!tgState.ready || !tgState.dbUser) return;
+  // Allow sync for both Telegram users and web (email) users
+  if (!tgState.inTelegram && !tgState.isWebUser) return;
 
   const delta = pendingBalance - confirmedBalance;
   inflight = true;
@@ -379,7 +407,8 @@ async function flushBalanceEvent(): Promise<void> {
  * The server always determines the authoritative new balance.
  */
 export function syncBalanceToServer(newAbsolute: number): void {
-  if (!tgState.inTelegram || !tgState.ready || !tgState.dbUser) return;
+  if (!tgState.ready || !tgState.dbUser) return;
+  if (!tgState.inTelegram && !tgState.isWebUser) return;
   if (confirmedBalance === null) return;
 
   pendingBalance = newAbsolute;
