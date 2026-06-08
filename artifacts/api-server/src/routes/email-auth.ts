@@ -39,11 +39,13 @@ function signUserToken(userId: string): string {
 }
 
 function buildTransporter() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASSWORD;
   if (!user || !pass) return null;
   return nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.zoho.com",
+    port: 465,
+    secure: true,
     auth: { user, pass },
   });
 }
@@ -112,9 +114,9 @@ router.post("/send-otp", async (req: Request, res: Response) => {
 
     const transporter = buildTransporter();
     if (!transporter) {
-      req.log.warn("GMAIL_USER or GMAIL_APP_PASSWORD not set — OTP not sent");
+      req.log.warn("EMAIL_USER or EMAIL_PASSWORD not set — OTP not sent");
       if (process.env.NODE_ENV !== "production") {
-        req.log.info({ code }, "DEV: OTP code (not sent)");
+        req.log.info({ code }, "DEV: OTP code (not sent via email)");
         res.json({ ok: true, dev: true });
         return;
       }
@@ -123,7 +125,7 @@ router.post("/send-otp", async (req: Request, res: Response) => {
     }
 
     await transporter.sendMail({
-      from: `"Souqrates System" <${process.env.GMAIL_USER}>`,
+      from: `"Souqrates System" <${process.env.EMAIL_USER}>`,
       to: normalizedEmail,
       subject: "رمز تسجيل الدخول — Souqrates",
       html: `
