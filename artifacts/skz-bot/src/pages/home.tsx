@@ -4,7 +4,7 @@ import {
   Trophy, Users, ShoppingBag, Coins,
   ArrowUpRight, ArrowDownLeft, Flame, Gamepad2,
   CheckCircle2, UserCircle2, CalendarCheck, ArrowRight,
-  TrendingUp,
+  TrendingUp, Target,
 } from "lucide-react";
 import { Link } from "wouter";
 import { NumberTicker } from "@/components/ui/number-ticker";
@@ -15,6 +15,11 @@ import {
   fetchCheckinStatus, claimCheckin, fetchUserStats, fetchUserActivity,
   type CheckinStatus, type ActivityItem, type UserStats,
 } from "@/lib/user-api";
+import { ProgressionCard } from "@/components/progression-card";
+import { refreshProgression } from "@/lib/progression";
+import { refreshQuests, useClaimableCount } from "@/lib/quests";
+import { hapticSuccess, hapticError } from "@/lib/haptics";
+import { sfx } from "@/lib/sound";
 
 const HOME_CACHE_TTL = 5 * 60 * 1000;
 interface HomeCache {
@@ -64,6 +69,9 @@ export default function Home() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
+    // Progression is cheap and changes after every game/check-in, so refresh
+    // it on each home mount rather than caching it with the 5-min home cache.
+    refreshProgression();
     const now = Date.now();
     if (_homeCache && now - _homeCache.ts < HOME_CACHE_TTL) {
       setCheckin(_homeCache.checkin);
@@ -81,12 +89,17 @@ export default function Home() {
     });
   }, []);
 
+  // Keep the missions badge fresh whenever home mounts.
+  useEffect(() => { refreshQuests(); }, []);
+
   const handleCheckin = async () => {
     if (claiming || checkin?.checkedInToday) return;
     setClaiming(true);
     const result = await claimCheckin();
     if (result.ok && result.reward !== undefined && result.streak !== undefined) {
       setClaimed({ reward: result.reward, streak: result.streak });
+      hapticSuccess();
+      sfx.coin();
       const newCheckin = { checkedInToday: true, streak: result.streak, nextReward: checkin?.nextReward ?? 50 };
       setCheckin(newCheckin);
       if (result.newSkz !== undefined) admin.setBalance(result.newSkz);
@@ -94,6 +107,10 @@ export default function Home() {
         setActivity(act);
         if (_homeCache) _homeCache = { ..._homeCache, checkin: newCheckin, activity: act, ts: Date.now() };
       });
+      // Check-in awards XP server-side; refresh so a level-up can surface.
+      refreshProgression();
+    } else {
+      hapticError();
     }
     setClaiming(false);
   };
@@ -144,6 +161,9 @@ export default function Home() {
           )}
         </motion.div>
       )}
+
+      {/* ── Progression: league badge + XP bar ─────────────────────────── */}
+      <ProgressionCard />
 
       {/* ── Balance Hero Card ──────────────────────────────────────────── */}
       <motion.div
@@ -295,6 +315,9 @@ export default function Home() {
         </motion.div>
       )}
 
+      {/* ── Missions entry ────────────────────────────────────────────── */}
+      <MissionsEntry accent={accent} s={s} />
+
       {/* ── Stats Row ─────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
@@ -398,5 +421,43 @@ export default function Home() {
         )}
       </motion.div>
     </div>
+  );
+}
+
+function MissionsEntry({ accent, s }: { accent: string; s: Strings }) {
+  const claimable = useClaimableCount();
+  return (
+    <Link href="/missions">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        whileTap={{ scale: 0.98 }}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform"
+        style={{
+          background: claimable > 0
+            ? `linear-gradient(135deg, ${accent}20, rgba(138,80,255,0.12))`
+            : "rgba(255,255,255,0.04)",
+          border: claimable > 0 ? `1px solid ${accent}45` : "1px solid rgba(255,255,255,0.07)",
+          boxShadow: claimable > 0 ? `0 4px 20px ${accent}15` : "none",
+        }}
+      >
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+          style={{ background: `${accent}22` }}>
+          <Target size={20} style={{ color: accent }} />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-display font-black text-white">{s.missionsTitle}</div>
+          <div className="text-[11px] text-white/40 mt-0.5">{s.missionsSubtitle}</div>
+        </div>
+        {claimable > 0 && (
+          <span className="text-[11px] font-display font-black px-2.5 py-1 rounded-full shrink-0"
+            style={{ background: accent, color: "#1a1206" }}>
+            {claimable}
+          </span>
+        )}
+        <ArrowRight size={16} style={{ color: accent }} />
+      </motion.div>
+    </Link>
   );
 }

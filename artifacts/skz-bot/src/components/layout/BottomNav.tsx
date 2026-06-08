@@ -1,7 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { Home, Gamepad2, ShoppingCart, Wallet, Users } from "lucide-react";
+import { Home, Gamepad2, ShoppingCart, Wallet, Users, Volume2, VolumeX } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLang, setLang, t } from "@/lib/i18n";
+import { useMuted, toggleMuted, sfx } from "@/lib/sound";
+import { hapticSelection } from "@/lib/haptics";
 
 export function BottomNav() {
   const [location] = useLocation();
@@ -73,13 +75,16 @@ export function BottomNav() {
 
       {/* Minimal footer */}
       <div className="flex items-center justify-between pb-2 px-6 max-w-sm mx-auto">
-        <button
-          onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-          className="text-[9px] font-bold tracking-widest transition-colors"
-          style={{ color: "rgba(255,255,255,0.2)" }}
-        >
-          {s.langSwitch}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+            className="text-[9px] font-bold tracking-widest transition-colors"
+            style={{ color: "rgba(255,255,255,0.2)" }}
+          >
+            {s.langSwitch}
+          </button>
+          <SoundToggle />
+        </div>
         <div className="flex items-center gap-4">
           <Link href="/contact">
             <span className="text-[9px] transition-colors" style={{ color: location === "/contact" ? "#c9a227" : "rgba(255,255,255,0.2)" }}>
@@ -94,5 +99,19 @@ export function BottomNav() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SoundToggle() {
+  const muted = useMuted();
+  return (
+    <button
+      onClick={() => { toggleMuted(); hapticSelection(); if (muted) sfx.tap(); }}
+      className="transition-colors"
+      style={{ color: "rgba(255,255,255,0.2)" }}
+      aria-label="Toggle sound"
+    >
+      {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+    </button>
   );
 }

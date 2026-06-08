@@ -10,7 +10,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Ban, Wrench, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/lib/admin-store";
 import { ALL_GAMES, getGameById } from "@/lib/games-data";
-import { setCurrentGameContext, useTelegramUser } from "@/lib/telegram-user";
+import { setCurrentGameContext, useTelegramUser, onCreditConfirmed } from "@/lib/telegram-user";
+import { refreshProgression } from "@/lib/progression";
+import { refreshQuests } from "@/lib/quests";
+import { LevelUpOverlay } from "@/components/level-up-overlay";
 import { Component, Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 
@@ -20,6 +23,7 @@ import Games from "@/pages/games";
 import Shop from "@/pages/shop";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
+import Missions from "@/pages/missions";
 import Manager from "@/pages/manager";
 import Contact from "@/pages/contact";
 import Policies from "@/pages/policies";
@@ -241,6 +245,11 @@ function Router() {
     }
   }, [location]);
 
+  // Refresh progression + quests exactly when the server confirms an earned
+  // credit (and therefore the XP/quest progress that came with it), so a level-up
+  // and quest completion surface reliably without racing the debounced balance-sync.
+  useEffect(() => onCreditConfirmed(() => { refreshProgression(); refreshQuests(); }), []);
+
   const immersive = isManager || (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
 
   // Lock document touchmove on game/arena routes so the Telegram WebView
@@ -311,6 +320,7 @@ function Router() {
             <Route path="/shop"><PageWrapper><Shop /></PageWrapper></Route>
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
+            <Route path="/missions"><PageWrapper><Missions /></PageWrapper></Route>
             <Route path="/contact"><PageWrapper><Contact /></PageWrapper></Route>
             <Route path="/policies"><PageWrapper><Policies /></PageWrapper></Route>
             <Route><PageWrapper><NotFound /></PageWrapper></Route>
@@ -318,6 +328,7 @@ function Router() {
         </AnimatePresence>
       </div>
       {!immersive && <BottomNav />}
+      <LevelUpOverlay />
     </MobileContainer>
   );
 }

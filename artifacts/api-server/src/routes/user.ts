@@ -12,6 +12,8 @@ import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, 
 import { eq, sql, and, desc, asc } from "@workspace/db";
 import { createStarsInvoiceLink } from "./bot";
 import { recordLedger } from "../lib/ledger";
+import { progressionFromXp, xpForGame, xpForCheckin } from "../lib/progression";
+import { bumpQuests, buildQuestViews, normalizeQuests, findActiveQuest } from "../lib/quests";
 
 const router = Router();
 
@@ -217,6 +219,8 @@ router.post("/init", async (req: Request, res: Response) => {
         lastSeen: Date.now(),
         tier: "rookie",
         balances: { SKZ: startingBalance, TON: 0, USDT: 0 },
+        xp: 0,
+        level: 1,
         totalDeposit: 0,
         totalWins: 0,
         status: "active",
@@ -361,6 +365,173 @@ router.get("/me", async (req: Request, res: Response) => {
     res.json({ user: row.data });
   } catch (err) {
     req.log.error({ err }, "user me error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/progression ─────────────────────────────────────────────────
+
+/**
+ * Returns the player's XP, level, and league tier with progress details.
+ * Computed server-side from the authoritative XP stored on the user so the
+ * client never has to duplicate the level curve / league boundaries.
+ */
+router.get("/progression", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [row] = await db
+      .select()
+      .from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId))
+      .limit(1);
+
+    if (!row) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = row.data as Record<string, unknown>;
+    const xp = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+    res.json(progressionFromXp(xp));
+  } catch (err) {
+    req.log.error({ err }, "progression error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/user/quests ──────────────────────────────────────────────────────
+
+/**
+ * Returns the player's active daily + weekly quests with current progress.
+ * Quest definitions, targets, and rewards are server-authoritative; the client
+ * only renders this list. Stale period buckets show zeroed progress.
+ */
+router.get("/quests", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [row] = await db
+      .select()
+      .from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId))
+      .limit(1);
+
+    if (!row) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = row.data as Record<string, unknown>;
+    res.json({ quests: buildQuestViews(data.quests) });
+  } catch (err) {
+    req.log.error({ err }, "quests error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/quests/claim ───────────────────────────────────────────────
+
+/**
+ * Claim the reward (XP + SKZ) for a completed quest. Server re-validates that
+ * the quest is active, complete, and not yet claimed inside a locked txn so the
+ * reward can be granted at most once.
+ */
+router.post("/quests/claim", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const { questId } = req.body ?? {};
+  if (typeof questId !== "string" || !questId) {
+    res.status(400).json({ error: "questId required" });
+    return;
+  }
+
+  const now = new Date();
+  const quest = findActiveQuest(questId, now);
+  if (!quest) {
+    res.status(400).json({ error: "Quest not active" });
+    return;
+  }
+
+  try {
+    let newSkz = 0;
+    let newXp = 0;
+    let questViews: ReturnType<typeof buildQuestViews> = [];
+
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+
+      if (!row) throw Object.assign(new Error("user_not_found"), { status: 404 });
+
+      const data = row.data as Record<string, unknown>;
+      const state = normalizeQuests(data.quests, now);
+      const bucket = quest.period === "weekly" ? state.weekly : state.daily;
+
+      const current = bucket.metrics[quest.metric] ?? 0;
+      if (current < quest.target) {
+        throw Object.assign(new Error("Quest not completed"), { status: 400 });
+      }
+      if (bucket.claimed.includes(quest.id)) {
+        throw Object.assign(new Error("Quest already claimed"), { status: 409 });
+      }
+
+      const balanceBefore = Math.floor(Number(
+        (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      ));
+      const balanceAfter = balanceBefore + quest.rewardSkz;
+      const xpBefore = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+      const xpAfter = xpBefore + quest.rewardXp;
+      const newLevel = progressionFromXp(xpAfter).level;
+
+      bucket.claimed = [...bucket.claimed, quest.id];
+
+      await tx
+        .update(platformUsersTable)
+        .set({
+          data: {
+            ...data,
+            balances: { ...(data.balances as Record<string, unknown>), SKZ: balanceAfter },
+            lastSeen: Date.now(),
+            xp: xpAfter,
+            level: newLevel,
+            quests: state,
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      await recordLedger(tx, {
+        userId: payload.tgId,
+        type: "credit",
+        reason: "bonus",
+        amount: quest.rewardSkz,
+        balanceBefore,
+        balanceAfter,
+        ref: quest.id,
+        meta: { kind: "quest", rewardXp: quest.rewardXp },
+      });
+
+      newSkz = balanceAfter;
+      newXp = xpAfter;
+      questViews = buildQuestViews(state, now);
+    });
+
+    req.log.info({ tgId: payload.tgId, questId, rewardSkz: quest.rewardSkz, rewardXp: quest.rewardXp }, "quest claimed");
+    res.json({ ok: true, skz: newSkz, xp: newXp, quests: questViews });
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 400) { res.status(400).json({ error: e.message ?? "Invalid request" }); return; }
+    if (e.status === 409) { res.status(409).json({ error: e.message ?? "Conflict" }); return; }
+    req.log.error({ err }, "quest claim error");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -660,12 +831,32 @@ router.post("/game-result", async (req: Request, res: Response) => {
       const currentSkz = Number((data.balances as Record<string, unknown>)?.SKZ ?? 0);
       const newSkzValue = currentSkz + effectiveAmount;
 
+      // Award XP for the play (progression engine — drives level & league).
+      const xpBefore = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+      const xpGain = xpForGame(effectiveAmount);
+      const xpAfter = xpBefore + xpGain;
+      const newLevel = progressionFromXp(xpAfter).level;
+
+      // Advance quest progress in the same locked txn. Gate reward-bearing
+      // progress on an actual credited play (effectiveAmount > 0) so a script
+      // cannot farm play-count quests via repeated zero-amount redemptions.
+      const quests = effectiveAmount > 0
+        ? bumpQuests(
+            data.quests,
+            { games_played: 1, skz_earned: effectiveAmount },
+            new Date(),
+          )
+        : normalizeQuests(data.quests, new Date());
+
       const updatedData: Record<string, unknown> = {
         ...data,
         balances: { ...(data.balances as Record<string, unknown>), SKZ: newSkzValue },
         lastSeen: Date.now(),
         gameSessions: updatedSessions,
         dailyCredits: { date: today, total: dailyTotal + effectiveAmount },
+        xp: xpAfter,
+        level: newLevel,
+        quests,
       };
 
       await tx
@@ -1351,6 +1542,14 @@ router.post("/checkin", async (req: Request, res: Response) => {
       ));
       const balanceAfter = balanceBefore + reward;
 
+      // Award XP for checking in (rewards daily consistency).
+      const xpBefore = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+      const xpAfter = xpBefore + xpForCheckin(streak);
+      const newLevel = progressionFromXp(xpAfter).level;
+
+      // Advance quest progress (check-in metric) in the same locked txn.
+      const quests = bumpQuests(data.quests, { checkin: 1 }, new Date());
+
       await tx
         .update(platformUsersTable)
         .set({
@@ -1358,6 +1557,9 @@ router.post("/checkin", async (req: Request, res: Response) => {
             ...data,
             balances: { ...(data.balances as Record<string, unknown>), SKZ: balanceAfter },
             lastSeen: Date.now(),
+            xp: xpAfter,
+            level: newLevel,
+            quests,
           },
           updatedAt: new Date(),
         })

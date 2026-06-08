@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Coins, Trophy, ShieldCheck } from "lucide-react";
 import { getLang, t as gt } from "@/lib/i18n";
+import { hapticSuccess, hapticImpact } from "@/lib/haptics";
+import { sfx } from "@/lib/sound";
 
 export interface GameTicket {
   price: number;
@@ -327,6 +329,8 @@ export function useGameFlow({
 
   const handleConfirmPay = useCallback(() => {
     const tk = pendingTicket;
+    hapticImpact("medium");
+    sfx.coin();
     setShowPay(false);
     setShowProcessing(true);
     timerRef.current = setTimeout(() => {
@@ -355,6 +359,8 @@ export function useGameFlow({
   const notifyWin = useCallback((prize: number) => {
     setWinPrize(prize);
     setShowWin(true);
+    hapticSuccess();
+    sfx.win();
     timerRef.current = setTimeout(() => setShowWin(false), 3800);
   }, []);
 

@@ -299,6 +299,17 @@ let pendingBalance: number | null = null;
 let inflight = false;
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Listeners notified whenever a CREDIT is confirmed by the server (delta > 0).
+// Used by the progression layer to refresh XP/level exactly when the server has
+// applied the earned XP, rather than guessing with a fixed timeout.
+const creditConfirmedListeners = new Set<() => void>();
+
+/** Subscribe to server-confirmed credits. Returns an unsubscribe fn. */
+export function onCreditConfirmed(cb: () => void): () => void {
+  creditConfirmedListeners.add(cb);
+  return () => creditConfirmedListeners.delete(cb);
+}
+
 export function setServerConfirmedBalance(skz: number): void {
   confirmedBalance = skz;
   pendingBalance = skz;
@@ -364,6 +375,8 @@ async function flushBalanceEvent(): Promise<void> {
       if (res.ok) {
         const json = (await res.json()) as { skz: number };
         newConfirmed = json.skz;
+        // Server has applied the credit (and the XP that comes with it).
+        creditConfirmedListeners.forEach((l) => { try { l(); } catch { /* ignore */ } });
       } else if (res.status === 400 || res.status === 409) {
         // Hard validation error (nonce invalid, expired, over-cap, etc.).
         // Reconcile from server to learn authoritative balance and break loop.

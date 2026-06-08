@@ -2,6 +2,7 @@
 - [Testing Telegram-auth payment endpoints](testing-telegram-payment.md) — sign initData from BOT_TOKEN to auth; withdraw is rate-limited 3/15min; known deposit/withdraw idempotency gaps.
 - [Admin panel audit findings](admin-panel-bugs.md) — rules for ALLOWED_USER_PATCH_FIELDS, VALID_CONFIG_KEYS, balance adjustment endpoint, approveAll pattern, referrers CRUD.
 - [SKZ Bot Phase 2 financial layer](skz-bot-phase2-financials.md) — ledger table, daily check-in, referral reward bootstrap; pattern for balance mutations.
+- [SKZ Bot quests/missions](skz-bot-quests.md) — daily rotate by epoch-day, weekly by ISO-week; reward progress must gate on effectiveAmount>0 or scripts farm zero-amount plays.
 - [drizzle-orm peer-fork](drizzle-upstash-peer-fork.md) — adding @upstash/redis forks drizzle into a 2nd type-brand; fix = re-export operators from @workspace/db, import from there not "drizzle-orm".
 - [Sentry Node + esbuild](sentry-node-esbuild.md) — @sentry/node v8+ crashes at runtime under esbuild (missing OTel dynamic deps); stay on v7.
 - [Admin owner bootstrap](admin-account-bootstrap.md) — admin_accounts isn't config-seeded; dev/prod DBs differ; idempotent ensureOwnerAccount on startup; store handles lowercase to match login normalization.
@@ -13,3 +14,4 @@
 - [SKZ Bot deposit rate config](skz-bot-deposit-rate.md) — depositSkzPerTon lives in finance admin config; ton-poller reads finance.depositSkzPerTon first then deposit_config.skzPerTon; default 100. TradedCurrency excludes STARS from finance tables.
 - [SKZ Bot Stars payment flow](skz-bot-stars-payment.md) — Telegram Stars: currency "XTR", provider_token "". pre_checkout_query must be answered <10s. successful_payment arrives as msg field. Idempotency key = telegram_payment_charge_id stored in deposits table.
 - [SKZ Bot email OTP](skz-bot-email-otp.md) — browser-login OTP sent via Resend connector (not Zoho SMTP, which IP-blocks); free tier only delivers to account-owner email until domain verified.
+- [SKZ Bot progression engine](skz-bot-progression.md) — XP/levels/leagues; server-authoritative; surface level-ups off onCreditConfirmed event (not timeouts) + monotonic refresh guard.
