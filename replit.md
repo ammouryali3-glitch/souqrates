@@ -11,6 +11,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
 - Optional env: `TELEGRAM_BOT_TOKEN` — if set, server verifies Telegram initData HMAC; if unset, initData is parsed without signature check (dev mode)
+- Email OTP (browser login) is sent via the Resend connector (`@replit/connectors-sdk`). Optional env `RESEND_FROM` overrides the sender; defaults to `onboarding@resend.dev`. To send to any recipient, verify a domain at resend.com/domains and set `RESEND_FROM` to an address on it.
 
 ## Stack
 

@@ -14,6 +14,7 @@ runButton = "Project"
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
+integrations = ["resend:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -35,8 +36,6 @@ externalPort = 80
 
 [userenv.shared]
 TON_DEPOSIT_WALLET = "UQA6ob_h_pLqtbdEMY2nmCuKemoHl2c4zuA9bo3oUu_9g8e1"
-EMAIL_USER = "info@souqrates.com"
-EMAIL_PASSWORD = "ibAfzGMXnj6V"
 
 [nix]
 channel = "stable-25_05"

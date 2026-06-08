@@ -7,11 +7,12 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { randomBytes, randomInt } from "crypto";
-import nodemailer from "nodemailer";
+// Resend email integration (Replit connector) — see blueprint id "resend"
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
 import { emailOtpsTable, platformUsersTable, adminConfigTable } from "@workspace/db";
-import { eq, and, lt } from "@workspace/db";
+import { eq, and } from "@workspace/db";
 
 const router = Router();
 
@@ -38,16 +39,46 @@ function signUserToken(userId: string): string {
   return jwt.sign({ tgId: userId }, JWT_SECRET!, { expiresIn: "30d" });
 }
 
-function buildTransporter() {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASSWORD;
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: "smtp.zoho.com",
-    port: 465,
-    secure: true,
-    auth: { user, pass },
+const connectors = new ReplitConnectors();
+
+// "from" address. With a fresh Resend account use the shared onboarding sender;
+// once souqrates.com is verified in Resend, set RESEND_FROM to a branded address
+// e.g. "Souqrates System <noreply@souqrates.com>".
+const RESEND_FROM =
+  process.env.RESEND_FROM || "Souqrates System <onboarding@resend.dev>";
+
+function otpEmailHtml(code: string): string {
+  return `
+    <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0614; color: #fff; padding: 32px; border-radius: 12px;">
+      <h2 style="color: #f0d060; margin: 0 0 16px;">رمز تسجيل الدخول</h2>
+      <p style="color: rgba(255,255,255,0.7); margin: 0 0 24px;">
+        استخدم هذا الرمز للدخول إلى حسابك في Souqrates System:
+      </p>
+      <div style="background: #1a0e3a; border: 1px solid #7c3aed; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px;">
+        <span style="font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #f0d060;">${code}</span>
+      </div>
+      <p style="color: rgba(255,255,255,0.4); font-size: 13px; margin: 0;">
+        صالح لمدة 10 دقائق. لا تشاركه مع أحد.
+      </p>
+    </div>
+  `;
+}
+
+// Sends the OTP email via the Resend connector. Throws on failure.
+async function sendOtpEmail(to: string, code: string): Promise<void> {
+  const response = await connectors.proxy("resend", "/emails", {
+    method: "POST",
+    body: {
+      from: RESEND_FROM,
+      to: [to],
+      subject: "رمز تسجيل الدخول — Souqrates",
+      html: otpEmailHtml(code),
+    },
   });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Resend send failed (${response.status}): ${detail}`);
+  }
 }
 
 async function getStartingBalance(): Promise<number> {
@@ -112,37 +143,7 @@ router.post("/send-otp", async (req: Request, res: Response) => {
       expiresAt,
     });
 
-    const transporter = buildTransporter();
-    if (!transporter) {
-      req.log.warn("EMAIL_USER or EMAIL_PASSWORD not set — OTP not sent");
-      if (process.env.NODE_ENV !== "production") {
-        req.log.info({ code }, "DEV: OTP code (not sent via email)");
-        res.json({ ok: true, dev: true });
-        return;
-      }
-      res.status(503).json({ error: "خدمة البريد الإلكتروني غير متاحة" });
-      return;
-    }
-
-    await transporter.sendMail({
-      from: `"Souqrates System" <${process.env.EMAIL_USER}>`,
-      to: normalizedEmail,
-      subject: "رمز تسجيل الدخول — Souqrates",
-      html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0614; color: #fff; padding: 32px; border-radius: 12px;">
-          <h2 style="color: #f0d060; margin: 0 0 16px;">رمز تسجيل الدخول</h2>
-          <p style="color: rgba(255,255,255,0.7); margin: 0 0 24px;">
-            استخدم هذا الرمز للدخول إلى حسابك في Souqrates System:
-          </p>
-          <div style="background: #1a0e3a; border: 1px solid #7c3aed; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px;">
-            <span style="font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #f0d060;">${code}</span>
-          </div>
-          <p style="color: rgba(255,255,255,0.4); font-size: 13px; margin: 0;">
-            صالح لمدة 10 دقائق. لا تشاركه مع أحد.
-          </p>
-        </div>
-      `,
-    });
+    await sendOtpEmail(normalizedEmail, code);
 
     res.json({ ok: true });
   } catch (err) {
