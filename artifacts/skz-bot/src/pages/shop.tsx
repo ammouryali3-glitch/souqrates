@@ -171,6 +171,7 @@ const BOOK_CONTENT: Record<number, { toc: string[]; body: string }> = {
 };
 
 function getTOC(p: Product): string[] {
+  if (p.toc && p.toc.length > 0) return p.toc;
   if (BOOK_CONTENT[p.id]) return BOOK_CONTENT[p.id].toc;
   const cat = p.category;
   if (cat === "📚 كتب مترجمة") return [
@@ -196,6 +197,7 @@ function getTOC(p: Product): string[] {
 }
 
 function getBody(p: Product): string {
+  if (p.body && p.body.trim()) return p.body;
   if (BOOK_CONTENT[p.id]) return BOOK_CONTENT[p.id].body;
   const cat = p.category;
 

@@ -21,6 +21,10 @@ export interface Product {
   rating: number;
   downloads: number;
   image: string;
+  /** فهرس المحتويات — قائمة عناوين الفصول/الأقسام */
+  toc?: string[];
+  /** نص الكتاب الكامل بصيغة HTML — يُعرض للمستخدم بعد الشراء */
+  body?: string;
 }
 
 export const CATEGORIES: Category[] = [

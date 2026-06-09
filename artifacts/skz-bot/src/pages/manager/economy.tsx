@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   Store, Coins, Trophy, Target, Gift, Sparkles, Plus, Pencil, Trash2,
-  Package, Boxes, Tag, AlertTriangle, type LucideIcon,
+  Package, Boxes, Tag, AlertTriangle, Eye, EyeOff, List, Type, Info,
+  type LucideIcon,
 } from "lucide-react";
 import { useAdmin, admin, type Product } from "../../lib/admin-store";
 import { CATEGORIES, type Category } from "../../lib/shop-products";
@@ -259,35 +260,148 @@ const SHOP_CATS = CATEGORIES.filter((c) => c !== "All") as Category[];
 const EMPTY_PRODUCT: Omit<Product, "id"> = {
   title: "", titleAr: "", category: SHOP_CATS[0], price: 100, pages: 50,
   desc: "", rating: 4.5, downloads: 0, image: "https://picsum.photos/seed/skz/600/450",
+  toc: [], body: "",
 };
+
+const EDITOR_TABS = [
+  { id: "info" as const,  label: "معلومات",   icon: Info },
+  { id: "toc"  as const,  label: "الفهرس",    icon: List },
+  { id: "body" as const,  label: "نص الكتاب", icon: Type },
+];
 
 function ProductModal({ open, initial, onClose, onSave }: {
   open: boolean; initial: Omit<Product, "id">; onClose: () => void; onSave: (p: Omit<Product, "id">) => void;
 }) {
   const [p, setP] = useState(initial);
-  useEffect(() => { setP(initial); }, [initial, open]);
+  const [tab, setTab] = useState<"info" | "toc" | "body">("info");
+  const [preview, setPreview] = useState(false);
+  useEffect(() => { setP(initial); setTab("info"); setPreview(false); }, [initial, open]);
+
   const set = <K extends keyof Omit<Product, "id">>(k: K, v: Omit<Product, "id">[K]) => setP((s) => ({ ...s, [k]: v }));
+  const toc: string[] = p.toc ?? [];
+  const setToc = (t: string[]) => set("toc", t);
+
   return (
-    <Modal open={open} onClose={onClose} title="منتج المتجر" wide>
-      <div className="grid sm:grid-cols-2 gap-2">
-        <div><Label>الاسم بالعربية</Label><Field value={p.titleAr} onChange={(e) => set("titleAr", e.target.value)} placeholder="دليل التداول" /></div>
-        <div><Label>الاسم بالإنجليزية</Label><Field value={p.title} onChange={(e) => set("title", e.target.value)} placeholder="Trading Guide" /></div>
-        <div><Label>التصنيف</Label><Select value={p.category} onChange={(e) => set("category", e.target.value as Category)}>
-          {SHOP_CATS.map((c) => <option key={c} value={c} className="bg-[#13101f]">{c}</option>)}
-        </Select></div>
-        <div><Label>الشارة</Label><Select value={p.badge ?? ""} onChange={(e) => set("badge", (e.target.value || undefined) as Product["badge"])}>
-          {BADGES.map((b) => <option key={b} value={b} className="bg-[#13101f]">{b || "بدون"}</option>)}
-        </Select></div>
-        <div><Label>السعر (SKZ)</Label><Field type="number" value={p.price} onChange={(e) => set("price", +e.target.value)} /></div>
-        <div><Label>عدد الصفحات</Label><Field type="number" value={p.pages} onChange={(e) => set("pages", +e.target.value)} /></div>
-        <div><Label>التقييم (0-5)</Label><Field type="number" step="0.1" value={p.rating} onChange={(e) => set("rating", +e.target.value)} /></div>
-        <div><Label>التحميلات</Label><Field type="number" value={p.downloads} onChange={(e) => set("downloads", +e.target.value)} /></div>
-        <div className="sm:col-span-2"><Label>رابط الصورة</Label><Field value={p.image} onChange={(e) => set("image", e.target.value)} /></div>
-        <div className="sm:col-span-2"><Label>الوصف</Label><Area rows={2} value={p.desc} onChange={(e) => set("desc", e.target.value)} placeholder="وصف المنتج..." /></div>
-        <div className="sm:col-span-2 flex gap-2 mt-1">
-          <Button variant="green" className="flex-1" onClick={() => onSave(p)} disabled={!p.titleAr.trim()} data-testid="button-save-product">حفظ المنتج</Button>
-          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+    <Modal open={open} onClose={onClose} title="محرر المنتج / الكتاب" wide>
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-4 bg-white/5 rounded-xl p-1">
+        {EDITOR_TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-display font-bold transition-all ${tab === t.id ? "bg-primary/20 text-primary border border-primary/30" : "text-white/40 hover:text-white/70"}`}>
+            <t.icon size={12} />{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab 1: معلومات ── */}
+      {tab === "info" && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          <div><Label>الاسم بالعربية *</Label><Field value={p.titleAr} onChange={(e) => set("titleAr", e.target.value)} placeholder="دليل التداول" /></div>
+          <div><Label>الاسم بالإنجليزية</Label><Field value={p.title} onChange={(e) => set("title", e.target.value)} placeholder="Trading Guide" /></div>
+          <div><Label>التصنيف</Label>
+            <Select value={p.category} onChange={(e) => set("category", e.target.value as Category)}>
+              {SHOP_CATS.map((c) => <option key={c} value={c} className="bg-[#13101f]">{c}</option>)}
+            </Select>
+          </div>
+          <div><Label>الشارة</Label>
+            <Select value={p.badge ?? ""} onChange={(e) => set("badge", (e.target.value || undefined) as Product["badge"])}>
+              {BADGES.map((b) => <option key={b} value={b} className="bg-[#13101f]">{b || "بدون"}</option>)}
+            </Select>
+          </div>
+          <div><Label>السعر (SKZ)</Label><Field type="number" min="0" value={p.price} onChange={(e) => set("price", +e.target.value)} /></div>
+          <div><Label>عدد الصفحات</Label><Field type="number" min="1" value={p.pages} onChange={(e) => set("pages", +e.target.value)} /></div>
+          <div><Label>التقييم (0–5)</Label><Field type="number" step="0.1" min="0" max="5" value={p.rating} onChange={(e) => set("rating", +e.target.value)} /></div>
+          <div><Label>التحميلات</Label><Field type="number" min="0" value={p.downloads} onChange={(e) => set("downloads", +e.target.value)} /></div>
+          <div className="sm:col-span-2"><Label>رابط صورة الغلاف</Label>
+            <Field value={p.image} onChange={(e) => set("image", e.target.value)} placeholder="https://..." />
+            {p.image && (
+              <img src={p.image} alt="preview" className="mt-2 h-20 w-full object-cover rounded-xl border border-white/10 opacity-80" />
+            )}
+          </div>
+          <div className="sm:col-span-2"><Label>الوصف المختصر</Label>
+            <Area rows={3} value={p.desc} onChange={(e) => set("desc", e.target.value)} placeholder="وصف يظهر في بطاقة المنتج وصفحة الشراء..." />
+          </div>
         </div>
+      )}
+
+      {/* ── Tab 2: الفهرس ── */}
+      {tab === "toc" && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] text-white/35 font-display mb-1">
+            أضف عناوين الفصول والأقسام بالترتيب — ستظهر في قائمة المحتويات بعد الشراء
+          </p>
+          {toc.length === 0 && (
+            <div className="text-center py-8 text-white/20 text-xs font-display rounded-xl border border-dashed border-white/10">
+              لا يوجد فهرس بعد — أضف الفصول أدناه
+            </div>
+          )}
+          {toc.map((chapter, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <span className="w-5 text-center text-[11px] text-white/30 font-display font-bold shrink-0 select-none">{idx + 1}</span>
+              <Field
+                value={chapter}
+                onChange={(e) => setToc(toc.map((c, i) => i === idx ? e.target.value : c))}
+                placeholder={`عنوان الفصل ${idx + 1}`}
+              />
+              <button
+                onClick={() => setToc(toc.filter((_, i) => i !== idx))}
+                className="w-7 h-7 rounded-lg bg-red-500/15 hover:bg-red-500/25 flex items-center justify-center shrink-0 transition-colors">
+                <Trash2 size={12} className="text-red-400" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setToc([...toc, ""])}
+            className="mt-1 w-full py-2.5 rounded-xl border border-dashed border-white/20 text-white/40 hover:text-white/60 hover:border-white/30 text-xs font-display font-bold flex items-center justify-center gap-1.5 transition-all">
+            <Plus size={13} />إضافة فصل / قسم جديد
+          </button>
+        </div>
+      )}
+
+      {/* ── Tab 3: نص الكتاب ── */}
+      {tab === "body" && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[11px] text-white/35 font-display flex-1">
+              اكتب النص بـ HTML: استخدم &lt;h2&gt; للعناوين، &lt;p&gt; للفقرات، &lt;blockquote&gt; للاقتباسات، &lt;ul&gt; للقوائم
+            </p>
+            <button
+              onClick={() => setPreview(!preview)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-bold border transition-all ms-3 shrink-0 ${preview ? "bg-primary/20 border-primary/30 text-primary" : "bg-white/5 border-white/10 text-white/50 hover:text-white/70"}`}>
+              {preview ? <><EyeOff size={11} />تحرير</> : <><Eye size={11} />معاينة</>}
+            </button>
+          </div>
+
+          {preview ? (
+            <div
+              className="min-h-64 max-h-96 overflow-y-auto rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed text-white/80 prose-invert"
+              dir="rtl"
+              dangerouslySetInnerHTML={{ __html: p.body?.trim() ? p.body : "<p style='color:rgba(255,255,255,0.2);text-align:center;padding:2rem 0'>لا يوجد نص بعد — ارجع لوضع التحرير وأضف المحتوى</p>" }}
+            />
+          ) : (
+            <textarea
+              value={p.body ?? ""}
+              onChange={(e) => set("body", e.target.value)}
+              placeholder={"<h2>عنوان الفصل الأول</h2>\n<p>محتوى الفصل هنا...</p>\n\n<blockquote>«اقتباس مهم من الكتاب»</blockquote>\n\n<h2>عنوان الفصل الثاني</h2>\n<p>...</p>"}
+              rows={14}
+              dir="ltr"
+              className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/80 font-mono leading-relaxed resize-y focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 placeholder:text-white/15"
+            />
+          )}
+
+          <div className="flex items-center justify-between text-[10px] text-white/25 font-display pt-1">
+            <span>{(p.body ?? "").length.toLocaleString()} حرف</span>
+            {toc.length > 0 && <span>{toc.length} فصل في الفهرس</span>}
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2 mt-4 pt-3 border-t border-white/8">
+        <Button variant="green" className="flex-1" onClick={() => onSave(p)} disabled={!p.titleAr.trim()} data-testid="button-save-product">
+          نشر المنتج
+        </Button>
+        <Button variant="ghost" onClick={onClose}>إلغاء</Button>
       </div>
     </Modal>
   );
