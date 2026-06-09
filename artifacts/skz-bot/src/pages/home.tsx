@@ -18,6 +18,7 @@ import {
 import { ProgressionCard } from "@/components/progression-card";
 import { refreshProgression } from "@/lib/progression";
 import { refreshQuests, useClaimableCount } from "@/lib/quests";
+import { useWheelStatus, refreshWheelStatus } from "@/lib/wheel";
 import { hapticSuccess, hapticError } from "@/lib/haptics";
 import { sfx } from "@/lib/sound";
 
@@ -32,6 +33,8 @@ let _homeCache: HomeCache | null = null;
 
 function reasonLabel(reason: string, s: Strings): string {
   const map: Record<string, string> = {
+    spin: s.activityReasonSpin,
+    lootbox: s.activityReasonLootbox,
     game_win: s.activityReasonGameWin,
     game_fee: s.activityReasonGameFee,
     withdrawal: s.activityReasonWithdrawal,
@@ -90,7 +93,7 @@ export default function Home() {
   }, []);
 
   // Keep the missions badge fresh whenever home mounts.
-  useEffect(() => { refreshQuests(); }, []);
+  useEffect(() => { refreshQuests(); refreshWheelStatus(); }, []);
 
   const handleCheckin = async () => {
     if (claiming || checkin?.checkedInToday) return;
@@ -318,6 +321,9 @@ export default function Home() {
       {/* ── Missions entry ────────────────────────────────────────────── */}
       <MissionsEntry accent={accent} s={s} />
 
+      {/* ── Lucky Wheel entry ─────────────────────────────────────────── */}
+      <WheelEntry accent={accent} s={s} />
+
       {/* ── Stats Row ─────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
@@ -421,6 +427,45 @@ export default function Home() {
         )}
       </motion.div>
     </div>
+  );
+}
+
+function WheelEntry({ accent, s }: { accent: string; s: Strings }) {
+  const status = useWheelStatus();
+  const canSpin = status ? (status.canSpin || status.extraSpins > 0) : false;
+  return (
+    <Link href="/wheel">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.13 }}
+        whileTap={{ scale: 0.98 }}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform"
+        style={{
+          background: canSpin
+            ? "linear-gradient(135deg, rgba(124,58,237,0.22), rgba(236,72,153,0.12))"
+            : "rgba(255,255,255,0.04)",
+          border: canSpin ? "1px solid rgba(124,58,237,0.45)" : "1px solid rgba(255,255,255,0.07)",
+          boxShadow: canSpin ? "0 4px 20px rgba(124,58,237,0.2)" : "none",
+        }}
+      >
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-2xl"
+          style={{ background: "rgba(124,58,237,0.2)" }}>
+          🎰
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-display font-black text-white">{s.wheelCta}</div>
+          <div className="text-[11px] text-white/40 mt-0.5">{canSpin ? s.wheelCtaSub : s.wheelCtaSubUsed}</div>
+        </div>
+        {canSpin && (
+          <span className="text-[10px] font-display font-black px-2 py-1 rounded-full shrink-0 animate-pulse"
+            style={{ background: "rgba(124,58,237,0.8)", color: "white" }}>
+            FREE
+          </span>
+        )}
+        <ArrowRight size={16} style={{ color: canSpin ? "#a78bfa" : "rgba(255,255,255,0.3)" }} />
+      </motion.div>
+    </Link>
   );
 }
 

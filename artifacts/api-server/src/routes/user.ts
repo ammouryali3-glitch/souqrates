@@ -14,6 +14,7 @@ import { createStarsInvoiceLink } from "./bot";
 import { recordLedger } from "../lib/ledger";
 import { progressionFromXp, xpForGame, xpForCheckin } from "../lib/progression";
 import { bumpQuests, buildQuestViews, normalizeQuests, findActiveQuest } from "../lib/quests";
+import { drawPrize, drawLootBoxPrizes, canFreeSpin, nextFreeSpinAt, WHEEL_PRIZES } from "../lib/wheel";
 
 const router = Router();
 
@@ -1882,6 +1883,244 @@ router.get("/stats", async (req: Request, res: Response) => {
     });
   } catch (err) {
     req.log.error({ err }, "stats error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Lucky Wheel ───────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/user/wheel/status
+ * Returns spin eligibility, cooldown, and loot box count.
+ */
+router.get("/wheel/status", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [row] = await db
+      .select()
+      .from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId))
+      .limit(1);
+    if (!row) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = row.data as Record<string, unknown>;
+    const wheelData = (data.wheel ?? {}) as { lastSpinAt?: string; extraSpins?: number };
+    const extraSpins = Math.max(0, Math.floor(Number(wheelData.extraSpins ?? 0)));
+    const freeSpin = canFreeSpin(wheelData.lastSpinAt);
+
+    res.json({
+      canSpin: freeSpin || extraSpins > 0,
+      nextSpinAt: nextFreeSpinAt(wheelData.lastSpinAt),
+      extraSpins,
+      lootBoxes: Math.max(0, Math.floor(Number(data.lootBoxes ?? 0))),
+    });
+  } catch (err) {
+    req.log.error({ err }, "wheel/status error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/user/wheel/spin
+ * Server-authoritative spin. Consumes a free spin (24h cooldown) or an extra spin token.
+ * Returns: { prizeId, prizeIndex, newSkz, newXp, canSpin, nextSpinAt, extraSpins, lootBoxes }
+ */
+router.post("/wheel/spin", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    let result: {
+      prizeId: string; prizeIndex: number; newSkz: number; newXp: number;
+      canSpin: boolean; nextSpinAt: string | null; extraSpins: number; lootBoxes: number;
+    } | null = null;
+
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+      if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
+
+      const data = row.data as Record<string, unknown>;
+      const wheelData = (data.wheel ?? {}) as { lastSpinAt?: string; extraSpins?: number };
+      const extraSpins = Math.max(0, Math.floor(Number(wheelData.extraSpins ?? 0)));
+      const freeSpin = canFreeSpin(wheelData.lastSpinAt);
+
+      if (!freeSpin && extraSpins === 0) {
+        throw Object.assign(new Error("No spin available"), { status: 429 });
+      }
+
+      const prize = drawPrize();
+      const prizeIndex = WHEEL_PRIZES.findIndex(p => p.id === prize.id);
+
+      const balanceBefore = Math.floor(Number(
+        (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      ));
+      const xpBefore = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+
+      // Apply prize
+      let balanceAfter = balanceBefore;
+      let xpAfter = xpBefore;
+      let newLootBoxes = Math.max(0, Math.floor(Number(data.lootBoxes ?? 0)));
+      let newExtraSpins = freeSpin ? extraSpins : Math.max(0, extraSpins - 1);
+
+      if (prize.kind === "skz") balanceAfter = balanceBefore + prize.amount;
+      if (prize.kind === "xp") xpAfter = xpBefore + prize.amount;
+      if (prize.kind === "lootbox") newLootBoxes += prize.amount;
+      if (prize.kind === "extra_spin") newExtraSpins += prize.amount;
+
+      const newLevel = progressionFromXp(xpAfter).level;
+      const lastSpinAt = freeSpin ? new Date().toISOString() : (wheelData.lastSpinAt ?? null);
+
+      await tx
+        .update(platformUsersTable)
+        .set({
+          data: {
+            ...data,
+            balances: { ...(data.balances as Record<string, unknown>), SKZ: balanceAfter },
+            xp: xpAfter,
+            level: newLevel,
+            lootBoxes: newLootBoxes,
+            wheel: { lastSpinAt, extraSpins: newExtraSpins },
+            lastSeen: Date.now(),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      if (prize.kind === "skz") {
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "credit",
+          reason: "spin",
+          amount: prize.amount,
+          balanceBefore,
+          balanceAfter,
+          ref: prize.id,
+          meta: { prizeId: prize.id },
+        });
+      }
+
+      result = {
+        prizeId: prize.id,
+        prizeIndex,
+        newSkz: balanceAfter,
+        newXp: xpAfter,
+        canSpin: canFreeSpin(lastSpinAt) || newExtraSpins > 0,
+        nextSpinAt: nextFreeSpinAt(lastSpinAt),
+        extraSpins: newExtraSpins,
+        lootBoxes: newLootBoxes,
+      };
+    });
+
+    req.log.info({ tgId: payload.tgId, prizeId: result!.prizeId }, "wheel spin");
+    res.json(result);
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 429) { res.status(429).json({ error: e.message ?? "No spin available" }); return; }
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    req.log.error({ err }, "wheel/spin error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/user/wheel/open-box
+ * Opens one loot box and awards 3 random prizes.
+ * Returns: { prizes, totalSkz, totalXp, newSkz, newXp, lootBoxes }
+ */
+router.post("/wheel/open-box", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    let result: {
+      prizes: Array<{ id: string; kind: string; amount: number; label: string; emoji: string }>;
+      totalSkz: number; totalXp: number; newSkz: number; newXp: number; lootBoxes: number;
+    } | null = null;
+
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(platformUsersTable)
+        .where(eq(platformUsersTable.id, payload.tgId))
+        .for("update")
+        .limit(1);
+      if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
+
+      const data = row.data as Record<string, unknown>;
+      const currentBoxes = Math.max(0, Math.floor(Number(data.lootBoxes ?? 0)));
+      if (currentBoxes === 0) throw Object.assign(new Error("No loot boxes"), { status: 400 });
+
+      const prizes = drawLootBoxPrizes();
+      const totalSkz = prizes.filter(p => p.kind === "skz").reduce((s, p) => s + p.amount, 0);
+      const totalXp  = prizes.filter(p => p.kind === "xp").reduce((s, p) => s + p.amount, 0);
+
+      const balanceBefore = Math.floor(Number(
+        (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+      ));
+      const xpBefore = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+      const balanceAfter = balanceBefore + totalSkz;
+      const xpAfter = xpBefore + totalXp;
+      const newLevel = progressionFromXp(xpAfter).level;
+      const newBoxes = currentBoxes - 1;
+
+      await tx
+        .update(platformUsersTable)
+        .set({
+          data: {
+            ...data,
+            balances: { ...(data.balances as Record<string, unknown>), SKZ: balanceAfter },
+            xp: xpAfter,
+            level: newLevel,
+            lootBoxes: newBoxes,
+            lastSeen: Date.now(),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      if (totalSkz > 0) {
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "credit",
+          reason: "lootbox",
+          amount: totalSkz,
+          balanceBefore,
+          balanceAfter,
+          ref: `box-${Date.now()}`,
+          meta: { prizes: prizes.map(p => p.id) },
+        });
+      }
+
+      result = {
+        prizes: prizes.map(p => ({ id: p.id, kind: p.kind, amount: p.amount, label: p.label, emoji: p.emoji })),
+        totalSkz,
+        totalXp,
+        newSkz: balanceAfter,
+        newXp: xpAfter,
+        lootBoxes: newBoxes,
+      };
+    });
+
+    req.log.info({ tgId: payload.tgId, lootBoxes: result!.lootBoxes }, "loot box opened");
+    res.json(result);
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 400) { res.status(400).json({ error: e.message ?? "No loot boxes" }); return; }
+    if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    req.log.error({ err }, "wheel/open-box error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

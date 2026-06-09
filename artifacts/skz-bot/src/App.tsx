@@ -24,6 +24,7 @@ import Shop from "@/pages/shop";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
 import Missions from "@/pages/missions";
+import WheelPage from "@/pages/wheel";
 import Manager from "@/pages/manager";
 import Contact from "@/pages/contact";
 import Policies from "@/pages/policies";
@@ -321,6 +322,7 @@ function Router() {
             <Route path="/wallet"><PageWrapper><Wallet /></PageWrapper></Route>
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
             <Route path="/missions"><PageWrapper><Missions /></PageWrapper></Route>
+            <Route path="/wheel"><PageWrapper><WheelPage /></PageWrapper></Route>
             <Route path="/contact"><PageWrapper><Contact /></PageWrapper></Route>
             <Route path="/policies"><PageWrapper><Policies /></PageWrapper></Route>
             <Route><PageWrapper><NotFound /></PageWrapper></Route>

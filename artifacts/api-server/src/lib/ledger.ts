@@ -24,7 +24,9 @@ export type LedgerReason =
   | "bonus"
   | "starting_balance"
   | "admin"
-  | "stars_purchase";
+  | "stars_purchase"
+  | "spin"
+  | "lootbox";
 
 export interface LedgerEntry {
   userId: string;
