@@ -4,7 +4,7 @@
  * Called once during server init if the DB is found to be empty.
  */
 import { db } from "@workspace/db";
-import { adminConfigTable, adminAccountsTable } from "@workspace/db";
+import { adminConfigTable, adminAccountsTable, shopProductsTable } from "@workspace/db";
 import { eq, sql } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import { logger } from "./logger";
@@ -224,6 +224,52 @@ export async function ensureIndexes(): Promise<void> {
  *
  * Safe to call on every startup — it's a no-op if the data is already correct.
  */
+/**
+ * Seeds default shop products (books, courses, templates) if none exist yet.
+ * Uses onConflictDoNothing so it is idempotent and admin edits are preserved.
+ */
+export async function ensureShopProducts(): Promise<void> {
+  try {
+    const existing = await db.select().from(shopProductsTable).limit(1);
+    if (existing.length > 0) {
+      logger.info("Shop products already seeded, skipping");
+      return;
+    }
+
+    const books = [
+      { id: 1,  data: { id: 1,  title: "Meditations", titleAr: "تأملات — ماركوس أوريليوس", category: "📚 كتب مترجمة", price: 150, pages: 204, desc: "أعمق كتب الفلسفة الرواقية، كتبه الإمبراطور ماركوس أوريليوس لنفسه خلال حروبه — دليل عملي للصمود والفضيلة وعدم الاستسلام.", badge: "BESTSELLER", rating: 5, downloads: 2847, image: "🏛️" } },
+      { id: 2,  data: { id: 2,  title: "The Art of War", titleAr: "فن الحرب — سون تزو", category: "📚 كتب مترجمة", price: 120, pages: 160, desc: "الكتاب الأكثر قراءة في تاريخ الاستراتيجية. مبادئ سون تزو تتحكم في النجاح منذ 2500 عام في الأعمال والقيادة والحياة.", badge: "HOT", rating: 5, downloads: 3921, image: "⚔️" } },
+      { id: 3,  data: { id: 3,  title: "Man's Search for Meaning", titleAr: "الإنسان يبحث عن معنى — فيكتور فرانكل", category: "📚 كتب مترجمة", price: 180, pages: 165, desc: "شهادة حية من الهولوكوست — فرانكل يكشف كيف أن البحث عن المعنى هو أقوى دافع بشري حتى في أشد الظروف قسوة.", badge: "TOP", rating: 5, downloads: 4102, image: "💡" } },
+      { id: 4,  data: { id: 4,  title: "The Power of the Subconscious Mind", titleAr: "قوة العقل الباطن — جوزيف ميرفي", category: "📚 كتب مترجمة", price: 140, pages: 280, desc: "ميرفي يكشف أسرار العقل الباطن وكيف تستخدمه لتحقيق الصحة والثروة والسعادة من خلال تقنيات مجربة علمياً.", badge: "NEW", rating: 4, downloads: 1567, image: "🧠" } },
+      { id: 5,  data: { id: 5,  title: "The Crowd: A Study of the Popular Mind", titleAr: "سيكولوجيا الجماهير — غوستاف لوبون", category: "📚 كتب مترجمة", price: 130, pages: 190, desc: "لوبون يكشف العقل الجماعي وكيف تتصرف الجماهير — أساس علم النفس الاجتماعي الذي يقرأه كل سياسي وقائد.", rating: 4, downloads: 2341, image: "👥" } },
+      { id: 6,  data: { id: 6,  title: "Think and Grow Rich", titleAr: "فكر وازدد ثروة — نابليون هيل", category: "📚 كتب مترجمة", price: 160, pages: 238, desc: "13 مبدأً للثروة استخلصها هيل من 20 عاماً دراسة أنجح الرجال في أمريكا. الكتاب الذي غير مسار ملايين الأشخاص.", badge: "BESTSELLER", rating: 5, downloads: 6102, image: "💰" } },
+      { id: 7,  data: { id: 7,  title: "The Richest Man in Babylon", titleAr: "أغنى رجل في بابل — جورج كلاسون", category: "📚 كتب مترجمة", price: 100, pages: 144, desc: "قصص من بابل القديمة تحمل حكماً مالية خالدة. أرقش يعلمك قوانين الثروة التي لم تتغير منذ آلاف السنين.", badge: "HOT", rating: 5, downloads: 5234, image: "🏺" } },
+      { id: 8,  data: { id: 8,  title: "As a Man Thinketh", titleAr: "كما يفكر الإنسان — جيمس ألن", category: "📚 كتب مترجمة", price: 80,  pages: 65,  desc: "65 صفحة غيّرت ملايين الأرواح — ألن يثبت أن أفكارك تشكّل واقعك بالكامل. أقوى كتاب تنمية بشرية مختصر.", badge: "FREE", rating: 4, downloads: 2198, image: "🌱" } },
+      { id: 9,  data: { id: 9,  title: "The 7 Habits of Highly Effective People", titleAr: "العادات السبع للناس الأكثر فاعلية — ستيفن كوفي", category: "💼 أعمال", price: 200, pages: 381, desc: "الإطار الكامل للنجاح الشخصي والمهني. كوفي يقدم منهجاً شاملاً يغير طريقة تفكيرك في العمل والحياة والعلاقات.", badge: "BESTSELLER", rating: 5, downloads: 6741, image: "🏆" } },
+      { id: 10, data: { id: 10, title: "Start With Why", titleAr: "ابدأ بلماذا — سايمون سينك", category: "💼 أعمال", price: 160, pages: 256, desc: "لماذا تختار بعض الشركات التأثير بينما يفشل الآخرون؟ سينك يكشف النمط الذهبي الذي يقود Apple و Martin Luther King.", badge: "HOT", rating: 4, downloads: 3102, image: "❓" } },
+      { id: 11, data: { id: 11, title: "Zero to One", titleAr: "من الصفر إلى الواحد — بيتر ثيل", category: "💼 أعمال", price: 175, pages: 195, desc: "مؤسس PayPal يشرح فلسفته في بناء الشركات الثورية — لا تنافس، ابتكر. الفرق بين ابتكار شيء جديد والنسخ.", badge: "NEW", rating: 4, downloads: 2443, image: "🚀" } },
+      { id: 12, data: { id: 12, title: "ChatGPT & AI Mastery Guide", titleAr: "الدليل الاحترافي للذكاء الاصطناعي — ChatGPT وأدوات 2024", category: "🤖 ذكاء اصطناعي", price: 250, pages: 180, desc: "كل ما تحتاجه للسيطرة على أدوات الذكاء الاصطناعي في عملك — من ChatGPT لـ Midjourney. 200+ حالة استخدام عملي.", badge: "HOT", rating: 5, downloads: 8901, image: "🤖" } },
+      { id: 13, data: { id: 13, title: "Prompt Engineering Masterclass", titleAr: "إتقان فن البرومبت — دليل المحترفين", category: "🤖 ذكاء اصطناعي", price: 300, pages: 220, desc: "تقنيات البرومبت المتقدمة: Zero-Shot، Chain-of-Thought، Role Prompting وأكثر من 150 مثال جاهز للاستخدام.", badge: "NEW", rating: 5, downloads: 4521, image: "⚡" } },
+      { id: 14, data: { id: 14, title: "Python Programming: Zero to Pro", titleAr: "Python من الصفر للاحتراف — الدليل الشامل", category: "💻 برمجة", price: 220, pages: 310, desc: "أشمل مرجع Python بالعربية — من الأساسيات للخوارزميات للمشاريع. 50+ تمرين محلول و10 مشاريع كاملة.", badge: "BESTSELLER", rating: 4, downloads: 5678, image: "🐍" } },
+      { id: 15, data: { id: 15, title: "Smart Money Investor Guide", titleAr: "المستثمر الذكي — حرية مالية للجيل الجديد", category: "📊 مالية", price: 190, pages: 240, desc: "خارطة طريق مالية كاملة — ميزانية، طوارئ، استثمار، تقاعد مبكر. استراتيجيات مجربة تناسب السوق العربي.", badge: "TOP", rating: 5, downloads: 3891, image: "📈" } },
+      { id: 16, data: { id: 16, title: "Graphic Design Fundamentals", titleAr: "أساسيات التصميم الجرافيكي — من المبتدئ للمحترف", category: "🎨 تصميم", price: 200, pages: 190, desc: "أكثر من 120 مبدأ تصميم مع أمثلة مرئية وتمارين عملية. يغطي Figma وAdobe والتصميم للمواقع والتطبيقات.", badge: "NEW", rating: 4, downloads: 2134, image: "🎨" } },
+      { id: 17, data: { id: 17, title: "E-commerce Masterclass 2024", titleAr: "كورس التجارة الإلكترونية الشامل — من الصفر للربح", category: "🎓 كورسات", price: 350, pages: 420, desc: "150 درس تفصيلي من المنتج حتى التوسع الدولي — Dropshipping، منتجات رقمية، Marketing، وأتمتة كاملة.", badge: "HOT", rating: 5, downloads: 7823, image: "🛒" } },
+      { id: 18, data: { id: 18, title: "Professional Templates Bundle", titleAr: "حزمة القوالب الاحترافية — خطط وتقارير وعروض", category: "📐 قوالب", price: 120, pages: 85,  desc: "50+ قالب جاهز للاستخدام — خطة أعمال، تقرير مالي، عرض تقديمي، عقود، CV. متوافق مع Word و PowerPoint.", rating: 4, downloads: 1923, image: "📐" } },
+    ] as const;
+
+    for (const book of books) {
+      await db
+        .insert(shopProductsTable)
+        .values({ id: book.id, data: book.data, updatedAt: new Date() })
+        .onConflictDoNothing();
+    }
+
+    logger.info({ count: books.length }, "Shop products seeded successfully");
+  } catch (err) {
+    logger.error({ err }, "ensureShopProducts failed");
+  }
+}
+
 export async function migrateRolesConfigIfNeeded(): Promise<void> {
   try {
     const [row] = await db

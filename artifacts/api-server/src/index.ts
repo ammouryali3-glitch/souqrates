@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount, ensureIndexes } from "./lib/seed";
+import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount, ensureIndexes, ensureShopProducts } from "./lib/seed";
 import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 import { registerWebhook } from "./routes/bot";
@@ -47,6 +47,11 @@ app.listen(port, (err) => {
   // Ensure functional (expression) indexes that Drizzle schema DSL can't express
   ensureIndexes().catch((err) => {
     logger.error({ err }, "Failed to ensure indexes");
+  });
+
+  // Seed default shop products (books, courses, templates) if none exist yet
+  ensureShopProducts().catch((err) => {
+    logger.error({ err }, "Failed to seed shop products");
   });
 
   // Start the blockchain deposit poller (non-blocking; log errors but keep server alive)
