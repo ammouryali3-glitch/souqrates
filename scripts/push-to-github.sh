@@ -7,8 +7,11 @@ GITHUB_USER="ammouryali3-glitch"
 GITHUB_REPO="souqrates"
 
 echo "=== 1. Checking token ==="
-if [ -z "${GITHUB_PERSONAL_ACCESS_TOKEN:-}" ]; then
-  echo "❌ GITHUB_PERSONAL_ACCESS_TOKEN secret is not set"
+# Accept token as argument or from env
+if [ -n "${1:-}" ]; then
+  GITHUB_PERSONAL_ACCESS_TOKEN="$1"
+elif [ -z "${GITHUB_PERSONAL_ACCESS_TOKEN:-}" ]; then
+  echo "Usage: bash scripts/push-to-github.sh ghp_YOUR_TOKEN_HERE"
   exit 1
 fi
 
