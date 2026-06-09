@@ -109,9 +109,10 @@ function filterReadableConfig(
  */
 router.get("/runtime-config", async (req: Request, res: Response) => {
   try {
-    const [configRows, notifications] = await Promise.all([
+    const [configRows, notifications, productRows] = await Promise.all([
       db.select().from(adminConfigTable),
       db.select().from(appNotificationsTable).orderBy(appNotificationsTable.createdAt),
+      db.select().from(shopProductsTable),
     ]);
 
     // Allowlist: only safe config keys leave this endpoint
@@ -133,6 +134,9 @@ router.get("/runtime-config", async (req: Request, res: Response) => {
         startAt: n.startAt,
         endAt: n.endAt,
       })),
+      // Shop products are public catalog items — safe to expose here so all
+      // mini-app users can browse and purchase without an admin session.
+      products: productRows.map((p) => p.data),
     });
   } catch (err) {
     req.log.error({ err }, "GET /admin/runtime-config error");

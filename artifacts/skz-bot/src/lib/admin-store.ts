@@ -302,10 +302,15 @@ function getSnapshot() {
  * Merge mini-app safe runtime config (public) into local state.
  * Only touches: settings, game_overrides, ticket_overrides, referral_config, daily_checkin, notifications.
  */
-function applyRuntimeConfig(cfg: Record<string, unknown>, notifications: AppNotification[]) {
+function applyRuntimeConfig(cfg: Record<string, unknown>, notifications: AppNotification[], products?: unknown[]) {
   state = {
     ...state,
     notifications,
+    // Shop products are served publicly via runtime-config so all users can browse the shop.
+    // Admin full-state may overwrite this later with the same data (harmless redundancy).
+    products: Array.isArray(products) && products.length > 0
+      ? (products as Product[])
+      : state.products,
     settings: cfg.settings
       ? { ...DEFAULT_SETTINGS, ...(cfg.settings as Partial<AdminSettings>) }
       : state.settings,
@@ -374,7 +379,7 @@ async function initFromApi(): Promise<void> {
   // Always fetch mini-app safe config (public, no auth required)
   const runtime = await fetchRuntimeConfig();
   if (runtime) {
-    applyRuntimeConfig(runtime.config, runtime.notifications as AppNotification[]);
+    applyRuntimeConfig(runtime.config, runtime.notifications as AppNotification[], runtime.products);
     persist();
     emit();
   }
@@ -386,7 +391,7 @@ async function initFromApi(): Promise<void> {
     // Attempt to fetch full admin state (auth-required — succeeds only if admin is logged in)
     fetchAdminState().then((fullState) => {
       if (fullState) {
-        applyRuntimeConfig(fullState.config, fullState.notifications as AppNotification[]);
+        applyRuntimeConfig(fullState.config, fullState.notifications as AppNotification[], fullState.products);
         applyFullAdminState(fullState, fullState.config);
         persist();
         emit();

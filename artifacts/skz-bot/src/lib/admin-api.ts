@@ -31,6 +31,8 @@ export interface ApiRuntimeConfig {
   /** Allowlisted subset of admin_config: settings, game_overrides, ticket_overrides, referral_config, daily_checkin */
   config: Record<string, unknown>;
   notifications: unknown[];
+  /** Public shop product catalog — included so all mini-app users can browse the shop */
+  products?: unknown[];
 }
 
 /**
