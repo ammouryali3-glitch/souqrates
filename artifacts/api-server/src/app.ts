@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { captureException, isSentryReady } from "./lib/integrations/sentry-node";
@@ -92,7 +92,7 @@ function userOrIpKey(req: Request): string {
   } catch {
     // fall through to IP
   }
-  return req.ip ?? "unknown";
+  return ipKeyGenerator(req.ip ?? "unknown");
 }
 
 // Admin login: max 10 attempts per 15 minutes (brute-force protection, IP-keyed)

@@ -18,3 +18,4 @@
 - [SKZ Bot progression engine](skz-bot-progression.md) — XP/levels/leagues; server-authoritative; surface level-ups off onCreditConfirmed event (not timeouts) + monotonic refresh guard.
 - [SKZ Bot lucky wheel + loot boxes](skz-bot-wheel.md) — WHEEL_PRIZES array must be identical (same order/index) in both server lib/wheel.ts and client lib/wheel.ts; prizeIndex drives SVG animation target angle.
 - [API server security hardening](api-server-security.md) — user-ID rate limit via lib/user-auth.ts; UUIDv7 in ledger; separate ADMIN_JWT_SECRET; admin audit log via logAdminAction().
+- [TON Center v3 poller](ton-poller-v3.md) — v2 returns 500 "lt not in db"; use v3 /api/v3/transactions?account=&sort=desc; comment in in_msg.message_content.decoded.text; hash is base64 string.

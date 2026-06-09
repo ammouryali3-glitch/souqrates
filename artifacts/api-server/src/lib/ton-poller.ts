@@ -27,7 +27,8 @@ import { recordLedger } from "./ledger";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = 60_000;       // base interval
+const MAX_POLL_INTERVAL_MS = 5 * 60_000; // back-off ceiling
 
 const TON_WALLET = process.env.TON_DEPOSIT_WALLET ?? "";
 const TON_API_KEY = process.env.TONCENTER_API_KEY ?? "";
@@ -224,49 +225,65 @@ function parseTgIdFromComment(comment: string | null | undefined): string | null
   return match ? match[1] : null;
 }
 
-// ── TON poller ────────────────────────────────────────────────────────────────
+// ── TON Center v3 response types ──────────────────────────────────────────────
 
-async function pollTon(state: PollerState): Promise<string> {
-  if (!TON_WALLET) return state.tonLastLt;
+interface TonV3Tx {
+  hash: string;   // base64
+  lt: string;
+  in_msg?: {
+    source?: string;
+    value?: string; // nanotons as string
+    message_content?: {
+      decoded?: {
+        "@type"?: string;
+        text?: string;
+      } | null;
+    } | null;
+  } | null;
+}
+
+interface TonV3Response {
+  transactions?: TonV3Tx[];
+}
+
+// ── TON poller (TON Center v3 API) ────────────────────────────────────────────
+
+/**
+ * Returns { lt: latestLt, apiOk } so the caller can apply backoff on failure.
+ * Uses TON Center v3 (`/api/v3/transactions`) which is stable and avoids the
+ * "lt not in db" 500 errors that v2 (`/api/v2/getTransactions`) produces.
+ */
+async function pollTon(state: PollerState): Promise<{ lt: string; apiOk: boolean }> {
+  if (!TON_WALLET) return { lt: state.tonLastLt, apiOk: true };
 
   try {
     const params = new URLSearchParams({
-      address: TON_WALLET,
+      account: TON_WALLET,
       limit: "50",
-      archival: "false",
+      sort: "desc",
     });
     const headers: Record<string, string> = { Accept: "application/json" };
     if (TON_API_KEY) headers["X-API-Key"] = TON_API_KEY;
 
-    const url = `https://toncenter.com/api/v2/getTransactions?${params}`;
+    const url = `https://toncenter.com/api/v3/transactions?${params}`;
     const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+
     if (!res.ok) {
       logger.warn({ status: res.status }, "ton-poller: TON API returned non-OK status");
-      return state.tonLastLt;
+      return { lt: state.tonLastLt, apiOk: false };
     }
 
-    const json = await res.json() as { ok: boolean; result: Array<{
-      transaction_id: { lt: string; hash: string };
-      in_msg?: {
-        source?: string;
-        value?: string;
-        message?: string;
-        comment?: string;
-      };
-    }> };
-
-    if (!json.ok || !Array.isArray(json.result)) return state.tonLastLt;
+    const json = await res.json() as TonV3Response;
+    if (!Array.isArray(json.transactions)) return { lt: state.tonLastLt, apiOk: true };
 
     const config = await getDepositConfig();
     let latestLt = state.tonLastLt;
 
-    for (const tx of json.result) {
-      const lt = tx.transaction_id.lt;
-      const hash = tx.transaction_id.hash;
+    for (const tx of json.transactions) {
+      const lt = tx.lt;
+      const hash = tx.hash;
 
-      // Skip already-processed transactions
       if (BigInt(lt) <= BigInt(state.tonLastLt || "0")) continue;
-
       if (BigInt(lt) > BigInt(latestLt || "0")) latestLt = lt;
 
       const inMsg = tx.in_msg;
@@ -275,17 +292,19 @@ async function pollTon(state: PollerState): Promise<string> {
       const rawValue = parseInt(inMsg.value, 10);
       if (!Number.isFinite(rawValue) || rawValue <= 0) continue;
 
-      const comment = inMsg.comment ?? inMsg.message ?? null;
+      // v3: comment is in in_msg.message_content.decoded.text (type = "text_comment")
+      const decoded = inMsg.message_content?.decoded;
+      const comment = decoded?.["@type"] === "text_comment" ? (decoded.text ?? null) : null;
       const tgId = parseTgIdFromComment(comment);
       if (!tgId) continue;
 
       await creditDeposit(hash, tgId, rawValue, config.skzPerTon);
     }
 
-    return latestLt;
+    return { lt: latestLt, apiOk: true };
   } catch (err) {
     logger.warn({ err }, "ton-poller: TON poll error");
-    return state.tonLastLt;
+    return { lt: state.tonLastLt, apiOk: false };
   }
 }
 
@@ -293,19 +312,28 @@ async function pollTon(state: PollerState): Promise<string> {
 
 let running = false;
 
-async function runPoll(): Promise<void> {
-  if (running) return;
+/**
+ * Runs one poll cycle. Returns true on API success, false on API failure.
+ * Distinguishing success lets the scheduler apply exponential back-off only
+ * when the remote API is actually unavailable.
+ */
+async function runPoll(): Promise<boolean> {
+  if (running) return true; // skip if previous cycle hasn't finished
   running = true;
 
+  let apiOk = true;
   try {
     const state = await loadPollerState();
-    const newTonLt = await pollTon(state);
-    await savePollerState({ tonLastLt: newTonLt });
+    const result = await pollTon(state);
+    apiOk = result.apiOk;
+    await savePollerState({ tonLastLt: result.lt });
   } catch (err) {
     logger.error({ err }, "ton-poller: unexpected error in poll cycle");
+    apiOk = false;
   } finally {
     running = false;
   }
+  return apiOk;
 }
 
 export function startDepositPoller(): void {
@@ -318,7 +346,28 @@ export function startDepositPoller(): void {
 
   logger.info({ tonWallet: TON_WALLET }, "ton-poller: deposit poller starting");
 
-  // Run once immediately, then every POLL_INTERVAL_MS
-  runPoll().catch(() => {});
-  setInterval(() => runPoll().catch(() => {}), POLL_INTERVAL_MS);
+  // Exponential back-off: 60s base, doubles on each consecutive API failure,
+  // caps at MAX_POLL_INTERVAL_MS (5 min) so logs don't flood on sustained outages.
+  let failStreak = 0;
+
+  function scheduleNext(): void {
+    const delay = Math.min(
+      POLL_INTERVAL_MS * Math.pow(2, failStreak),
+      MAX_POLL_INTERVAL_MS,
+    );
+    setTimeout(async () => {
+      const ok = await runPoll();
+      failStreak = ok ? 0 : Math.min(failStreak + 1, 5);
+      scheduleNext();
+    }, delay);
+  }
+
+  // First run immediately, then enter the back-off loop
+  runPoll().then((ok) => {
+    failStreak = ok ? 0 : 1;
+    scheduleNext();
+  }).catch(() => {
+    failStreak = 1;
+    scheduleNext();
+  });
 }
