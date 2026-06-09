@@ -29,7 +29,10 @@ export type LedgerReason =
   | "admin"
   | "stars_purchase"
   | "spin"
-  | "lootbox";
+  | "lootbox"
+  | "battle_pass"
+  | "battle_pass_unlock"
+  | "challenge_win";
 
 export interface LedgerEntry {
   userId: string;

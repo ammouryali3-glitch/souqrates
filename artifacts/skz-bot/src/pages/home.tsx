@@ -19,6 +19,8 @@ import { ProgressionCard } from "@/components/progression-card";
 import { refreshProgression } from "@/lib/progression";
 import { refreshQuests, useClaimableCount } from "@/lib/quests";
 import { useWheelStatus, refreshWheelStatus } from "@/lib/wheel";
+import { useBattlePassStatus, refreshBattlePassStatus } from "@/lib/battle-pass";
+import { useClanStatus, refreshClanStatus } from "@/lib/clan";
 import { hapticSuccess, hapticError } from "@/lib/haptics";
 import { sfx } from "@/lib/sound";
 
@@ -93,7 +95,7 @@ export default function Home() {
   }, []);
 
   // Keep the missions badge fresh whenever home mounts.
-  useEffect(() => { refreshQuests(); refreshWheelStatus(); }, []);
+  useEffect(() => { refreshQuests(); refreshWheelStatus(); refreshBattlePassStatus(); }, []);
 
   const handleCheckin = async () => {
     if (claiming || checkin?.checkedInToday) return;
@@ -324,6 +326,12 @@ export default function Home() {
       {/* ── Lucky Wheel entry ─────────────────────────────────────────── */}
       <WheelEntry accent={accent} s={s} />
 
+      {/* ── Battle Pass entry ──────────────────────────────────────────── */}
+      <BattlePassEntry accent={accent} s={s} />
+
+      {/* ── Clans entry ──────────────────────────────────────────────── */}
+      <ClanEntry accent={accent} s={s} />
+
       {/* ── Stats Row ─────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
@@ -502,6 +510,86 @@ function MissionsEntry({ accent, s }: { accent: string; s: Strings }) {
           </span>
         )}
         <ArrowRight size={16} style={{ color: accent }} />
+      </motion.div>
+    </Link>
+  );
+}
+
+function ClanEntry({ accent, s }: { accent: string; s: Strings }) {
+  const status = useClanStatus();
+  useEffect(() => { refreshClanStatus(); }, []);
+  const inClan = status?.clan != null;
+  return (
+    <Link href="/clan">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        whileTap={{ scale: 0.98 }}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform"
+        style={{
+          background: inClan
+            ? "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(245,181,10,0.1))"
+            : "rgba(255,255,255,0.04)",
+          border: inClan ? "1px solid rgba(139,92,246,0.3)" : "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-2xl"
+          style={{ background: "rgba(139,92,246,0.15)" }}>
+          🏰
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-display font-black text-white">{s.clanTitle}</div>
+          <div className="text-[11px] text-white/40 mt-0.5">
+            {inClan ? status!.clan!.name : s.clanSub}
+          </div>
+        </div>
+        {inClan && (
+          <span className="text-[11px] font-display font-black px-2 py-1 rounded-lg shrink-0"
+            style={{ background: "rgba(139,92,246,0.2)", color: "#a78bfa" }}>
+            {status!.clan!.tag}
+          </span>
+        )}
+        <ArrowRight size={16} style={{ color: inClan ? "#a78bfa" : "rgba(255,255,255,0.3)" }} />
+      </motion.div>
+    </Link>
+  );
+}
+
+function BattlePassEntry({ accent, s }: { accent: string; s: Strings }) {
+  const status = useBattlePassStatus();
+  const claimable = status?.claimableCount ?? 0;
+  return (
+    <Link href="/battle-pass">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.14 }}
+        whileTap={{ scale: 0.98 }}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform"
+        style={{
+          background: claimable > 0
+            ? "linear-gradient(135deg, rgba(245,181,10,0.18), rgba(139,92,246,0.12))"
+            : "rgba(255,255,255,0.04)",
+          border: claimable > 0 ? "1px solid rgba(245,181,10,0.35)" : "1px solid rgba(255,255,255,0.07)",
+          boxShadow: claimable > 0 ? "0 4px 20px rgba(245,181,10,0.15)" : "none",
+        }}
+      >
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-2xl"
+          style={{ background: "rgba(245,181,10,0.15)" }}>
+          👑
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-display font-black text-white">{s.battlePass}</div>
+          <div className="text-[11px] text-white/40 mt-0.5">{s.battlePassSub}</div>
+        </div>
+        {claimable > 0 && (
+          <span className="text-[11px] font-display font-black px-2.5 py-1 rounded-full shrink-0 animate-pulse"
+            style={{ background: "#F5B50A", color: "#0d0118" }}>
+            {claimable}
+          </span>
+        )}
+        <ArrowRight size={16} style={{ color: claimable > 0 ? "#F5B50A" : "rgba(255,255,255,0.3)" }} />
       </motion.div>
     </Link>
   );

@@ -9,13 +9,15 @@ import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { USER_COOKIE, signUserToken, verifyUserToken } from "../lib/user-auth";
 export type { UserTokenPayload } from "../lib/user-auth";
 import { db } from "@workspace/db";
-import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable, tokenPackagesTable } from "@workspace/db";
-import { eq, sql, and, desc, asc } from "@workspace/db";
+import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable, tokenPackagesTable, clansTable, gameChallengesTable } from "@workspace/db";
+import { eq, sql, and, desc, asc, inArray } from "@workspace/db";
 import { createStarsInvoiceLink } from "./bot";
 import { recordLedger } from "../lib/ledger";
 import { progressionFromXp, xpForGame, xpForCheckin } from "../lib/progression";
 import { bumpQuests, buildQuestViews, normalizeQuests, findActiveQuest } from "../lib/quests";
 import { drawPrize, drawLootBoxPrizes, canFreeSpin, nextFreeSpinAt, WHEEL_PRIZES } from "../lib/wheel";
+import { DEFAULT_SEASON, reconcileUserBP, unlockedTiers, isSeasonActive } from "../lib/battle-pass";
+import type { BattlePassSeason } from "../lib/battle-pass";
 
 const router = Router();
 
@@ -2106,6 +2108,223 @@ router.post("/wheel/open-box", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/user/battle-pass ─────────────────────────────────────────────────
+router.get("/battle-pass", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const rows = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, payload.tgId)).limit(1);
+    if (!rows[0]) { res.status(404).json({ error: "User not found" }); return; }
+    const user = rows[0];
+    const data = (user.data ?? {}) as Record<string, unknown>;
+    const totalXp = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+
+    const cfgRow = await db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "battle_pass")).limit(1);
+    const season = (cfgRow[0]?.value as BattlePassSeason | undefined) ?? DEFAULT_SEASON;
+
+    const bp = reconcileUserBP(data.battlePass, season.seasonId, totalXp);
+    const seasonXp = Math.max(0, totalXp - bp.seasonStartXp);
+
+    // Persist reconciled data back if season changed
+    const prevSeasonId = (data.battlePass as { seasonId?: string } | undefined)?.seasonId;
+    if (prevSeasonId !== season.seasonId) {
+      await db.update(platformUsersTable)
+        .set({ data: { ...data, battlePass: bp }, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+    }
+
+    const unlocked = [...unlockedTiers(seasonXp, season.tiers)];
+    const unlockedSet = new Set(unlocked);
+    const claimedFreeSet = new Set(bp.claimedFree);
+    const claimedPremiumSet = new Set(bp.claimedPremium);
+
+    let claimableCount = 0;
+    for (const t of unlockedSet) {
+      if (!claimedFreeSet.has(t)) claimableCount++;
+      if (bp.premium && !claimedPremiumSet.has(t)) claimableCount++;
+    }
+
+    res.json({
+      season,
+      seasonXp,
+      premium: bp.premium,
+      claimedFree: bp.claimedFree,
+      claimedPremium: bp.claimedPremium,
+      unlockedTiers: unlocked,
+      claimableCount,
+    });
+  } catch (err) {
+    req.log.error({ err }, "battle-pass GET error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/battle-pass/claim ─────────────────────────────────────────
+router.post("/battle-pass/claim", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const { tier, track } = req.body as { tier?: unknown; track?: unknown };
+  if (typeof tier !== "number" || !Number.isInteger(tier) || tier < 1 || tier > 30) {
+    res.status(400).json({ error: "Invalid tier" }); return;
+  }
+  if (track !== "free" && track !== "premium") {
+    res.status(400).json({ error: "Invalid track" }); return;
+  }
+
+  try {
+    const rows = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, payload.tgId)).limit(1);
+    if (!rows[0]) { res.status(404).json({ error: "User not found" }); return; }
+    const user = rows[0];
+    const data = (user.data ?? {}) as Record<string, unknown>;
+    const totalXp = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+
+    const cfgRow = await db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "battle_pass")).limit(1);
+    const season = (cfgRow[0]?.value as BattlePassSeason | undefined) ?? DEFAULT_SEASON;
+
+    if (!isSeasonActive(season.endDate)) {
+      res.status(400).json({ error: "Season has ended" }); return;
+    }
+
+    const bp = reconcileUserBP(data.battlePass, season.seasonId, totalXp);
+    const seasonXp = Math.max(0, totalXp - bp.seasonStartXp);
+
+    const tierCfg = season.tiers.find((t) => t.tier === tier);
+    if (!tierCfg) { res.status(400).json({ error: "Tier not found" }); return; }
+
+    if (seasonXp < tierCfg.xpRequired) {
+      res.status(400).json({ error: "Not enough XP to unlock this tier" }); return;
+    }
+    if (track === "premium" && !bp.premium) {
+      res.status(400).json({ error: "Premium track not unlocked" }); return;
+    }
+
+    const alreadyClaimed = track === "free"
+      ? bp.claimedFree.includes(tier)
+      : bp.claimedPremium.includes(tier);
+    if (alreadyClaimed) { res.status(400).json({ error: "Already claimed" }); return; }
+
+    const reward = track === "free" ? tierCfg.freeReward : tierCfg.premiumReward;
+
+    const newBP = {
+      ...bp,
+      ...(track === "free"
+        ? { claimedFree: [...bp.claimedFree, tier] }
+        : { claimedPremium: [...bp.claimedPremium, tier] }),
+    };
+
+    let newSkz: number | undefined;
+    let newLootBoxes: number | undefined;
+    let newExtraSpins: number | undefined;
+    const balances = (data.balances as Record<string, unknown>) ?? {};
+
+    if (reward.type === "skz") {
+      const currentSkz = Math.floor(Number(balances.SKZ ?? 0));
+      const newBalance = currentSkz + reward.amount;
+      await db.transaction(async (tx) => {
+        await tx.update(platformUsersTable)
+          .set({ data: { ...data, balances: { ...balances, SKZ: newBalance }, battlePass: newBP }, updatedAt: new Date() })
+          .where(eq(platformUsersTable.id, payload.tgId));
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "credit",
+          reason: "battle_pass",
+          amount: reward.amount,
+          balanceBefore: currentSkz,
+          balanceAfter: newBalance,
+        });
+      });
+      newSkz = newBalance;
+    } else if (reward.type === "lootbox") {
+      const currentBoxes = Math.max(0, Math.floor(Number(data.lootBoxes ?? 0)));
+      const newBoxes = currentBoxes + reward.amount;
+      await db.update(platformUsersTable)
+        .set({ data: { ...data, lootBoxes: newBoxes, battlePass: newBP }, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+      newLootBoxes = newBoxes;
+    } else {
+      // extra_spin
+      const wheelData = (data.wheel ?? {}) as { lastSpinAt?: string; extraSpins?: number };
+      const currentSpins = Math.max(0, Math.floor(Number(wheelData.extraSpins ?? 0)));
+      const newSpins = currentSpins + reward.amount;
+      await db.update(platformUsersTable)
+        .set({ data: { ...data, wheel: { ...wheelData, extraSpins: newSpins }, battlePass: newBP }, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+      newExtraSpins = newSpins;
+    }
+
+    res.json({
+      ok: true,
+      reward,
+      ...(newSkz !== undefined && { newSkz }),
+      ...(newLootBoxes !== undefined && { newLootBoxes }),
+      ...(newExtraSpins !== undefined && { newExtraSpins }),
+    });
+  } catch (err) {
+    req.log.error({ err }, "battle-pass/claim error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/user/battle-pass/unlock-premium ─────────────────────────────────
+router.post("/battle-pass/unlock-premium", async (req: Request, res: Response) => {
+  const token = req.cookies?.[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const rows = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, payload.tgId)).limit(1);
+    if (!rows[0]) { res.status(404).json({ error: "User not found" }); return; }
+    const user = rows[0];
+    const data = (user.data ?? {}) as Record<string, unknown>;
+    const totalXp = Math.max(0, Math.floor(Number(data.xp ?? 0)));
+
+    const cfgRow = await db.select().from(adminConfigTable).where(eq(adminConfigTable.key, "battle_pass")).limit(1);
+    const season = (cfgRow[0]?.value as BattlePassSeason | undefined) ?? DEFAULT_SEASON;
+
+    if (!isSeasonActive(season.endDate)) {
+      res.status(400).json({ error: "Season has ended" }); return;
+    }
+
+    const bp = reconcileUserBP(data.battlePass, season.seasonId, totalXp);
+    if (bp.premium) { res.status(400).json({ error: "Already premium" }); return; }
+
+    const balances = (data.balances as Record<string, unknown>) ?? {};
+    const currentSkz = Math.floor(Number(balances.SKZ ?? 0));
+    if (currentSkz < season.premiumCost) {
+      res.status(400).json({ error: `Not enough SKZ — need ${season.premiumCost}` }); return;
+    }
+
+    const newBalance = currentSkz - season.premiumCost;
+    const newBP = { ...bp, premium: true };
+
+    await db.transaction(async (tx) => {
+      await tx.update(platformUsersTable)
+        .set({ data: { ...data, balances: { ...balances, SKZ: newBalance }, battlePass: newBP }, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+      await recordLedger(tx, {
+        userId: payload.tgId,
+        type: "debit",
+        reason: "battle_pass_unlock",
+        amount: season.premiumCost,
+        balanceBefore: currentSkz,
+        balanceAfter: newBalance,
+      });
+    });
+
+    res.json({ ok: true, newSkz: newBalance });
+  } catch (err) {
+    req.log.error({ err }, "battle-pass/unlock-premium error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── GET /api/user/activity ────────────────────────────────────────────────────
 /**
  * Returns the last 15 balance transactions for the authenticated user.
@@ -2139,6 +2358,418 @@ router.get("/activity", async (req: Request, res: Response) => {
     });
   } catch (err) {
     req.log.error({ err }, "activity error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPER: clan leaderboard by member XP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function computeClanLeaderboard(limit = 10) {
+  const rows = await db.select().from(platformUsersTable)
+    .where(sql`data->>'clanId' IS NOT NULL`);
+
+  const xpMap = new Map<string, number>();
+  for (const u of rows) {
+    const d = u.data as Record<string, unknown>;
+    const cid = typeof d.clanId === "string" ? d.clanId : null;
+    if (!cid) continue;
+    const prog = (d.progression as Record<string, unknown> | null) ?? {};
+    xpMap.set(cid, (xpMap.get(cid) ?? 0) + Number(prog.xp ?? 0));
+  }
+
+  const sorted = [...xpMap.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, limit);
+
+  if (sorted.length === 0) return [];
+
+  const topIds = sorted.map(([id]) => id);
+  const clanRows = await db.select().from(clansTable).where(inArray(clansTable.id, topIds));
+
+  return topIds.map((cid, i) => {
+    const c = clanRows.find((r) => r.id === cid);
+    return {
+      id: cid,
+      name: c?.name ?? "?",
+      tag: c?.tag ?? "?",
+      memberCount: c?.memberCount ?? 0,
+      totalXp: xpMap.get(cid) ?? 0,
+      rank: i + 1,
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLAN ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/user/clan
+router.get("/clan", async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [userRow] = await db.select().from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId));
+    if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = userRow.data as Record<string, unknown>;
+    const clanId = typeof data.clanId === "string" ? data.clanId : null;
+
+    const leaderboard = await computeClanLeaderboard(10);
+
+    if (!clanId) {
+      res.json({ clan: null, leaderboard });
+      return;
+    }
+
+    const [clanRow] = await db.select().from(clansTable)
+      .where(eq(clansTable.id, clanId));
+    if (!clanRow) {
+      res.json({ clan: null, leaderboard });
+      return;
+    }
+
+    const memberRows = await db.select().from(platformUsersTable)
+      .where(sql`data->>'clanId' = ${clanId}`);
+
+    const members = memberRows.map((m) => {
+      const d = m.data as Record<string, unknown>;
+      const prog = (d.progression as Record<string, unknown> | null) ?? {};
+      return {
+        id: m.id,
+        name: typeof d.name === "string" ? d.name : String(m.id),
+        xp: Number(prog.xp ?? 0),
+        level: Number(prog.level ?? 1),
+      };
+    }).sort((a, b) => b.xp - a.xp);
+
+    const totalXp = members.reduce((s, m) => s + m.xp, 0);
+    const lbIdx = leaderboard.findIndex((c) => c.id === clanId);
+
+    res.json({
+      clan: {
+        id: clanRow.id,
+        name: clanRow.name,
+        tag: clanRow.tag,
+        ownerId: clanRow.ownerId,
+        memberCount: clanRow.memberCount,
+        totalXp,
+        rank: lbIdx >= 0 ? lbIdx + 1 : leaderboard.length + 1,
+        members,
+      },
+      leaderboard,
+    });
+  } catch (err) {
+    req.log.error({ err }, "clan get error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/user/clan/create
+router.post("/clan/create", async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const rawName = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    const rawTag = typeof req.body.tag === "string"
+      ? req.body.tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "")
+      : "";
+
+    if (rawName.length < 3 || rawName.length > 30) {
+      res.status(400).json({ error: "Name must be 3-30 characters" }); return;
+    }
+    if (rawTag.length < 3 || rawTag.length > 6) {
+      res.status(400).json({ error: "Tag must be 3-6 alphanumeric characters" }); return;
+    }
+
+    const [userRow] = await db.select().from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId));
+    if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = userRow.data as Record<string, unknown>;
+    if (typeof data.clanId === "string" && data.clanId) {
+      res.status(400).json({ error: "Already in a clan" }); return;
+    }
+
+    const id = randomBytes(12).toString("hex");
+    await db.transaction(async (tx) => {
+      await tx.insert(clansTable).values({
+        id,
+        name: rawName,
+        tag: rawTag,
+        ownerId: payload.tgId,
+        memberCount: 1,
+      });
+      await tx.update(platformUsersTable)
+        .set({ data: { ...data, clanId: id }, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+    });
+
+    res.json({ ok: true, id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("clans_tag_idx") || msg.includes("unique")) {
+      res.status(400).json({ error: "Tag already taken" }); return;
+    }
+    req.log.error({ err }, "clan create error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/user/clan/join
+router.post("/clan/join", async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const rawTag = typeof req.body.tag === "string" ? req.body.tag.trim().toUpperCase() : "";
+    if (!rawTag) { res.status(400).json({ error: "Tag required" }); return; }
+
+    const [userRow] = await db.select().from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId));
+    if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = userRow.data as Record<string, unknown>;
+    if (typeof data.clanId === "string" && data.clanId) {
+      res.status(400).json({ error: "Already in a clan" }); return;
+    }
+
+    const [clanRow] = await db.select().from(clansTable)
+      .where(eq(clansTable.tag, rawTag));
+    if (!clanRow) { res.status(404).json({ error: "Clan not found" }); return; }
+    if (clanRow.memberCount >= 50) {
+      res.status(400).json({ error: "Clan is full (max 50 members)" }); return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.update(clansTable)
+        .set({ memberCount: clanRow.memberCount + 1 })
+        .where(eq(clansTable.id, clanRow.id));
+      await tx.update(platformUsersTable)
+        .set({ data: { ...data, clanId: clanRow.id }, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "clan join error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/user/clan/leave
+router.post("/clan/leave", async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const [userRow] = await db.select().from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId));
+    if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = userRow.data as Record<string, unknown>;
+    const clanId = typeof data.clanId === "string" ? data.clanId : null;
+    if (!clanId) { res.status(400).json({ error: "Not in a clan" }); return; }
+
+    const [clanRow] = await db.select().from(clansTable)
+      .where(eq(clansTable.id, clanId));
+
+    await db.transaction(async (tx) => {
+      const { clanId: _rm, ...restData } = data as Record<string, unknown> & { clanId: string };
+      await tx.update(platformUsersTable)
+        .set({ data: restData, updatedAt: new Date() })
+        .where(eq(platformUsersTable.id, payload.tgId));
+
+      if (clanRow) {
+        const newCount = clanRow.memberCount - 1;
+        if (newCount <= 0) {
+          await tx.delete(clansTable).where(eq(clansTable.id, clanId));
+        } else {
+          let newOwnerId = clanRow.ownerId;
+          if (clanRow.ownerId === payload.tgId) {
+            const others = await tx.select().from(platformUsersTable)
+              .where(sql`data->>'clanId' = ${clanId} AND id != ${payload.tgId}`)
+              .limit(1);
+            if (others.length > 0) newOwnerId = others[0].id;
+          }
+          await tx.update(clansTable)
+            .set({ memberCount: newCount, ownerId: newOwnerId })
+            .where(eq(clansTable.id, clanId));
+        }
+      }
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "clan leave error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHALLENGE ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/user/challenge/:id — public, no auth required
+router.get("/challenge/:id", async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+  try {
+    const [row] = await db.select().from(gameChallengesTable)
+      .where(eq(gameChallengesTable.id, id));
+    if (!row) { res.status(404).json({ error: "Challenge not found" }); return; }
+
+    if (row.status === "open" && new Date(row.expiresAt) < new Date()) {
+      await db.update(gameChallengesTable)
+        .set({ status: "expired" })
+        .where(eq(gameChallengesTable.id, id));
+      res.json({ ...row, status: "expired" });
+      return;
+    }
+
+    res.json(row);
+  } catch (err) {
+    req.log.error({ err }, "challenge get error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/user/challenge/create
+router.post("/challenge/create", async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  try {
+    const gameId = typeof req.body.gameId === "string" ? req.body.gameId : "";
+    const gameName = typeof req.body.gameName === "string" ? req.body.gameName.slice(0, 60) : "Game";
+    const score = Number(req.body.score ?? 0);
+
+    if (!gameId) { res.status(400).json({ error: "gameId required" }); return; }
+    if (!Number.isFinite(score) || score < 0) {
+      res.status(400).json({ error: "Invalid score" }); return;
+    }
+
+    const [userRow] = await db.select().from(platformUsersTable)
+      .where(eq(platformUsersTable.id, payload.tgId));
+    if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+
+    const data = userRow.data as Record<string, unknown>;
+    const challengerName = typeof data.name === "string" && data.name
+      ? data.name
+      : `Player #${payload.tgId}`;
+
+    const id = randomBytes(12).toString("hex");
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+    await db.insert(gameChallengesTable).values({
+      id,
+      challengerId: payload.tgId,
+      challengerName,
+      gameId,
+      gameName,
+      score,
+      status: "open",
+      expiresAt,
+    });
+
+    const [settingsRow] = await db.select().from(adminConfigTable)
+      .where(eq(adminConfigTable.key, "settings"));
+    const adminSettings = (settingsRow?.value ?? {}) as Record<string, unknown>;
+    const botUsername = typeof adminSettings.botUsername === "string" && adminSettings.botUsername
+      ? adminSettings.botUsername
+      : "skzbot";
+
+    res.json({ id, shareUrl: `https://t.me/${botUsername}?startapp=ch_${id}` });
+  } catch (err) {
+    req.log.error({ err }, "challenge create error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/user/challenge/:id/beat
+router.post("/challenge/:id/beat", async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies[USER_COOKIE];
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const payload = verifyUserToken(token);
+  if (!payload) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const id = req.params.id as string;
+  try {
+    const score = Number(req.body.score ?? 0);
+    if (!Number.isFinite(score) || score < 0) {
+      res.status(400).json({ error: "Invalid score" }); return;
+    }
+
+    const [row] = await db.select().from(gameChallengesTable)
+      .where(eq(gameChallengesTable.id, id));
+    if (!row) { res.status(404).json({ error: "Challenge not found" }); return; }
+    if (row.status !== "open") {
+      res.status(400).json({ error: "Challenge is no longer open" }); return;
+    }
+    if (new Date(row.expiresAt) < new Date()) {
+      await db.update(gameChallengesTable)
+        .set({ status: "expired" })
+        .where(eq(gameChallengesTable.id, id));
+      res.status(400).json({ error: "Challenge has expired" }); return;
+    }
+    if (row.challengerId === payload.tgId) {
+      res.status(400).json({ error: "Cannot beat your own challenge" }); return;
+    }
+
+    const beaten = score > row.score;
+    const REWARD = 100;
+    let newSkz: number | undefined;
+
+    if (beaten) {
+      await db.transaction(async (tx) => {
+        const [uRow] = await tx.select().from(platformUsersTable)
+          .where(eq(platformUsersTable.id, payload.tgId))
+          .for("update");
+        if (!uRow) throw new Error("User not found");
+        const ud = uRow.data as Record<string, unknown>;
+        const balances = (ud.balances as Record<string, unknown>) ?? {};
+        const prev = Number(balances.SKZ ?? 0);
+        newSkz = prev + REWARD;
+        await tx.update(platformUsersTable)
+          .set({ data: { ...ud, balances: { ...balances, SKZ: newSkz } }, updatedAt: new Date() })
+          .where(eq(platformUsersTable.id, payload.tgId));
+        await recordLedger(tx, {
+          userId: payload.tgId,
+          type: "credit",
+          reason: "challenge_win",
+          amount: REWARD,
+          currency: "SKZ",
+          balanceBefore: prev,
+          balanceAfter: newSkz,
+          ref: id,
+        });
+      });
+    }
+
+    await db.update(gameChallengesTable)
+      .set({
+        status: beaten ? "beaten" : "open",
+        opponentId: payload.tgId,
+        opponentScore: score,
+      })
+      .where(eq(gameChallengesTable.id, id));
+
+    res.json({ beaten, ...(beaten ? { newSkz, reward: REWARD } : {}) });
+  } catch (err) {
+    req.log.error({ err }, "challenge beat error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

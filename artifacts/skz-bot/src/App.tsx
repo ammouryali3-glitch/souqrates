@@ -25,6 +25,9 @@ import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
 import Missions from "@/pages/missions";
 import WheelPage from "@/pages/wheel";
+import BattlePassPage from "@/pages/battle-pass";
+import ClanPage from "@/pages/clan";
+import ChallengePage from "@/pages/challenge";
 import Manager from "@/pages/manager";
 import Contact from "@/pages/contact";
 import Policies from "@/pages/policies";
@@ -227,7 +230,7 @@ function BanScreen() {
 }
 
 function Router() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { banned, settings } = useAdmin();
   const { ready, inTelegram, isWebUser, dbUser, loading } = useTelegramUser();
   const isManager = location === "/manager";
@@ -250,6 +253,16 @@ function Router() {
   // credit (and therefore the XP/quest progress that came with it), so a level-up
   // and quest completion surface reliably without racing the debounced balance-sync.
   useEffect(() => onCreditConfirmed(() => { refreshProgression(); refreshQuests(); }), []);
+
+  // Handle Telegram deep-link startapp param (e.g. ch_<challengeId>)
+  useEffect(() => {
+    const twa = (window as any).Telegram?.WebApp;
+    const sp: unknown = twa?.initDataUnsafe?.start_param;
+    if (typeof sp === "string" && sp.startsWith("ch_")) {
+      navigate(`/challenge/${sp.slice(3)}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const immersive = isManager || (location.startsWith("/games/") && location !== "/games") || location.startsWith("/arena/");
 
@@ -323,6 +336,9 @@ function Router() {
             <Route path="/referrals"><PageWrapper><Referrals /></PageWrapper></Route>
             <Route path="/missions"><PageWrapper><Missions /></PageWrapper></Route>
             <Route path="/wheel"><PageWrapper><WheelPage /></PageWrapper></Route>
+            <Route path="/battle-pass"><PageWrapper><BattlePassPage /></PageWrapper></Route>
+            <Route path="/clan"><PageWrapper><ClanPage /></PageWrapper></Route>
+            <Route path="/challenge/:id"><PageWrapper><ChallengePage /></PageWrapper></Route>
             <Route path="/contact"><PageWrapper><Contact /></PageWrapper></Route>
             <Route path="/policies"><PageWrapper><Policies /></PageWrapper></Route>
             <Route><PageWrapper><NotFound /></PageWrapper></Route>

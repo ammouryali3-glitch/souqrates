@@ -5,6 +5,7 @@ import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 import { registerWebhook } from "./routes/bot";
 import { loadAndApplyIntegrations } from "./lib/integrations";
+import { startNotificationScheduler } from "./lib/notifications";
 
 const rawPort = process.env["PORT"];
 
@@ -71,4 +72,11 @@ app.listen(port, (err) => {
   loadAndApplyIntegrations().catch((err) => {
     logger.error({ err }, "Failed to load integrations config");
   });
+
+  // Start Telegram re-engagement notification scheduler (streak, BP, quests)
+  try {
+    startNotificationScheduler();
+  } catch (err) {
+    logger.error({ err }, "Failed to start notification scheduler");
+  }
 });

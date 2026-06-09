@@ -193,6 +193,46 @@ app.use("/api/user/wheel/open-box", rateLimit({
   message: { error: "Too many requests — slow down" },
 }));
 
+// Clan create: max 5 per hour per authenticated user
+app.use("/api/user/clan/create", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: userOrIpKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many clan create requests" },
+}));
+
+// Challenge create: max 20 per hour per authenticated user
+app.use("/api/user/challenge/create", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  keyGenerator: userOrIpKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many challenge requests" },
+}));
+
+// Battle pass claim: max 60 per hour per authenticated user
+app.use("/api/user/battle-pass/claim", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  keyGenerator: userOrIpKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many claim requests — slow down" },
+}));
+
+// Battle pass premium unlock: max 10 per hour per authenticated user
+app.use("/api/user/battle-pass/unlock-premium", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: userOrIpKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down" },
+}));
+
 app.use("/api", router);
 
 // Global error handler — captures to Sentry when active, then returns 500

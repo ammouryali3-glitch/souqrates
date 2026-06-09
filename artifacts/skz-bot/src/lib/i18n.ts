@@ -292,6 +292,17 @@ export const t = {
     wheelCta: "ألف عجلة الحظ",
     wheelCtaSub: "دورة مجانية متاحة!",
     wheelCtaSubUsed: "عجلة الحظ",
+    // Battle Pass
+    battlePass: "باس الموسم",
+    battlePassSub: "مكافآت موسمية حصرية",
+    // Clans
+    clanTitle: "العشائر",
+    clanSub: "انضم أو أنشئ عشيرة",
+    // Challenges
+    challengeCreate: "تحدَّ صديقاً",
+    challengePlay: "اقبل التحدي",
+    challengeBeaten: "فزت! 🏆",
+    challengeFailed: "لم تتفوق هذه المرة",
     // Misc
     langSwitch: "EN",
     play: "العب",
@@ -561,6 +572,17 @@ export const t = {
     wheelCta: "Lucky Wheel",
     wheelCtaSub: "Free spin available!",
     wheelCtaSubUsed: "Lucky Wheel",
+    // Battle Pass
+    battlePass: "Battle Pass",
+    battlePassSub: "Exclusive seasonal rewards",
+    // Clans
+    clanTitle: "Clans",
+    clanSub: "Join or create a clan",
+    // Challenges
+    challengeCreate: "Challenge a Friend",
+    challengePlay: "Accept Challenge",
+    challengeBeaten: "You won! 🏆",
+    challengeFailed: "Better luck next time",
     // Misc
     langSwitch: "ع",
     play: "Play",

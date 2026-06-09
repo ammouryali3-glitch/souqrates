@@ -11,6 +11,7 @@ import {
 import { useArenaEconomy } from "@/lib/game-economy";
 import { useTelegramUser } from "@/lib/telegram-user";
 import { useLang, t } from "@/lib/i18n";
+import { createChallenge, getActiveChallenge, clearActiveChallenge, beatChallenge } from "@/lib/challenge";
 
 const BALANCE_KEY = "skz_balance";
 
@@ -98,6 +99,18 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
     return () => clearInterval(cdInterval);
   }, [shell, period]);
 
+  // ── Challenge state ──────────────────────────────────────────────────────
+  const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
+  const [challengeLoading, setChallengeLoading] = useState(false);
+  const [challengeResult, setChallengeResult] = useState<{ beaten: boolean; reward?: number } | null>(null);
+
+  useEffect(() => {
+    if (shell === "result") {
+      const cid = getActiveChallenge();
+      if (cid) setActiveChallengeId(cid);
+    }
+  }, [shell]);
+
   const handlePay = useCallback(() => {
     if (balance < effEntry) return;
     const nb = balance - effEntry;
@@ -133,6 +146,35 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
       }
     }
   }, [gameId, period, dbUser, s.arenaYouBadge]);
+
+  const handleCreateChallenge = useCallback(async () => {
+    if (challengeLoading || myScore <= 0) return;
+    setChallengeLoading(true);
+    try {
+      const result = await createChallenge(gameId, title, myScore);
+      const twa = (window as any).Telegram?.WebApp;
+      if (twa?.openTelegramLink) {
+        twa.openTelegramLink(result.shareUrl);
+      } else {
+        await navigator.clipboard?.writeText(result.shareUrl).catch(() => {});
+      }
+    } catch { /* silent */ } finally {
+      setChallengeLoading(false);
+    }
+  }, [challengeLoading, gameId, title, myScore]);
+
+  const handleBeatChallenge = useCallback(async () => {
+    if (!activeChallengeId || challengeLoading) return;
+    setChallengeLoading(true);
+    try {
+      const result = await beatChallenge(activeChallengeId, myScore);
+      setChallengeResult(result);
+      clearActiveChallenge();
+      setActiveChallengeId(null);
+    } catch { /* silent */ } finally {
+      setChallengeLoading(false);
+    }
+  }, [activeChallengeId, challengeLoading, myScore]);
 
   return (
     <div className="flex-1 relative flex flex-col h-full overflow-hidden select-none" style={{ background: "#06040f" }}>
@@ -285,6 +327,31 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
                 style={{ background: `${color}22`, border: `1px solid ${color}50`, color }}>
                 <Trophy size={16} /> {s.arenaViewLeaderboard}
               </button>
+              {/* Challenge */}
+              {challengeResult ? (
+                <div className="w-full py-3 rounded-2xl text-sm font-bold text-center"
+                  style={{
+                    background: challengeResult.beaten ? "rgba(74,222,128,0.1)" : "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: challengeResult.beaten ? "#4ade80" : "rgba(255,255,255,0.4)",
+                  }}>
+                  {challengeResult.beaten
+                    ? `${s.challengeBeaten} +${challengeResult.reward} SKZ`
+                    : s.challengeFailed}
+                </div>
+              ) : activeChallengeId ? (
+                <button onClick={handleBeatChallenge} disabled={challengeLoading}
+                  className="w-full py-3.5 rounded-2xl font-display font-bold tracking-wide flex items-center justify-center gap-2"
+                  style={{ background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80" }}>
+                  ⚔️ {challengeLoading ? "…" : s.challengePlay}
+                </button>
+              ) : (
+                <button onClick={handleCreateChallenge} disabled={challengeLoading || myScore <= 0}
+                  className="w-full py-3.5 rounded-2xl font-display font-bold tracking-wide flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{ background: "rgba(245,181,10,0.1)", border: "1px solid rgba(245,181,10,0.3)", color: "#F5B50A" }}>
+                  ⚔️ {challengeLoading ? "…" : s.challengeCreate}
+                </button>
+              )}
               <Link href="/games">
                 <button className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/50 font-display font-bold tracking-wide text-sm">
                   {s.arenaBackToGames}

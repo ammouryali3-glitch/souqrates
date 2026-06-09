@@ -13,6 +13,7 @@
 - [SKZ Bot server-side admin auth](skz-bot-server-auth.md) — JWT HttpOnly cookie via /api/admin/*; DB table admin_accounts; bcrypt hashes; AdminSessionContext replaces sessionStorage.
 - [SKZ Bot deposit rate config](skz-bot-deposit-rate.md) — depositSkzPerTon lives in finance admin config; ton-poller reads finance.depositSkzPerTon first then deposit_config.skzPerTon; default 100. TradedCurrency excludes STARS from finance tables.
 - [SKZ Bot Stars payment flow](skz-bot-stars-payment.md) — Telegram Stars: currency "XTR", provider_token "". pre_checkout_query must be answered <10s. successful_payment arrives as msg field. Idempotency key = telegram_payment_charge_id stored in deposits table.
+- [SKZ Bot battle pass patterns](skz-bot-battle-pass.md) — platformUsersTable has only id/data/updatedAt; balance in data.balances.SKZ not skzBalance; useLang() returns Lang not { lang }.
 - [SKZ Bot email OTP](skz-bot-email-otp.md) — browser-login OTP sent via Resend connector (not Zoho SMTP, which IP-blocks); free tier only delivers to account-owner email until domain verified.
 - [SKZ Bot progression engine](skz-bot-progression.md) — XP/levels/leagues; server-authoritative; surface level-ups off onCreditConfirmed event (not timeouts) + monotonic refresh guard.
 - [SKZ Bot lucky wheel + loot boxes](skz-bot-wheel.md) — WHEEL_PRIZES array must be identical (same order/index) in both server lib/wheel.ts and client lib/wheel.ts; prizeIndex drives SVG animation target angle.
