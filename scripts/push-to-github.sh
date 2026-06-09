@@ -37,16 +37,18 @@ echo "=== 3. Adding SSH key to GitHub ==="
 PUBKEY=$(cat ~/.ssh/github_replit.pub)
 KEY_TITLE="replit-$(date +%Y%m%d%H%M%S)"
 
-# Remove any existing replit keys to avoid duplicates
+# Remove any existing replit keys to avoid duplicates (allow grep to return nothing)
 EXISTING=$(curl -s \
   -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
-  https://api.github.com/user/keys | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
+  https://api.github.com/user/keys | grep -o '"id":[0-9]*' | grep -o '[0-9]*' || true)
 
-for KEY_ID in $EXISTING; do
-  curl -s -X DELETE \
-    -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
-    "https://api.github.com/user/keys/$KEY_ID" > /dev/null
-done
+if [ -n "$EXISTING" ]; then
+  for KEY_ID in $EXISTING; do
+    curl -s -X DELETE \
+      -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
+      "https://api.github.com/user/keys/$KEY_ID" > /dev/null || true
+  done
+fi
 
 RESULT=$(curl -s -X POST \
   -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
@@ -54,10 +56,12 @@ RESULT=$(curl -s -X POST \
   https://api.github.com/user/keys \
   -d "{\"title\":\"$KEY_TITLE\",\"key\":\"$PUBKEY\"}")
 
+echo "GitHub API response: $RESULT" | head -c 200
+
 if echo "$RESULT" | grep -q '"id"'; then
   echo "✅ SSH key added to GitHub"
 else
-  echo "❌ Failed to add SSH key: $RESULT"
+  echo "❌ Failed to add SSH key"
   exit 1
 fi
 
