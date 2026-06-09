@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { captureException, isSentryReady } from "./lib/integrations/sentry-node";
+import { USER_COOKIE, verifyUserToken } from "./lib/user-auth";
 
 const app: Express = express();
 
@@ -68,7 +69,33 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
-// Admin login: max 10 attempts per 15 minutes (brute-force protection)
+//
+// Authenticated endpoints use a user-ID key (extracted from the signed JWT
+// cookie) so that IP rotation cannot bypass per-user limits. Unauthenticated
+// endpoints (login, init) fall back to IP.
+//
+// NOTE: cookieParser() is registered above, so req.cookies is populated before
+// any of these rate-limit middlewares run.
+
+/**
+ * For authenticated routes: key = "uid:<tgId>" extracted from the signed JWT
+ * cookie. Falls back to IP for unauthenticated / tampered requests.
+ */
+function userOrIpKey(req: Request): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const token = (req as any).cookies?.[USER_COOKIE] as string | undefined;
+    if (token) {
+      const payload = verifyUserToken(token);
+      if (payload?.tgId) return `uid:${payload.tgId}`;
+    }
+  } catch {
+    // fall through to IP
+  }
+  return req.ip ?? "unknown";
+}
+
+// Admin login: max 10 attempts per 15 minutes (brute-force protection, IP-keyed)
 app.use("/api/admin/login", rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -86,55 +113,81 @@ app.use("/api/user/init", rateLimit({
   message: { error: "Too many requests — slow down" },
 }));
 
-// Balance debit endpoint: max 60 debits per minute per IP
+// Balance debit: max 60 per minute per authenticated user
 app.use("/api/user/balance-event", rateLimit({
   windowMs: 60 * 1000,
   max: 60,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — slow down" },
 }));
 
-// Game result (win credit): max 60 per minute per IP
+// Game result (win credit): max 60 per minute per authenticated user
 app.use("/api/user/game-result", rateLimit({
   windowMs: 60 * 1000,
   max: 60,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — slow down" },
 }));
 
-// Submit score (arena): max 60 per minute per IP
+// Submit score (arena): max 60 per minute per authenticated user
 app.use("/api/user/submit-score", rateLimit({
   windowMs: 60 * 1000,
   max: 60,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — slow down" },
 }));
 
-// Withdraw: max 3 per 15 minutes per IP (brute-force / drain protection)
+// Withdraw: max 3 per 15 minutes per authenticated user (drain protection)
 app.use("/api/user/withdraw", rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many withdrawal requests — try again later" },
 }));
 
-// Shop purchases: max 20 per minute per IP
+// Shop purchases: max 20 per minute per authenticated user
 app.use("/api/user/shop/buy", rateLimit({
   windowMs: 60 * 1000,
   max: 20,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — slow down" },
 }));
 
-// Check-in: max 5 per minute per IP
+// Check-in: max 5 per minute per authenticated user
 app.use("/api/user/checkin", rateLimit({
   windowMs: 60 * 1000,
   max: 5,
+  keyGenerator: userOrIpKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — slow down" },
+}));
+
+// Wheel spin: max 10 per hour per authenticated user
+app.use("/api/user/wheel/spin", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: userOrIpKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many spin requests — try again later" },
+}));
+
+// Loot box: max 30 per hour per authenticated user
+app.use("/api/user/wheel/open-box", rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — slow down" },

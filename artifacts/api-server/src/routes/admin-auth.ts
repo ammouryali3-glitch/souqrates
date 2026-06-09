@@ -9,8 +9,10 @@ import { eq, and, ne } from "@workspace/db";
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) throw new Error("JWT_SECRET env var must be set");
+// Dedicated admin secret; falls back to shared JWT_SECRET for zero-downtime migration.
+// Set ADMIN_JWT_SECRET in production to fully isolate admin tokens from user tokens.
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET ?? process.env.JWT_SECRET;
+if (!ADMIN_JWT_SECRET) throw new Error("ADMIN_JWT_SECRET (or JWT_SECRET) env var must be set");
 
 const COOKIE_NAME = "skz_admin_token";
 const COOKIE_OPTS = {
@@ -32,15 +34,43 @@ export interface AdminTokenPayload {
 }
 
 function signToken(payload: Omit<AdminTokenPayload, "iat" | "exp">): string {
-  return jwt.sign(payload, JWT_SECRET!, { expiresIn: "8h" });
+  return jwt.sign(payload, ADMIN_JWT_SECRET!, { expiresIn: "8h" });
 }
 
 function verifyToken(token: string): AdminTokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET!) as AdminTokenPayload;
+    return jwt.verify(token, ADMIN_JWT_SECRET!) as AdminTokenPayload;
   } catch {
     return null;
   }
+}
+
+/**
+ * Log a structured admin audit event. Call from any admin route that mutates
+ * state (config changes, user edits, deposit/withdrawal approvals, etc.).
+ *
+ * Output goes to the structured pino log so it can be queried/alerted on.
+ * Format: { adminAudit: { adminId, adminHandle, adminRole, action, ip, ...details } }
+ */
+export function logAdminAction(
+  req: Request,
+  action: string,
+  details: Record<string, unknown> = {},
+): void {
+  const account = (req as any).adminAccount as (typeof adminAccountsTable.$inferSelect) | undefined;
+  req.log.info(
+    {
+      adminAudit: {
+        adminId: account?.id ?? "unknown",
+        adminHandle: account?.handle ?? "unknown",
+        adminRole: account?.role ?? "unknown",
+        action,
+        ip: req.ip,
+        ...details,
+      },
+    },
+    "admin action",
+  );
 }
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
@@ -162,6 +192,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
     const token = signToken({ sub: account.id, handle: account.handle, role: account.role });
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
+    req.log.info({ adminAudit: { adminId: account.id, adminHandle: account.handle, adminRole: account.role, action: "login", ip: req.ip } }, "admin action");
     res.json(serializeAccount(account));
   } catch (err) {
     req.log.error({ err }, "admin login error");

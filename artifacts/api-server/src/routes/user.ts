@@ -6,7 +6,8 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
-import jwt from "jsonwebtoken";
+import { USER_COOKIE, signUserToken, verifyUserToken } from "../lib/user-auth";
+export type { UserTokenPayload } from "../lib/user-auth";
 import { db } from "@workspace/db";
 import { platformUsersTable, adminConfigTable, gameResultsTable, depositsTable, withdrawalsTable, shopProductsTable, referrersTable, dailyCheckinsTable, balanceTransactionsTable, tokenPackagesTable } from "@workspace/db";
 import { eq, sql, and, desc, asc } from "@workspace/db";
@@ -18,9 +19,6 @@ import { drawPrize, drawLootBoxPrizes, canFreeSpin, nextFreeSpinAt, WHEEL_PRIZES
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) throw new Error("JWT_SECRET env var must be set");
-
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 
 if (!BOT_TOKEN && process.env.NODE_ENV === "production") {
@@ -30,7 +28,6 @@ if (!BOT_TOKEN && process.env.NODE_ENV === "production") {
   );
 }
 
-const USER_COOKIE = "skz_user_token";
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: "strict" as const,
@@ -38,24 +35,6 @@ const COOKIE_OPTS = {
   maxAge: 30 * 24 * 60 * 60 * 1000,
   path: "/",
 };
-
-export interface UserTokenPayload {
-  tgId: string;
-  iat?: number;
-  exp?: number;
-}
-
-function signUserToken(tgId: string): string {
-  return jwt.sign({ tgId }, JWT_SECRET!, { expiresIn: "30d" });
-}
-
-function verifyUserToken(token: string): UserTokenPayload | null {
-  try {
-    return jwt.verify(token, JWT_SECRET!) as UserTokenPayload;
-  } catch {
-    return null;
-  }
-}
 
 /** Maximum age of Telegram initData auth_date before rejection (seconds). */
 const AUTH_DATE_MAX_AGE_S = 300;
@@ -1246,7 +1225,9 @@ router.post("/withdraw", async (req: Request, res: Response) => {
     res.status(400).json({ error: `Maximum withdrawal is ${maxSkz.toLocaleString()} SKZ` }); return;
   }
 
-  const tonAmount = +(safeAmount / skzPerTon).toFixed(4);
+  // Use integer multiplication before division to avoid floating-point precision
+  // loss. Result: exact 4-decimal representation stored as a JS number.
+  const tonAmount = Math.round(safeAmount * 10000 / skzPerTon) / 10000;
 
   try {
     let newSkz = 0;

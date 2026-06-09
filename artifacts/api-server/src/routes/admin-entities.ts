@@ -20,7 +20,7 @@ import {
   referrersTable,
 } from "@workspace/db";
 import { eq, desc, sql, count } from "@workspace/db";
-import { requireAdminSession, requirePermission } from "./admin-auth";
+import { requireAdminSession, requirePermission, logAdminAction } from "./admin-auth";
 import { recordLedger } from "../lib/ledger";
 
 const router = Router();
@@ -161,6 +161,7 @@ router.patch("/users/:id", requirePermission("users"), async (req: Request, res:
         .set({ data: merged, updatedAt: new Date() })
         .where(eq(platformUsersTable.id, id));
     });
+    logAdminAction(req, "patch_user", { userId: id, fields: Object.keys(patch) });
     res.json(merged);
   } catch (err) {
     const e = err as { status?: number };
@@ -221,6 +222,7 @@ router.post("/users/:id/adjust-balance", requirePermission("users"), async (req:
       });
     });
 
+    logAdminAction(req, "adjust_balance", { userId: id, currency, delta, reason: reason ?? null });
     res.json(newData);
   } catch (err) {
     const e = err as { status?: number };
@@ -304,6 +306,7 @@ router.patch("/deposits/:id", requirePermission("finance"), async (req: Request,
         .set({ status: newStatus, data: merged })
         .where(eq(depositsTable.id, id));
     });
+    logAdminAction(req, "patch_deposit", { depositId: id, newStatus: patch.status ?? "unchanged" });
     res.json(merged);
   } catch (err) {
     const e = err as { status?: number };
@@ -447,6 +450,7 @@ router.patch("/withdrawals/:id", requirePermission("finance"), async (req: Reque
     });
 
     if (!merged) { res.status(404).json({ error: "Withdrawal not found" }); return; }
+    logAdminAction(req, "patch_withdrawal", { withdrawalId: id, newStatus: patch.status ?? "unchanged" });
     res.json(merged);
   } catch (err) {
     const e = err as { status?: number; message?: string };

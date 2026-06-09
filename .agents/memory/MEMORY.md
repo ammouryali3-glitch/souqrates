@@ -16,3 +16,4 @@
 - [SKZ Bot email OTP](skz-bot-email-otp.md) — browser-login OTP sent via Resend connector (not Zoho SMTP, which IP-blocks); free tier only delivers to account-owner email until domain verified.
 - [SKZ Bot progression engine](skz-bot-progression.md) — XP/levels/leagues; server-authoritative; surface level-ups off onCreditConfirmed event (not timeouts) + monotonic refresh guard.
 - [SKZ Bot lucky wheel + loot boxes](skz-bot-wheel.md) — WHEEL_PRIZES array must be identical (same order/index) in both server lib/wheel.ts and client lib/wheel.ts; prizeIndex drives SVG animation target angle.
+- [API server security hardening](api-server-security.md) — user-ID rate limit via lib/user-auth.ts; UUIDv7 in ledger; separate ADMIN_JWT_SECRET; admin audit log via logAdminAction().
