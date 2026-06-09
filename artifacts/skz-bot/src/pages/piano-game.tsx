@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useGameTickets } from "@/lib/game-economy";
 import { getLang, t as gt } from "@/lib/i18n";
 import { GAME_TICKETS } from "@/lib/tickets-data";
+import { GameOverOverlay, GameWonOverlay } from "@/components/game-end-overlay";
 
 type Phase = "select" | "playing" | "won" | "lost";
 interface Ticket { id: string; name: string; price: number; prize: number; target: number; time: number; }
@@ -112,6 +113,7 @@ export default function PianoGame() {
   const pointerLanesRef = useRef(new Map<number, number>()); // pointerId → lane
 
   const [phase, setPhase] = useState<Phase>("select");
+  const [lostReason, setLostReason] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -351,7 +353,7 @@ export default function PianoGame() {
     const g = gameRef.current; if (!g || !g.running) return; g.running = false; startingRef.current = false;
     setBest(prev => { const n = Math.max(prev, finalScore); localStorage.setItem(BEST_KEY, String(n)); return n; });
     if (outcome === "win") { audioRef.current.goal(); const t = ticketRef.current; if (t) setBalance(prev => { const n = prev + t.prize; localStorage.setItem(BALANCE_KEY, String(n)); return n; }); notifyWin(ticketRef.current?.prize ?? 0); setPhase("won"); }
-    else { audioRef.current.gameOver(); setPhase("lost"); }
+    else { audioRef.current.gameOver(); setLostReason(outcome); setPhase("lost"); }
   }, []);
 
   const ticketRef = useRef<Ticket | null>(null);
@@ -490,6 +492,8 @@ export default function PianoGame() {
           </motion.div>
         </motion.div>
       )}</AnimatePresence>
+      <GameOverOverlay show={phase === "lost"} entryFee={ticket?.price ?? 0} score={score} target={target} balance={balance} lostReason={lostReason} onRetry={() => { setLostReason(null); setPhase("select"); }} />
+      <GameWonOverlay show={phase === "won"} prize={ticket?.prize ?? 0} score={score} target={target} balance={balance} onRetry={() => setPhase("select")} />
       {overlays}
     </div>
   );
