@@ -12,6 +12,8 @@ import { useArenaEconomy } from "@/lib/game-economy";
 import { useTelegramUser } from "@/lib/telegram-user";
 import { useLang, t } from "@/lib/i18n";
 import { createChallenge, getActiveChallenge, clearActiveChallenge, beatChallenge } from "@/lib/challenge";
+import { refreshProgression } from "@/lib/progression";
+import { refreshQuests } from "@/lib/quests";
 
 const BALANCE_KEY = "skz_balance";
 
@@ -135,6 +137,10 @@ export default function ArenaShell({ gameId, title, subtitle, icon, color, entry
 
     const serverResult = await submitScoreToServer(gameId, score, timeSec, playerName, period);
     if (serverResult) {
+      // Refresh progression + quests now that server has awarded XP and bumped quest progress.
+      refreshProgression().catch(() => null);
+      refreshQuests().catch(() => null);
+
       const fresh = await fetchLeaderboard(gameId, period);
       if (fresh) {
         setLeaders(fresh.leaders);
