@@ -88,8 +88,8 @@ jobs:
 
       - name: Write SSH key
         run: |
-          install -m 600 -D /dev/null ~/.ssh/contabo_key
-          echo "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/contabo_key
+          install -m 600 -D /dev/null ~/.ssh/id_ed25519
+          echo "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/id_ed25519
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
       - name: Sync API server to Contabo
