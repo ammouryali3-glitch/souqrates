@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount, ensureIndexes, ensureShopProducts } from "./lib/seed";
+import { seedDatabaseIfEmpty, migrateRolesConfigIfNeeded, ensureOwnerAccount, ensureIndexes, ensureShopProducts, ensureAdminSchema } from "./lib/seed";
 import { startDepositPoller } from "./lib/ton-poller";
 import { startLeaderboardResetScheduler } from "./lib/leaderboard-reset";
 import { registerWebhook } from "./routes/bot";
@@ -28,6 +28,11 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Ensure admin tables exist (self-healing for DBs missing the schema migration)
+  ensureAdminSchema().catch((err) => {
+    logger.error({ err }, "Failed to ensure admin schema");
+  });
 
   // Seed database with demo data if empty (non-blocking)
   seedDatabaseIfEmpty().catch((err) => {
