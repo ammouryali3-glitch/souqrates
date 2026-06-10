@@ -150,7 +150,7 @@ async function runBpReminders(): Promise<void> {
 
     if (notifications.lastBpAt === today) continue;
     // Only target premium battle pass holders with something at stake
-    if (!bp.premiumUnlocked) continue;
+    if (!bp.premium) continue;
 
     await callTg("sendMessage", {
       chat_id: u.id,
@@ -190,11 +190,10 @@ async function runQuestReminders(): Promise<void> {
   for (const u of users) {
     const d = u.data as Record<string, unknown>;
     const notifications = (d.notifications as Record<string, unknown> | null) ?? {};
-    const prog = (d.progression as Record<string, unknown> | null) ?? {};
 
     if (notifications.lastQuestAt === today) continue;
     // Only notify users who have actually engaged (have XP)
-    if (Number(prog.xp ?? 0) === 0) continue;
+    if (Number(d.xp ?? 0) === 0) continue;
 
     await callTg("sendMessage", {
       chat_id: u.id,
