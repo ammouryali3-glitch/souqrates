@@ -18,6 +18,7 @@
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { recordLedger } from "./ledger";
+import { bumpQuests } from "./quests";
 import {
   platformUsersTable,
   gameResultsTable as _gameResultsTable,
@@ -195,6 +196,8 @@ export async function awardPeriodWinners(
         );
         newSkz = currentSkz + prize;
 
+        const questsAfter = bumpQuests(data.quests, { skz_earned: prize }, new Date());
+
         await tx
           .update(platformUsersTable)
           .set({
@@ -204,6 +207,7 @@ export async function awardPeriodWinners(
                 ...(data.balances as Record<string, unknown> | undefined),
                 SKZ: newSkz,
               },
+              quests: questsAfter,
             },
             updatedAt: new Date(),
           })
