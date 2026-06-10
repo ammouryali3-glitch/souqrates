@@ -303,6 +303,7 @@ export const t = {
     challengePlay: "اقبل التحدي",
     challengeBeaten: "فزت! 🏆",
     challengeFailed: "لم تتفوق هذه المرة",
+    challengeSent: "تم إرسال التحدي! 🎯",
     // Misc
     langSwitch: "EN",
     play: "العب",
@@ -583,6 +584,7 @@ export const t = {
     challengePlay: "Accept Challenge",
     challengeBeaten: "You won! 🏆",
     challengeFailed: "Better luck next time",
+    challengeSent: "Challenge sent! 🎯",
     // Misc
     langSwitch: "ع",
     play: "Play",
