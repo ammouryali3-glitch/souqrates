@@ -172,7 +172,6 @@ router.post("/login", async (req: Request, res: Response) => {
 
   const normalised = handle.trim().toLowerCase().replace(/^@+/, "");
 
-  let _step = "db-select";
   try {
     const [account] = await db
       .select()
@@ -185,23 +184,19 @@ router.post("/login", async (req: Request, res: Response) => {
       return;
     }
 
-    _step = "bcrypt-compare";
     const valid = await bcrypt.compare(password, account.passwordHash);
     if (!valid) {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
 
-    _step = "jwt-sign";
     const token = signToken({ sub: account.id, handle: account.handle, role: account.role });
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
     req.log.info({ adminAudit: { adminId: account.id, adminHandle: account.handle, adminRole: account.role, action: "login", ip: req.ip } }, "admin action");
     res.json(serializeAccount(account));
   } catch (err) {
-    req.log.error({ err, _step }, "admin login error");
-    const _cause = err instanceof Error && err.cause ? String((err.cause as Error).message ?? err.cause) : undefined;
-    const _code = (err as NodeJS.ErrnoException).code;
-    res.status(500).json({ error: "Internal server error", _step, _detail: err instanceof Error ? err.message : String(err), _cause, _code });
+    req.log.error({ err }, "admin login error");
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
