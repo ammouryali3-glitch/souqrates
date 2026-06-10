@@ -124,6 +124,10 @@ router.get("/runtime-config", async (req: Request, res: Response) => {
       }
     }
 
+    // Must never be cached — Telegram WebView and browsers cache GET responses
+    // aggressively; without this header, price/config changes would be invisible
+    // to users until they clear Telegram's cache manually.
+    res.set("Cache-Control", "no-store");
     res.json({
       config: safeConfig,
       notifications: notifications.map((n) => ({

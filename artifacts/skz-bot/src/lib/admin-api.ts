@@ -41,7 +41,7 @@ export interface ApiRuntimeConfig {
  */
 export async function fetchRuntimeConfig(): Promise<ApiRuntimeConfig | null> {
   try {
-    const res = await apiFetch("/api/admin/runtime-config");
+    const res = await apiFetch("/api/admin/runtime-config", { cache: "no-store" });
     if (!res.ok) return null;
     return res.json();
   } catch {
