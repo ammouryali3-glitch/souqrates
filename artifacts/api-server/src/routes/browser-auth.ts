@@ -229,8 +229,9 @@ router.post("/claim", async (req: Request, res: Response) => {
     res.cookie(USER_COOKIE, jwtToken, COOKIE_OPTS);
     res.json({ ok: true, user: userData });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "browser-auth: claim error");
-    res.status(500).json({ error: "Claim failed" });
+    res.status(500).json({ error: "Claim failed", detail: msg });
   }
 });
 
