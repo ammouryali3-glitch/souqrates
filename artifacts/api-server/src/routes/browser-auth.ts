@@ -229,11 +229,8 @@ router.post("/claim", async (req: Request, res: Response) => {
     res.cookie(USER_COOKIE, jwtToken, COOKIE_OPTS);
     res.json({ ok: true, user: userData });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const cause = (err as Record<string,unknown>)?.cause;
-    const causeMsg = cause instanceof Error ? cause.message : String(cause ?? "");
     req.log.error({ err }, "browser-auth: claim error");
-    res.status(500).json({ error: "Claim failed", detail: msg, cause: causeMsg });
+    res.status(500).json({ error: "Claim failed" });
   }
 });
 
