@@ -1059,6 +1059,9 @@ router.post("/submit-score", async (req: Request, res: Response) => {
     const since = periodStart(safePeriod);
     let newSkz: number | null = null;
     let safeFee = 0;
+    let xpGainedResult = 0;
+    let newXpResult = 0;
+    let newLevelResult = 0;
 
     // Atomically: check existing entry, deduct fee if first play, insert result.
     // Locking the user row prevents double-charge races if two requests arrive simultaneously.
@@ -1086,10 +1089,20 @@ router.post("/submit-score", async (req: Request, res: Response) => {
       const alreadyPaid = (existingRows.rows as Array<{ id: string }>).length > 0;
       safeFee = alreadyPaid ? 0 : baseEntryFee;
 
+      // Award base XP + advance quest progress inside the same locked txn.
+      // xpForGame(0) = 10 XP base per play (score-independent so replays still reward).
+      const xpBefore = Math.max(0, Math.floor(Number(userData.xp ?? 0)));
+      const xpGained = xpForGame(0);
+      const xpAfter = xpBefore + xpGained;
+      const newLevel = progressionFromXp(xpAfter).level;
+      xpGainedResult = xpGained;
+      newXpResult = xpAfter;
+      newLevelResult = newLevel;
+      const questsAfter = bumpQuests(userData.quests, { games_played: 1 }, new Date());
+
       if (safeFee > 0) {
-        const data = userRow.data as Record<string, unknown>;
         const currentSkz = Number(
-          (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
+          (userData.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
         );
         if (currentSkz < safeFee) {
           throw Object.assign(
@@ -1098,17 +1111,22 @@ router.post("/submit-score", async (req: Request, res: Response) => {
           );
         }
         newSkz = currentSkz - safeFee;
-        const updatedData: Record<string, unknown> = {
-          ...data,
-          balances: {
-            ...(data.balances as Record<string, unknown> | undefined),
-            SKZ: newSkz,
-          },
-          lastSeen: Date.now(),
-        };
         await tx
           .update(platformUsersTable)
-          .set({ data: updatedData, updatedAt: new Date() })
+          .set({
+            data: {
+              ...userData,
+              balances: {
+                ...(userData.balances as Record<string, unknown> | undefined),
+                SKZ: newSkz,
+              },
+              xp: xpAfter,
+              level: newLevel,
+              quests: questsAfter,
+              lastSeen: Date.now(),
+            },
+            updatedAt: new Date(),
+          })
           .where(eq(platformUsersTable.id, payload.tgId));
 
         await recordLedger(tx, {
@@ -1120,6 +1138,21 @@ router.post("/submit-score", async (req: Request, res: Response) => {
           balanceAfter: newSkz,
           ref: gameId,
         });
+      } else {
+        // Replay (no fee) — still persist XP + quest progress.
+        await tx
+          .update(platformUsersTable)
+          .set({
+            data: {
+              ...userData,
+              xp: xpAfter,
+              level: newLevel,
+              quests: questsAfter,
+              lastSeen: Date.now(),
+            },
+            updatedAt: new Date(),
+          })
+          .where(eq(platformUsersTable.id, payload.tgId));
       }
 
       const id = randomBytes(12).toString("hex");
@@ -1158,7 +1191,14 @@ router.post("/submit-score", async (req: Request, res: Response) => {
       { tgId: payload.tgId, gameId, score, timeSec, period: safePeriod, feePaid: safeFee },
       "game score submitted",
     );
-    res.json({ ok: true, rank, ...(newSkz !== null ? { newSkz } : {}) });
+    res.json({
+      ok: true,
+      rank,
+      xpGained: xpGainedResult,
+      newXp: newXpResult,
+      newLevel: newLevelResult,
+      ...(newSkz !== null ? { newSkz } : {}),
+    });
   } catch (err) {
     const e = err as { status?: number; message?: string };
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
@@ -2445,8 +2485,7 @@ async function computeClanLeaderboard(limit = 10) {
     const d = u.data as Record<string, unknown>;
     const cid = typeof d.clanId === "string" ? d.clanId : null;
     if (!cid) continue;
-    const prog = (d.progression as Record<string, unknown> | null) ?? {};
-    xpMap.set(cid, (xpMap.get(cid) ?? 0) + Number(prog.xp ?? 0));
+    xpMap.set(cid, (xpMap.get(cid) ?? 0) + Number(d.xp ?? 0));
   }
 
   const sorted = [...xpMap.entries()]
@@ -2509,12 +2548,11 @@ router.get("/clan", async (req: Request, res: Response): Promise<void> => {
 
     const members = memberRows.map((m) => {
       const d = m.data as Record<string, unknown>;
-      const prog = (d.progression as Record<string, unknown> | null) ?? {};
       return {
         id: m.id,
         name: typeof d.name === "string" ? d.name : String(m.id),
-        xp: Number(prog.xp ?? 0),
-        level: Number(prog.level ?? 1),
+        xp: Number(d.xp ?? 0),
+        level: Number(d.level ?? 1),
       };
     }).sort((a, b) => b.xp - a.xp);
 
