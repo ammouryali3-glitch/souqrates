@@ -78,6 +78,24 @@ export const referrersTable = pgTable("referrers", {
 });
 
 /**
+ * Browser authentication tokens for Telegram Magic Link login.
+ * A browser requests a token → shares it with the Telegram bot → bot marks it
+ * "claimed" with the user's Telegram identity → browser exchanges it for a cookie.
+ * Tokens expire in 5 minutes; used tokens are kept briefly for audit then ignored.
+ */
+export const browserAuthTokensTable = pgTable("browser_auth_tokens", {
+  id: text("id").primaryKey(),           // 48-char hex — the magic token
+  tgId: text("tg_id"),                   // filled by bot when user confirms
+  tgName: text("tg_name"),               // Telegram first name
+  tgUsername: text("tg_username"),       // Telegram @username (nullable)
+  status: text("status", { enum: ["pending", "claimed", "used"] }).notNull().default("pending"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("browser_auth_tokens_status_exp_idx").on(t.status, t.expiresAt),
+]);
+
+/**
  * Email OTP codes for browser-based login (non-Telegram users).
  * Each row is single-use; expired or used rows are cleaned up on login.
  */

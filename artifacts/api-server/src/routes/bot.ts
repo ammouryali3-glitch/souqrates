@@ -12,7 +12,7 @@ import { Router, type Request, type Response } from "express";
 import { createHmac } from "crypto";
 import { logger } from "../lib/logger";
 import { db } from "@workspace/db";
-import { platformUsersTable, tokenPackagesTable, depositsTable } from "@workspace/db";
+import { platformUsersTable, tokenPackagesTable, depositsTable, browserAuthTokensTable } from "@workspace/db";
 import { eq, sql } from "@workspace/db";
 import { recordLedger } from "../lib/ledger";
 
@@ -223,6 +223,70 @@ function buildWelcomeMessageEn(firstName: string) {
   );
 }
 
+// ── Browser Magic Link handler ────────────────────────────────────────────────
+
+async function handleBrowserLogin(
+  chatId: number,
+  token: string,
+  from: { id: number; first_name: string; username?: string },
+): Promise<void> {
+  try {
+    const [row] = await db
+      .select()
+      .from(browserAuthTokensTable)
+      .where(eq(browserAuthTokensTable.id, token))
+      .limit(1);
+
+    if (!row || new Date(row.expiresAt) < new Date()) {
+      await callTg("sendMessage", {
+        chat_id: chatId,
+        text: "❌ رمز الدخول انتهت صلاحيته.\n\nافتح التطبيق في المتصفح واطلب رمزاً جديداً.",
+      });
+      return;
+    }
+
+    if (row.status === "used") {
+      await callTg("sendMessage", {
+        chat_id: chatId,
+        text: "⚠️ هذا الرمز تم استخدامه مسبقاً.\n\nإذا لم تكن أنت من استخدمه، اطلب رمزاً جديداً.",
+      });
+      return;
+    }
+
+    if (row.status === "claimed") {
+      await callTg("sendMessage", {
+        chat_id: chatId,
+        text: "✅ تم التحقق مسبقاً. ارجع إلى المتصفح لإكمال تسجيل الدخول.",
+      });
+      return;
+    }
+
+    // Mark as claimed with the user's Telegram identity
+    await db
+      .update(browserAuthTokensTable)
+      .set({
+        status: "claimed",
+        tgId: String(from.id),
+        tgName: from.first_name,
+        tgUsername: from.username ?? null,
+      })
+      .where(eq(browserAuthTokensTable.id, token));
+
+    await callTg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `✅ *تم التحقق من هويتك بنجاح!*\n\n` +
+        `أهلاً ${from.first_name} 👋\n\n` +
+        `ارجع إلى المتصفح — سيتم تسجيل دخولك تلقائياً خلال ثوانٍ.`,
+      parse_mode: "Markdown",
+    });
+
+    logger.info({ tgId: String(from.id), token }, "bot: browser magic-link claimed");
+  } catch (err) {
+    logger.error({ err, token }, "bot: handleBrowserLogin error");
+  }
+}
+
 // ── Command handlers ──────────────────────────────────────────────────────────
 
 async function handleStart(chatId: number, firstName: string, languageCode?: string) {
@@ -320,7 +384,13 @@ async function processUpdate(update: TgUpdate) {
   const firstName = msg.from?.first_name ?? "there";
   const langCode = msg.from?.language_code;
 
-  if (text.startsWith("/start")) {
+  if (text.startsWith("/start login_")) {
+    // Browser Magic Link: /start login_<48hextoken>
+    const loginToken = text.slice("/start login_".length).trim();
+    if (loginToken && msg.from) {
+      await handleBrowserLogin(chatId, loginToken, msg.from);
+    }
+  } else if (text.startsWith("/start")) {
     await handleStart(chatId, firstName, langCode);
   } else if (text.startsWith("/help")) {
     await handleHelp(chatId, firstName, langCode);

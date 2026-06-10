@@ -155,7 +155,9 @@ async function getCachedSettings(): Promise<Record<string, unknown>> {
 // /init is intentionally exempt so the client can still identify the user
 // and display the maintenance screen; blocking it would soft-lock the app.
 router.use(async (req: Request, res: Response, next: NextFunction) => {
-  if (req.method === "POST" && req.path === "/init") { next(); return; }
+  // /init — needed to show the maintenance screen.
+  // /browser-auth/* — login must stay open even during maintenance.
+  if ((req.method === "POST" && req.path === "/init") || req.path.startsWith("/browser-auth")) { next(); return; }
   try {
     const settings = await getCachedSettings();
     if (settings.maintenance) {
