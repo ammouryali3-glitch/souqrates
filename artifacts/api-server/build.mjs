@@ -24,6 +24,10 @@ async function buildAll() {
     logLevel: "info",
     // Some packages may not be bundleable, so we externalize them, we can add more here as needed.
     // Some of the packages below may not be imported or installed, but we're adding them in case they are in the future.
+    // PRODUCTION NOTE (Contabo deploy): the prod host may run WITHOUT a reliable node_modules
+    // (its `pnpm install --prod` can fail silently on workspace:* deps), so anything the code
+    // actually imports MUST stay bundled here. Do NOT add @aws-sdk/* back to this list — it is
+    // used by src/lib/integrations/r2.ts and externalizing it crashes prod with ERR_MODULE_NOT_FOUND.
     // Examples of unbundleable packages:
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
