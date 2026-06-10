@@ -87,6 +87,44 @@ const DEFAULT_CONFIG = {
 };
 
 /**
+ * Ensures the admin tables (admin_accounts, admin_config) exist in the database.
+ * Uses CREATE TABLE IF NOT EXISTS so it is safe to call on every startup.
+ * This is the self-healing guard for production databases that were deployed
+ * before the admin schema migration ran — it creates the tables in-process
+ * using only the existing DATABASE_URL connection, with no external tooling.
+ */
+export async function ensureAdminSchema(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS admin_accounts (
+        id                  text        PRIMARY KEY,
+        name                text        NOT NULL,
+        handle              text        NOT NULL UNIQUE,
+        role                text        NOT NULL,
+        password_hash       text        NOT NULL,
+        permissions         text[]      NOT NULL DEFAULT '{}',
+        active              boolean     NOT NULL DEFAULT true,
+        must_change_password boolean    NOT NULL DEFAULT true,
+        created_at          timestamptz NOT NULL DEFAULT now(),
+        updated_at          timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS admin_config (
+        key        text        PRIMARY KEY,
+        value      jsonb       NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    logger.info("ensureAdminSchema: tables verified");
+  } catch (err) {
+    logger.error({ err }, "ensureAdminSchema failed");
+  }
+}
+
+/**
  * Bootstrap the default owner account if no owner exists yet.
  *
  * Safe to call on every startup — it's a no-op once any owner account is
