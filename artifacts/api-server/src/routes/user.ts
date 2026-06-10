@@ -4,7 +4,7 @@
  * set after Telegram initData verification.
  */
 import { Router } from "express";
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { USER_COOKIE, signUserToken, verifyUserToken } from "../lib/user-auth";
 export type { UserTokenPayload } from "../lib/user-auth";
@@ -123,6 +123,48 @@ async function getReferralConfig(): Promise<{ l1Bonus: number }> {
   } catch { /* ignore */ }
   return { l1Bonus: 10 };
 }
+
+// ── System-rules helpers ──────────────────────────────────────────────────────
+
+/**
+ * 10-second in-process cache for admin `settings`.
+ * Avoids a DB round-trip on every protected request while still propagating
+ * admin changes (maintenance toggle, etc.) within a few seconds.
+ */
+let _settingsCache: { value: Record<string, unknown>; at: number } | null = null;
+
+async function getCachedSettings(): Promise<Record<string, unknown>> {
+  const now = Date.now();
+  if (_settingsCache && now - _settingsCache.at < 10_000) return _settingsCache.value;
+  try {
+    const [row] = await db
+      .select()
+      .from(adminConfigTable)
+      .where(eq(adminConfigTable.key, "settings"))
+      .limit(1);
+    const value = (row?.value as Record<string, unknown>) ?? {};
+    _settingsCache = { value, at: now };
+    return value;
+  } catch {
+    return _settingsCache?.value ?? {};
+  }
+}
+
+// ── Maintenance + ban middleware ───────────────────────────────────────────────
+// Runs on every /user/* request.
+// /init is intentionally exempt so the client can still identify the user
+// and display the maintenance screen; blocking it would soft-lock the app.
+router.use(async (req: Request, res: Response, next: NextFunction) => {
+  if (req.method === "POST" && req.path === "/init") { next(); return; }
+  try {
+    const settings = await getCachedSettings();
+    if (settings.maintenance) {
+      res.status(503).json({ error: "Under maintenance" });
+      return;
+    }
+  } catch { /* fail open — a DB error here must not lock everyone out */ }
+  next();
+});
 
 /** Default daily check-in reward schedule (7-day cycle, loops). */
 const DEFAULT_CHECKIN_REWARDS = [50, 75, 100, 150, 200, 300, 500];
@@ -683,6 +725,13 @@ router.post("/game-session", async (req: Request, res: Response) => {
   }
 
   try {
+    // Enforce game enabled flag before acquiring any locks
+    const { enabled } = await getGameEconomy(gameId);
+    if (!enabled) {
+      res.status(403).json({ error: "This game is currently disabled" });
+      return;
+    }
+
     const maxReward = await getEffectiveMaxReward();
     const sessionId = randomBytes(24).toString("hex");
     const now = Date.now();
@@ -699,6 +748,8 @@ router.post("/game-session", async (req: Request, res: Response) => {
       if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
 
       const data = row.data as Record<string, unknown>;
+      if (data.status === "banned") throw Object.assign(new Error("Account suspended"), { status: 403 });
+
       const existing: StoredGameSession[] = Array.isArray(data.gameSessions) ? data.gameSessions : [];
 
       // Prune expired and redeemed sessions; keep most-recent unredeemed ones.
@@ -719,6 +770,7 @@ router.post("/game-session", async (req: Request, res: Response) => {
   } catch (err) {
     const e = err as { status?: number };
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 403) { res.status(403).json({ error: "Account suspended" }); return; }
     req.log.error({ err }, "game-session error");
     res.status(500).json({ error: "Internal server error" });
   }
@@ -916,6 +968,8 @@ const DEFAULT_ENTRY_FEES: Record<string, number> = {
 interface GameEconomyConfig {
   poolShare: number;
   entryFee: number;
+  /** false only when admin has explicitly set enabled=false for this game */
+  enabled: boolean;
 }
 
 async function getGameEconomy(gameId: string): Promise<GameEconomyConfig> {
@@ -934,9 +988,11 @@ async function getGameEconomy(gameId: string): Promise<GameEconomyConfig> {
     const entryFee = typeof ov.entry === "number" && ov.entry >= 0
       ? Math.floor(ov.entry)
       : (DEFAULT_ENTRY_FEES[gameId] ?? 0);
-    return { poolShare, entryFee };
+    // enabled defaults to true; only false when admin explicitly sets it
+    const enabled = ov.enabled !== false;
+    return { poolShare, entryFee, enabled };
   } catch {
-    return { poolShare: 0.7, entryFee: DEFAULT_ENTRY_FEES[gameId] ?? 0 };
+    return { poolShare: 0.7, entryFee: DEFAULT_ENTRY_FEES[gameId] ?? 0, enabled: true };
   }
 }
 
@@ -1012,6 +1068,9 @@ router.post("/submit-score", async (req: Request, res: Response) => {
         .for("update")
         .limit(1);
       if (!userRow) throw Object.assign(new Error("user_not_found"), { status: 404 });
+
+      const userData = userRow.data as Record<string, unknown>;
+      if (userData.status === "banned") throw Object.assign(new Error("Account suspended"), { status: 403 });
 
       // First play this period = pay the fee; subsequent plays = free replays
       const existingRows = await tx.execute(sql`
@@ -1102,6 +1161,7 @@ router.post("/submit-score", async (req: Request, res: Response) => {
     const e = err as { status?: number; message?: string };
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
     if (e.status === 402) { res.status(402).json({ error: e.message ?? "Insufficient balance" }); return; }
+    if (e.status === 403) { res.status(403).json({ error: "Account suspended" }); return; }
     req.log.error({ err }, "submit-score error");
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1269,6 +1329,8 @@ router.post("/withdraw", async (req: Request, res: Response) => {
       if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
 
       const data = row.data as Record<string, unknown>;
+      if (data.status === "banned") throw Object.assign(new Error("Account suspended"), { status: 403 });
+
       const balances = (data.balances ?? {}) as Record<string, number>;
       const currentSkz = Math.floor(Number(balances.SKZ ?? 0));
 
@@ -1521,6 +1583,8 @@ router.post("/checkin", async (req: Request, res: Response) => {
       if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
 
       const data = row.data as Record<string, unknown>;
+      if (data.status === "banned") throw Object.assign(new Error("Account suspended"), { status: 403 });
+
       const balanceBefore = Math.floor(Number(
         (data.balances as Record<string, unknown> | undefined)?.SKZ ?? 0,
       ));
@@ -1582,6 +1646,7 @@ router.post("/checkin", async (req: Request, res: Response) => {
   } catch (err) {
     const e = err as { status?: number; message?: string };
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 403) { res.status(403).json({ error: "Account suspended" }); return; }
     req.log.error({ err }, "checkin error");
     res.status(500).json({ error: "Internal server error" });
   }
@@ -1934,6 +1999,8 @@ router.post("/wheel/spin", async (req: Request, res: Response) => {
       if (!row) throw Object.assign(new Error("User not found"), { status: 404 });
 
       const data = row.data as Record<string, unknown>;
+      if (data.status === "banned") throw Object.assign(new Error("Account suspended"), { status: 403 });
+
       const wheelData = (data.wheel ?? {}) as { lastSpinAt?: string; extraSpins?: number };
       const extraSpins = Math.max(0, Math.floor(Number(wheelData.extraSpins ?? 0)));
       const freeSpin = canFreeSpin(wheelData.lastSpinAt);
@@ -2011,6 +2078,7 @@ router.post("/wheel/spin", async (req: Request, res: Response) => {
     const e = err as { status?: number; message?: string };
     if (e.status === 429) { res.status(429).json({ error: e.message ?? "No spin available" }); return; }
     if (e.status === 404) { res.status(404).json({ error: "User not found" }); return; }
+    if (e.status === 403) { res.status(403).json({ error: "Account suspended" }); return; }
     req.log.error({ err }, "wheel/spin error");
     res.status(500).json({ error: "Internal server error" });
   }
