@@ -199,7 +199,9 @@ router.post("/login", async (req: Request, res: Response) => {
     res.json(serializeAccount(account));
   } catch (err) {
     req.log.error({ err, _step }, "admin login error");
-    res.status(500).json({ error: "Internal server error", _step, _detail: err instanceof Error ? err.message : String(err) });
+    const _cause = err instanceof Error && err.cause ? String((err.cause as Error).message ?? err.cause) : undefined;
+    const _code = (err as NodeJS.ErrnoException).code;
+    res.status(500).json({ error: "Internal server error", _step, _detail: err instanceof Error ? err.message : String(err), _cause, _code });
   }
 });
 
