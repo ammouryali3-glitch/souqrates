@@ -19,12 +19,12 @@ import { recordLedger } from "../lib/ledger";
 const router = Router();
 
 const TOKEN = process.env["TELEGRAM_BOT_TOKEN"] ?? "";
-const MINI_APP_URL =
-  process.env["MINI_APP_URL"] ??
-  (() => {
-    const domain = (process.env["REPLIT_DOMAINS"] ?? "").split(",")[0]?.trim();
-    return domain ? `https://${domain}/` : "";
-  })();
+// MINI_APP_URL must be explicitly set (e.g. https://souqrates.com/) on the
+// production server. We intentionally do NOT fall back to REPLIT_DOMAINS here:
+// if the dev server on Replit were allowed to derive a URL, it would call
+// setWebhook on every restart and point Telegram at the ephemeral Replit
+// preview domain, silently breaking the production bot for all users.
+const MINI_APP_URL = process.env["MINI_APP_URL"] ?? "";
 
 // ── Telegram Bot API helper ───────────────────────────────────────────────────
 
