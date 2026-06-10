@@ -132,6 +132,10 @@ export async function fetchLeaderboard(gameId: string, period: LeaderboardPeriod
 export interface SubmitScoreResult {
   ok: boolean;
   rank: number;
+  xpGained?: number;
+  newXp?: number;
+  newLevel?: number;
+  newSkz?: number;
 }
 
 /**
