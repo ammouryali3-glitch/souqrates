@@ -289,6 +289,15 @@ async function handleBrowserLogin(
 
 // ── Command handlers ──────────────────────────────────────────────────────────
 
+function makeAppButton(isArabic: boolean, label?: string): Record<string, unknown> {
+  const btnText = label ?? (isArabic ? "🚀 فتح Souqrates System" : "🚀 Open Souqrates System");
+  if (MINI_APP_URL) {
+    return { text: btnText, web_app: { url: MINI_APP_URL } };
+  }
+  // Fallback: plain URL button when MINI_APP_URL is not configured
+  return { text: btnText, url: "https://souqrates.com" };
+}
+
 async function handleStart(chatId: number, firstName: string, languageCode?: string) {
   const isArabic = !languageCode || languageCode.startsWith("ar");
   const text = isArabic ? buildWelcomeMessage(firstName) : buildWelcomeMessageEn(firstName);
@@ -298,14 +307,7 @@ async function handleStart(chatId: number, firstName: string, languageCode?: str
     text,
     parse_mode: "Markdown",
     reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: isArabic ? "🚀 فتح Souqrates System" : "🚀 Open Souqrates System",
-            web_app: { url: MINI_APP_URL },
-          },
-        ],
-      ],
+      inline_keyboard: [[makeAppButton(isArabic)]],
     },
   });
 }
@@ -331,14 +333,7 @@ async function handleHelp(chatId: number, _firstName: string, languageCode?: str
     text,
     parse_mode: "Markdown",
     reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: isArabic ? "🎮 فتح التطبيق" : "🎮 Open App",
-            web_app: { url: MINI_APP_URL },
-          },
-        ],
-      ],
+      inline_keyboard: [[makeAppButton(isArabic, isArabic ? "🎮 فتح التطبيق" : "🎮 Open App")]],
     },
   });
 }
