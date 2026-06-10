@@ -1,9 +1,12 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw, Coins, Trophy, Skull } from "lucide-react";
+import { RotateCcw, Coins, Skull, Share2, CheckCircle2 } from "lucide-react";
 import { useLang, t } from "@/lib/i18n";
 import { hapticImpact, hapticSuccess } from "@/lib/haptics";
+import { sfx } from "@/lib/sound";
+import { createChallenge } from "@/lib/challenge";
+import { ALL_GAMES } from "@/lib/games-data";
 
 interface GameOverOverlayProps {
   show: boolean;
@@ -109,10 +112,43 @@ interface GameWonOverlayProps {
 export function GameWonOverlay({ show, prize, score, target, balance, onRetry }: GameWonOverlayProps) {
   const lang = useLang();
   const s = t[lang];
+  const [location] = useLocation();
+  const [challenging, setChallenging] = useState(false);
+  const [challengeSent, setChallengeSent] = useState(false);
 
   useEffect(() => {
-    if (show) hapticSuccess();
+    if (show) {
+      hapticSuccess();
+      setChallengeSent(false);
+    }
   }, [show]);
+
+  // Derive game def from current route e.g. /games/stack → "stack"
+  const gameMatch = location.match(/^\/games\/(\w+)/);
+  const gameId = gameMatch?.[1] ?? null;
+  const gameDef = gameId ? ALL_GAMES.find((g) => g.id === gameId) : null;
+
+  const handleChallenge = async () => {
+    if (!gameId || !gameDef || challenging) return;
+    setChallenging(true);
+    hapticImpact("medium");
+    try {
+      const result = await createChallenge(gameId, gameDef.title, score);
+      setChallengeSent(true);
+      hapticSuccess();
+      sfx.coin();
+      type TelegramWebApp = { openTelegramLink?: (u: string) => void; openLink?: (u: string) => void };
+      const twa = (window as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+      if (twa?.openTelegramLink) {
+        twa.openTelegramLink(result.shareUrl);
+      } else if (twa?.openLink) {
+        twa.openLink(result.shareUrl);
+      } else {
+        try { await navigator.clipboard.writeText(result.shareUrl); } catch { /* ignore */ }
+      }
+    } catch { /* silent */ }
+    setChallenging(false);
+  };
 
   return (
     <AnimatePresence>
@@ -182,6 +218,32 @@ export function GameWonOverlay({ show, prize, score, target, balance, onRetry }:
               <RotateCcw size={17} />
               {s.gamePlayAgain}
             </button>
+
+            {/* Challenge button — visible only for skill game routes */}
+            {gameDef && !challengeSent && (
+              <button
+                onClick={handleChallenge}
+                disabled={challenging}
+                className="w-full py-3 rounded-2xl font-display font-bold tracking-widest flex items-center justify-center gap-2 mb-3 active:scale-95 transition-transform disabled:opacity-50"
+                style={{
+                  background: "rgba(124,58,237,0.18)",
+                  border: "1px solid rgba(139,92,246,0.4)",
+                  color: "#a78bfa",
+                }}
+              >
+                {challenging ? (
+                  <div className="w-4 h-4 border-2 rounded-full animate-spin border-violet-400/30 border-t-violet-400" />
+                ) : (
+                  <><Share2 size={16} /> {s.challengeCreate}</>
+                )}
+              </button>
+            )}
+            {challengeSent && (
+              <div className="flex items-center justify-center gap-1.5 text-sm mb-3" style={{ color: "#34d399" }}>
+                <CheckCircle2 size={14} />
+                <span>{s.challengeSent}</span>
+              </div>
+            )}
 
             <Link href="/games">
               <button className="text-sm text-white/40 hover:text-white/70 transition-colors font-medium">
