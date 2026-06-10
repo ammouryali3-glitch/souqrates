@@ -41,6 +41,13 @@ function signUserToken(userId: string): string {
 
 const connectors = new ReplitConnectors();
 
+// Direct Resend REST API key. PREFERRED in production (Contabo) because the
+// Replit connector SDK cannot authenticate outside a Repl (it needs the
+// `replit identity` CLI or REPL_IDENTITY/WEB_REPL_RENEWAL env vars, none of
+// which exist on Contabo). When RESEND_API_KEY is set we call api.resend.com
+// directly; otherwise we fall back to the Replit connector (dev on Replit).
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
 // "from" address. With a fresh Resend account use the shared onboarding sender;
 // once souqrates.com is verified in Resend, set RESEND_FROM to a branded address
 // e.g. "Souqrates System <noreply@souqrates.com>".
@@ -64,20 +71,40 @@ function otpEmailHtml(code: string): string {
   `;
 }
 
-// Sends the OTP email via the Resend connector. Throws on failure.
+// Sends the OTP email. Throws on failure.
+// Preferred path: direct Resend REST API (works on any host, including Contabo).
+// Fallback path: Replit Resend connector (Replit-hosted dev only).
 async function sendOtpEmail(to: string, code: string): Promise<void> {
+  const payload = {
+    from: RESEND_FROM,
+    to: [to],
+    subject: "رمز تسجيل الدخول — Souqrates",
+    html: otpEmailHtml(code),
+  };
+
+  if (RESEND_API_KEY) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`Resend API send failed (${response.status}): ${detail}`);
+    }
+    return;
+  }
+
   const response = await connectors.proxy("resend", "/emails", {
     method: "POST",
-    body: {
-      from: RESEND_FROM,
-      to: [to],
-      subject: "رمز تسجيل الدخول — Souqrates",
-      html: otpEmailHtml(code),
-    },
+    body: payload,
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`Resend send failed (${response.status}): ${detail}`);
+    throw new Error(`Resend connector send failed (${response.status}): ${detail}`);
   }
 }
 
