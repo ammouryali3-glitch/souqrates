@@ -29,35 +29,19 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // Ensure admin tables exist (self-healing for DBs missing the schema migration)
-  ensureAdminSchema().catch((err) => {
-    logger.error({ err }, "Failed to ensure admin schema");
-  });
-
-  // Seed database with demo data if empty (non-blocking)
-  seedDatabaseIfEmpty().catch((err) => {
-    logger.error({ err }, "Failed to seed database");
-  });
-
-  // Fix roles config shape from old object-permissions format to AdminRole[]
-  migrateRolesConfigIfNeeded().catch((err) => {
-    logger.error({ err }, "Failed to migrate roles config");
-  });
-
-  // Ensure a working owner account exists (idempotent; bootstraps fresh DBs)
-  ensureOwnerAccount().catch((err) => {
-    logger.error({ err }, "Failed to ensure owner account");
-  });
-
-  // Ensure functional (expression) indexes that Drizzle schema DSL can't express
-  ensureIndexes().catch((err) => {
-    logger.error({ err }, "Failed to ensure indexes");
-  });
-
-  // Seed default shop products (books, courses, templates) if none exist yet
-  ensureShopProducts().catch((err) => {
-    logger.error({ err }, "Failed to seed shop products");
-  });
+  // Run startup tasks sequentially where ordering matters:
+  // 1. Ensure schema tables exist FIRST (creates admin_accounts / admin_config if missing).
+  // 2. Then seed / bootstrap data that depends on those tables.
+  // The rest (indexes, products, roles migration) are independent and fire in parallel.
+  ensureAdminSchema()
+    .then(() => Promise.all([
+      seedDatabaseIfEmpty().catch((err) => logger.error({ err }, "Failed to seed database")),
+      migrateRolesConfigIfNeeded().catch((err) => logger.error({ err }, "Failed to migrate roles config")),
+      ensureOwnerAccount().catch((err) => logger.error({ err }, "Failed to ensure owner account")),
+      ensureIndexes().catch((err) => logger.error({ err }, "Failed to ensure indexes")),
+      ensureShopProducts().catch((err) => logger.error({ err }, "Failed to seed shop products")),
+    ]))
+    .catch((err) => logger.error({ err }, "Failed to ensure admin schema"));
 
   // Start the blockchain deposit poller (non-blocking; log errors but keep server alive)
   try {
